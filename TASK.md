@@ -148,8 +148,8 @@ para preparar o próprio dossiê é permitida; alteração de código da tarefa 
 **Objetivo:** garantir que o pacote compile, instale, rode testes reproduzivelmente
 e não anuncie capacidades inexistentes.
 
-**Status da fase:** `in_progress` — F0.0 a F0.5 concluídas; próxima tarefa: F0.6, que permanece
-`pending` até seu próprio gate de defensabilidade ser comprovado e marcado como `READY`.
+**Status da fase:** `in_progress` — F0.0 a F0.5 concluídas; F0.6 está em execução remota. O primeiro
+run comprovou `EXE001` somente no Linux; a correção mínima F0.6-R1 foi congelada e validada localmente.
 
 ### Coordenação e ambiente observado
 
@@ -158,7 +158,7 @@ e não anuncie capacidades inexistentes.
 | **Executor ativo** | `Codex` — responsável por implementar, validar, manter checkpoints e criar commits locais |
 | **Auditor/revisor** | `Antigravity` — somente-leitura por padrão; só edita quando o usuário solicitar explicitamente ou transferir a execução |
 | **Workspace** | `C:\Users\walla\OneDrive\Desktop\ai-engineering-harness` |
-| **Git** | `available` — branch de execução `phase/f0-baseline`, criada a partir de `main`/`origin/main` no baseline `6eef8e0`; remote `https://github.com/Wf-ops1/Harnessinfra.git` |
+| **Git** | `available` — `phase/f0-baseline` publicada e acompanhando `origin/phase/f0-baseline`; primeiro commit remoto validado `56b104fd1158bd3af35de28f686140b65b61c5ac`; `main` e tags não foram alteradas |
 | **python_command** | `& 'C:\Users\walla\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe'` — Python `3.12.13` |
 | **uv_command** | `& '.\build\f0.6-tools\uv\bin\uv.exe'` — uv `0.11.32` restaurado de forma isolada/ignorada, sem PATH ou instalação global; `lock --check` e `sync --all-extras --locked` verdes |
 | **Dependências do projeto** | `.venv` sincronizada pelo uv com Python 3.12.13 e `uv.lock`; 73 testes + 6 subtests, mypy em 86 arquivos, ruff, compileall, build e smoke isolado da wheel verdes |
@@ -916,7 +916,7 @@ defensibility:
 
 | Campo | Detalhe |
 |-------|---------|
-| **Status** | `in_progress` — implementação local validada; execução remota e branch protection permanecem obrigatórias |
+| **Status** | `in_progress` — primeiro run remoto concluído com falha Linux diagnosticada; correção F0.6-R1 validada localmente; novo run e branch protection permanecem obrigatórios |
 | **Objetivo** | Pipeline automatizado impede merge com falhas em encoding, lint, tipos, testes ou build |
 | **Arquivos envolvidos** | `.github/workflows/*.yml` (ou equivalente CI) |
 | **Implementação esperada** | Pipeline Windows + Linux com jobs: encoding/compileall; ruff; mypy; testes unitários; E2E locais; build da wheel; instalação e smoke test. Merge bloqueado quando job obrigatório falha |
@@ -928,10 +928,10 @@ defensibility:
 
 | Campo | Estado atual |
 |---|---|
-| **Gate** | `READY → LOCAL_VALIDATED` — todos os critérios locais passaram; critérios remotos ainda pendentes |
+| **Gate** | `REMOTE_FAILED_DIAGNOSED → CORRECTION_LOCAL_VALIDATED` — `EXE001` comprovado no Ubuntu; correção mínima preparada sem alterar conteúdo Python ou reduzir gates |
 | **Checkpoint de rollback** | `checkpoint/f0.5-complete` → `7cd6d81137b64914b8f53f6067f76f42cfde2711` |
 | **Checkpoint de liberação** | `checkpoint/f0.6-ready` — tag criada no commit deste dossiê antes do primeiro workflow |
-| **Fronteira externa** | Nenhum push, PR ou branch protection autorizado nesta tarefa local; F0.6 não pode ser `completed` sem execução remota Windows/Linux e proteção comprovada |
+| **Fronteira externa** | Publicação somente de `phase/f0-baseline` autorizada e executada; `main`, tags, PR e branch protection não foram alterados; F0.6 não pode ser `completed` sem execução remota verde e proteção comprovada |
 
 ```yaml
 defensibility:
@@ -1056,6 +1056,24 @@ defensibility:
       que o workflow/regras voltaram ao último estado conhecido
 ```
 
+#### Recongelamento F0.6-R1 — shebang e bit executável no Linux
+
+O primeiro run remoto da F0.6 comprovou uma divergência objetiva que o filesystem Windows não
+consegue reproduzir: `compiler/compile.py` começa com shebang, mas o índice Git o publicou com modo
+`100644`. O Ruff 0.16.1 aplica `EXE001` no Ubuntu e encerra o job de lint com exit 1.
+
+| Campo | Decisão congelada |
+|---|---|
+| **Problema comprovado** | Run `30878935976`, jobs Ubuntu `91895938462` (Python 3.11) e `91895938420` (Python 3.14): etapa `Lint` falhou com `EXE001 Shebang is present but file is not executable` em `compiler/compile.py:1:1` |
+| **Comportamento preservado** | Conteúdo Python, shebang, CLI do compilador, regras Ruff, matriz Windows/Linux e todos os demais gates permanecem inalterados |
+| **Escopo adicional permitido** | Somente metadata Git de `compiler/compile.py`, de `100644` para `100755`, e este registro em `TASK.md` |
+| **Explicitamente proibido** | Remover o shebang; adicionar `noqa`; ignorar `EXE001`; excluir `compiler/`; retirar Ubuntu; reduzir matriz ou gates |
+| **Critério local** | `git ls-files --stage compiler/compile.py` mostra `100755`; blob/hash do conteúdo não muda; Ruff, testes focados e `git diff --check` permanecem verdes |
+| **Critério remoto** | Novo run no commit corrigido conclui os 4 quality, 4 tests, 2 package e `CI required` com `success` |
+| **Rollback** | Antes do commit: `git update-index --chmod=-x compiler/compile.py`; depois do commit/push: `git revert <commit-da-correção>` pelo mesmo fluxo autorizado |
+
+Evidência remota: <https://github.com/Wf-ops1/Harnessinfra/actions/runs/30878935976>.
+
 #### Resultado local e handoff parcial da F0.6
 
 | Verificação local | Resultado |
@@ -1068,6 +1086,15 @@ defensibility:
 | Build | exit 0; wheel e sdist geradas |
 | Smoke isolado da wheel | exit 0; metadata=`0.1.0`, package=`0.1.0`, CLI=`harness, version 0.1.0`; import fora do checkout |
 | Contrato CI | quality/tests em Windows+Linux e Python 3.11/3.14; package em ambos SOs/Python 3.12; actions pinadas; `CI required` fail-closed |
+
+| Primeiro run remoto | Resultado |
+|---|---|
+| Run | [`30878935976`](https://github.com/Wf-ops1/Harnessinfra/actions/runs/30878935976), commit `56b104fd1158bd3af35de28f686140b65b61c5ac` |
+| Testes | 4/4 jobs `success` em Ubuntu/Windows e Python 3.11/3.14 |
+| Pacote | 2/2 jobs `success` em Ubuntu/Windows e Python 3.12, incluindo build e smoke da wheel |
+| Qualidade Windows | 2/2 jobs `success` em Python 3.11/3.14 |
+| Qualidade Ubuntu | 2/2 jobs `failure` somente no lint: `EXE001` em `compiler/compile.py:1:1` |
+| Aggregate | `CI required` concluiu `failure`, provando comportamento fail-closed quando quality falha |
 
 | Pergunta obrigatória | Resposta local F0.6 |
 |---|---|
@@ -1087,12 +1114,12 @@ defensibility:
 
 **Aceite remoto ainda pendente — F0.6 não está concluída:**
 
-1. publicar a branch `phase/f0-baseline` no `origin`;
-2. observar 4 jobs quality, 4 jobs tests, 2 jobs package e o aggregate `CI required`;
-3. corrigir qualquer divergência Windows/Linux sem reduzir matriz ou gates;
-4. abrir PR para `main` e configurar `CI required` como status check obrigatório;
-5. comprovar com PR controlado que uma falha obrigatória impede merge;
-6. somente então marcar F0.6 e Fase 0 como `completed` e criar `checkpoint/f0.6-complete`.
+1. [x] publicar somente a branch `phase/f0-baseline` no `origin`;
+2. [x] observar o primeiro conjunto de 4 quality, 4 tests, 2 package e o aggregate `CI required`;
+3. [ ] publicar a correção F0.6-R1 e comprovar novo run integralmente verde, sem reduzir matriz ou gates;
+4. [ ] com nova autorização, abrir PR para `main` e configurar `CI required` como status check obrigatório;
+5. [ ] comprovar com PR controlado que uma falha obrigatória impede merge;
+6. [ ] somente então marcar F0.6 e Fase 0 como `completed` e criar `checkpoint/f0.6-complete`.
 
 ---
 
@@ -1159,13 +1186,13 @@ defensibility:
 ```
 Data:              2026-08-04
 Fase:              F0
-Tarefa:            F0.6 — CI mínima, implementação local
-Estado:            in_progress — local validated; aceite remoto pendente
-Arquivos alterados: .github/workflows/ci.yml; tests/ci/smoke_wheel.py; tests/unit/test_ci_workflow.py; README.md; TASK.md
-Validações:         lock/sync; 12 testes focados + 6 subtests; suíte 73 + 6; mypy 86; ruff/compileall/diff check; build e wheel smoke isolado — todos verdes
+Tarefa:            F0.6-R1 — corrigir divergência comprovada no lint Linux
+Estado:            in_progress — primeiro run remoto falhou de modo seguro; correção local validada
+Arquivos alterados: metadata Git de compiler/compile.py (100644 → 100755); TASK.md
+Validações:         blob Python inalterado; modo staged 100755; 12 testes focados + 6 subtests; ruff; compileall; diff check — todos verdes
 Checkpoint:         checkpoint/f0.6-local-validated na branch phase/f0-baseline; rollback em checkpoint/f0.6-ready e checkpoint/f0.5-complete
-Observação:         nenhum push/PR/configuração GitHub executado; F0.6 e Fase 0 permanecem in_progress
-Resultado:          workflow local fail-closed pronto para ser publicado e validado em 10 matrizes + aggregate
+Observação:         branch publicada; main/tags/PR/branch protection intactos; run 30878935976 falhou somente por EXE001 no Ubuntu
+Resultado:          CI provou 8 jobs verdes, 2 quality Ubuntu vermelhos e aggregate fail-closed; correção mínima pronta para commit/push
 ```
 
 ---
@@ -1173,11 +1200,11 @@ Resultado:          workflow local fail-closed pronto para ser publicado e valid
 ## 11. Próxima Ação Exata
 
 ```text
-VALIDAR F0.6 REMOTAMENTE — EXIGE AUTORIZAÇÃO EXPLÍCITA:
-1. Criar e confirmar checkpoint/f0.6-local-validated no commit local já testado.
-2. Com autorização, publicar somente phase/f0-baseline no origin; não alterar main nem tags.
-3. Acompanhar todos os jobs GitHub até conclusão e registrar URLs/resultados.
-4. Se houver falha, reproduzir/corrigir localmente com recongelamento; não reduzir matriz/gates.
+CONCLUIR A CORREÇÃO REMOTA F0.6-R1:
+1. Confirmar no diff que compiler/compile.py muda somente de modo 100644 para 100755 e que TASK.md registra o recongelamento.
+2. Criar commit da correção na phase/f0-baseline e publicar somente essa branch; não alterar main nem tags.
+3. Acompanhar o novo run até os 4 quality, 4 tests, 2 package e CI required concluírem success.
+4. Registrar URL, commit e resultados finais neste painel.
 5. Com nova autorização, abrir PR e configurar CI required como check obrigatório de main.
 6. Provar bloqueio de merge com falha controlada e depois restaurar a branch de teste.
 7. Somente após todos os critérios remotos marcar F0.6/Fase 0 completed e criar checkpoint/f0.6-complete.
