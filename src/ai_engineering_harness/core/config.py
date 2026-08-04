@@ -9,9 +9,9 @@ Ordem de Precedência (Menor para Maior):
 6. Argumentos da CLI (Maior Prioridade)
 """
 
-import os
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
+
 import yaml
 
 try:
@@ -19,7 +19,7 @@ try:
 except ImportError:
     import tomli as tomllib  # type: ignore
 
-def deep_merge(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
+def deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
     """Realiza o merge recursivo de dicionários."""
     merged = dict(base)
     for key, value in override.items():
@@ -32,15 +32,15 @@ def deep_merge(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]
 class ConfigResolver:
     """Carrega e mescla a configuração efetiva do motor em 6 níveis."""
 
-    def __init__(self, project_root: Optional[Path] = None):
+    def __init__(self, project_root: Path | None = None):
         self.project_root = project_root or Path.cwd()
 
     def resolve(
         self,
         profile_name: str = "default",
-        cli_overrides: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
-        config: Dict[str, Any] = {}
+        cli_overrides: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
+        config: dict[str, Any] = {}
 
         # 1. Defaults do Pacote
         package_defaults = {

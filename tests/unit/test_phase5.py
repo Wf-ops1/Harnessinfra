@@ -2,10 +2,14 @@
 
 import json
 from pathlib import Path
+
 import pytest
+
 from ai_engineering_harness.compiler.compiler import GraphCompiler
-from ai_engineering_harness.verification.evaluator import VerificationEvaluator
 from ai_engineering_harness.verification.engine import VerificationEngine
+from ai_engineering_harness.verification.evaluator import VerificationEvaluator
+from ai_engineering_harness.versioning import ARTIFACT_SCHEMA_VERSION, PACKAGE_VERSION
+
 
 def test_compiler_governed_loops_success(tmp_path: Path):
     yaml_spec = tmp_path / "valid_graph.yaml"
@@ -25,7 +29,11 @@ nodes:
 
     compiled_data = json.loads(output.read_text(encoding="utf-8"))
     assert compiled_data["header"]["workflow"] == "valid_workflow"
-    assert compiled_data["header"]["artifact_schema_version"] == "1.0"
+    assert compiled_data["header"]["artifact_schema_version"] == ARTIFACT_SCHEMA_VERSION
+    assert compiled_data["header"]["package_version"] == PACKAGE_VERSION
+    assert compiled_data["header"]["compiler_version"] == PACKAGE_VERSION
+    assert compiled_data["header"]["runtime_adapter_version"] == PACKAGE_VERSION
+    assert "harness_version" not in compiled_data["header"]
 
 def test_compiler_ungoverned_loop_rejection(tmp_path: Path):
     yaml_spec = tmp_path / "invalid_graph.yaml"

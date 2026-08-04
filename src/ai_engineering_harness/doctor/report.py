@@ -1,9 +1,10 @@
 """Formatador gráfico do relatório do harness doctor."""
 
 import sys
-from typing import List
+
 from rich.console import Console
 from rich.table import Table
+
 from ai_engineering_harness.doctor.probes import ComponentProbeResult
 
 console = Console()
@@ -12,7 +13,7 @@ class DoctorReport:
     """Gera saída amigável no terminal para o harness doctor."""
 
     @classmethod
-    def render(cls, results: List[ComponentProbeResult]) -> None:
+    def render(cls, results: list[ComponentProbeResult]) -> None:
         table = Table(title="Diagnóstico do AI-Engineering-Harness (Probe de 6 Estágios)")
         table.add_column("Componente", style="cyan", no_wrap=True)
         table.add_column("Status", style="bold")

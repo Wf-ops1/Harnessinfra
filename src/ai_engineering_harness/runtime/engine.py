@@ -1,21 +1,22 @@
 """Runtime Engine orquestrador de workflows agentic."""
 
 import json
-import yaml
 from pathlib import Path
-from typing import Dict, Any, Optional
-from ai_engineering_harness.runtime.state_machine import WorkflowStateMachine, WorkflowState
-from ai_engineering_harness.runtime.maf_adapter import MAFAdapter
-from ai_engineering_harness.runtime.agent_executor import AgentExecutor
-from ai_engineering_harness.runtime.context_assembler import ContextAssembler, InsufficientContextError
-from ai_engineering_harness.runtime.planner import Planner
-from ai_engineering_harness.runtime.promotion_manager import PromotionManager
-from ai_engineering_harness.models.router import ModelRouter
-from ai_engineering_harness.tools.router import ToolRouter
+
+import yaml
+
 from ai_engineering_harness.governance.approval import ApprovalManager
-from ai_engineering_harness.verification.engine import VerificationEngine
 from ai_engineering_harness.indexer.codebase_memory_adapter import CodebaseMemoryAdapter
 from ai_engineering_harness.knowledge.synchronizer import KnowledgeSynchronizer
+from ai_engineering_harness.models.router import ModelRouter
+from ai_engineering_harness.runtime.agent_executor import AgentExecutor
+from ai_engineering_harness.runtime.context_assembler import ContextAssembler, InsufficientContextError
+from ai_engineering_harness.runtime.maf_adapter import MAFAdapter
+from ai_engineering_harness.runtime.planner import Planner
+from ai_engineering_harness.runtime.promotion_manager import PromotionManager
+from ai_engineering_harness.runtime.state_machine import WorkflowState, WorkflowStateMachine
+from ai_engineering_harness.tools.router import ToolRouter
+from ai_engineering_harness.verification.engine import VerificationEngine
 
 
 class RuntimeEngine:
@@ -37,8 +38,8 @@ class RuntimeEngine:
             try:
                 data = yaml.safe_load(policy_file.read_text(encoding="utf-8")) or {}
                 return int(data.get("model_routing", {}).get("retry_max", 3))
-            except Exception:
-                pass
+            except (OSError, TypeError, ValueError, yaml.YAMLError):
+                return 3
         return 3
 
     def _get_active_gates(self) -> list:
@@ -65,15 +66,15 @@ class RuntimeEngine:
                     data = yaml.safe_load(policy_file.read_text(encoding="utf-8")) or {}
                     gates = data.get("required_gates", [])
                     return [g["id"] for g in gates if isinstance(g, dict) and "id" in g]
-                except Exception:
-                    pass
+                except (OSError, TypeError, ValueError, yaml.YAMLError):
+                    return []
         # Sem política encontrada → sem gates obrigatórios
         return []
 
 
     def run_workflow(self, compiled_maf_path: Path, approval_required: bool = False, intent: str = "Execute workflow") -> WorkflowState:
         # 1. Carregar MAF JSON
-        artifact = MAFAdapter.load_and_validate(compiled_maf_path)
+        MAFAdapter.load_and_validate(compiled_maf_path)
 
         # 2. Context Assembly
         self.fsm.transition_to(WorkflowState.CONTEXT_ASSEMBLING)
@@ -104,7 +105,7 @@ class RuntimeEngine:
                 # Repair loop: re-executa a partir de EXECUTING após gate failure
                 self.fsm.transition_to(WorkflowState.EXECUTING)
 
-            res = executor.execute_node(f"Implementar história de usuário: {intent} (tentativa {attempt + 1})")
+            executor.execute_node(f"Implementar história de usuário: {intent} (tentativa {attempt + 1})")
 
             # 5. Verifying — usa resultado REAL do VerificationEngine
             self.fsm.transition_to(WorkflowState.VERIFYING)

@@ -1,7 +1,8 @@
 """Context Sufficiency Evaluator (Avaliador de Suficiência de Contexto)."""
 
-from typing import Dict
+
 from ai_engineering_harness.contracts.nodes import ContextSufficiencyReport
+
 
 class ContextSufficiencyEvaluator:
     """Calcula a pontuação de suficiência de contexto e compara com o limiar do perfil."""
@@ -9,7 +10,7 @@ class ContextSufficiencyEvaluator:
     @classmethod
     def evaluate(
         cls,
-        dimensions: Dict[str, float],
+        dimensions: dict[str, float],
         required_threshold: float = 0.72
     ) -> ContextSufficiencyReport:
         """Calcula a média ponderada das dimensões (KIs, AST, Requisitos)."""

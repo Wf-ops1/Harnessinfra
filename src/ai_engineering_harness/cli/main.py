@@ -1,25 +1,27 @@
 """Interface CLI unificada final com todos os subcomandos do AI-Engineering-Harness."""
 
-import sys
 import json
-import uuid
 import shutil
-from datetime import datetime, timezone
+import sys
+import uuid
+from datetime import UTC, datetime
 from pathlib import Path
+
 import click
 from rich.console import Console
 from rich.table import Table
-from ai_engineering_harness.doctor.checker import DoctorChecker
-from ai_engineering_harness.doctor.report import DoctorReport
+
+from ai_engineering_harness import __version__
+from ai_engineering_harness.cli.commands.rollback import RollbackManager
 from ai_engineering_harness.compiler.compiler import GraphCompiler
 from ai_engineering_harness.compiler.visualizer import GraphVisualizer
-from ai_engineering_harness.indexer.codebase_memory_adapter import CodebaseMemoryAdapter
-from ai_engineering_harness.verification.engine import VerificationEngine
-from ai_engineering_harness.observability.audit import AuditTrailManager
-from ai_engineering_harness.cli.commands.rollback import RollbackManager
+from ai_engineering_harness.doctor.checker import DoctorChecker
+from ai_engineering_harness.doctor.report import DoctorReport
 from ai_engineering_harness.governance.approval import ApprovalManager
+from ai_engineering_harness.indexer.codebase_memory_adapter import CodebaseMemoryAdapter
+from ai_engineering_harness.observability.audit import AuditTrailManager
 from ai_engineering_harness.runtime.engine import RuntimeEngine
-from ai_engineering_harness.core.config import ConfigResolver
+from ai_engineering_harness.verification.engine import VerificationEngine
 
 console = Console()
 
@@ -30,8 +32,8 @@ def _get_symbol(success: bool) -> str:
         return "✔ " if supports_unicode else "[OK] "
     return "✖ " if supports_unicode else "[FAIL] "
 
-@click.group(help="AI-Engineering-Harness — Motor Agentic Autônomo e Instalável")
-@click.version_option(version="0.1.0", prog_name="harness")
+@click.group(help="AI-Engineering-Harness - Motor Agentic Autônomo e Instalável")
+@click.version_option(version=__version__, prog_name="harness")
 def main():
     pass
 
@@ -72,7 +74,7 @@ def init():
 
 @main.command(help="Executa os probes de diagnóstico de saúde em 6 estágios.")
 def doctor():
-    console.print("[bold blue]harness doctor[/bold blue] — Executando Probes Seguros de Saúde...")
+    console.print("[bold blue]harness doctor[/bold blue] - Executando Probes Seguros de Saúde...")
     checker = DoctorChecker(config={})
     results = checker.check_all()
     DoctorReport.render(results)
@@ -103,11 +105,11 @@ def index():
 @click.option("--approval-required", is_flag=True, help="Requer aprovação humana prévia para promoção.")
 def run(workflow_name, approval_required):
     project_root = Path.cwd()
-    timestamp_str = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
+    timestamp_str = datetime.now(UTC).strftime("%Y%m%d%H%M%S")
     short_hash = uuid.uuid4().hex[:6]
     execution_id = f"exec-{timestamp_str}-{short_hash}"
 
-    console.print(f"[bold green]harness run {workflow_name}[/bold green] — Execução iniciada. ID: [bold cyan]{execution_id}[/bold cyan]")
+    console.print(f"[bold green]harness run {workflow_name}[/bold green] - Execução iniciada. ID: [bold cyan]{execution_id}[/bold cyan]")
 
     # Verificar se a especificação compilada existe ou auto-compilar
     compiled_dir = project_root / ".harness" / "state" / "compiled"
@@ -181,9 +183,9 @@ def inspect(execution_id):
     approval_status = approval_mgr.get_approval_status(execution_id) or "NENHUMA"
 
     console.print(f"[bold cyan]Inspeção Detalhada da Execução {execution_id}:[/bold cyan]")
-    console.print(f"  • [bold]Estado FSM:[/bold] {fsm_state}")
-    console.print(f"  • [bold]Integridade Hash Chain:[/bold] [{'green' if is_valid else 'red'}]{msg}[/{'green' if is_valid else 'red'}]")
-    console.print(f"  • [bold]Status de Aprovação:[/bold] {approval_status}")
+    console.print(f"  - [bold]Estado FSM:[/bold] {fsm_state}")
+    console.print(f"  - [bold]Integridade Hash Chain:[/bold] [{'green' if is_valid else 'red'}]{msg}[/{'green' if is_valid else 'red'}]")
+    console.print(f"  - [bold]Status de Aprovação:[/bold] {approval_status}")
 
 @main.command(help="Aprova manualmente a promoção de alterações em estado AWAITING_APPROVAL.")
 @click.argument("execution_id")

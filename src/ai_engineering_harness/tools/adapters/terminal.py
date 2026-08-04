@@ -1,13 +1,14 @@
 """Adaptador para execução segura de comandos no terminal sandbox."""
 
 import subprocess
-from typing import Dict, Any
+from typing import Any
+
 
 class TerminalAdapter:
     """Executor controlado no Terminal Sandbox."""
 
     @classmethod
-    def run_command(cls, command: str, cwd: str, timeout: int = 30) -> Dict[str, Any]:
+    def run_command(cls, command: str, cwd: str, timeout: int = 30) -> dict[str, Any]:
         """Executa um comando de shell capturando stdout e exit code."""
         try:
             res = subprocess.run(
@@ -15,6 +16,7 @@ class TerminalAdapter:
                 shell=True,
                 cwd=cwd,
                 capture_output=True,
+                check=False,
                 text=True,
                 timeout=timeout
             )

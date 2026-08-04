@@ -1,7 +1,9 @@
 """Testes unitários para validar a estrutura do pacote e templates de defaults."""
 
 from pathlib import Path
+
 import click.testing
+
 from ai_engineering_harness.cli.main import main
 
 

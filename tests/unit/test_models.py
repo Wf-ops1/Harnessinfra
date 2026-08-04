@@ -1,7 +1,9 @@
 """Testes unitários para a camada de modelos e Data Egress (TASK-1.5)."""
 
 import pytest
+
 from ai_engineering_harness.models.router import ModelRouter
+
 
 def test_model_router_success():
     router = ModelRouter(allowed_providers=["openai", "anthropic"])

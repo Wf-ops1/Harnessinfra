@@ -1,9 +1,10 @@
 """Gerador de relatórios de evidências em .harness/artifacts/latest.json."""
 
 import json
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Dict, Any
-from datetime import datetime, timezone
+from typing import Any
+
 
 class ArtifactGenerator:
     """Consolida os resultados da execução e gera evidências finais."""
@@ -12,10 +13,10 @@ class ArtifactGenerator:
         self.artifacts_dir = project_root / ".harness" / "artifacts"
         self.artifacts_dir.mkdir(parents=True, exist_ok=True)
 
-    def generate_latest_report(self, execution_id: str, summary: Dict[str, Any]) -> Path:
+    def generate_latest_report(self, execution_id: str, summary: dict[str, Any]) -> Path:
         data = {
             "execution_id": execution_id,
-            "generated_at_iso": datetime.now(timezone.utc).isoformat(),
+            "generated_at_iso": datetime.now(UTC).isoformat(),
             "summary": summary
         }
 

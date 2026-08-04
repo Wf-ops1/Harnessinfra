@@ -2,9 +2,11 @@
 
 import os
 from pathlib import Path
-from ai_engineering_harness.security.secrets import SecretManager
+
 from ai_engineering_harness.security.redaction import Redactor
+from ai_engineering_harness.security.secrets import SecretManager
 from ai_engineering_harness.security.trust import TrustBoundaryEvaluator
+
 
 def test_secret_manager_in_memory():
     os.environ["OPENAI_API_KEY"] = "sk-test12345678901234567890123456789012"

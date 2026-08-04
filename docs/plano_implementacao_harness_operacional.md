@@ -302,14 +302,14 @@ Ambos devem encerrar com código `0`.
 **Implementação**
 
 - Converter arquivos Python, Markdown, YAML, TOML e JSON para UTF-8 válido.
-- Corrigir textos como `AutÃ´nomo`, `âœ”`, `Ã­ndice` e equivalentes.
+- Corrigir sequências resultantes de dupla decodificação UTF-8/Windows-1252 e equivalentes.
 - Remover lógica baseada em símbolos já corrompidos.
 - Adicionar `.editorconfig` com `charset = utf-8`.
 - Validar CLI em Windows com console UTF-8 e console legado.
 
 **Critérios de aceite**
 
-- `rg 'Ã|âœ|ðŸ' src docs README.md` não deve retornar mojibake conhecido.
+- `rg '\x{00C3}|\x{00E2}\x{0153}|\x{00F0}\x{0178}' src docs README.md` não deve retornar mojibake conhecido.
 - `harness --help`, `harness doctor` e mensagens de erro devem renderizar sem exceção.
 
 ### Tarefa F0.3 — Tornar o ambiente reproduzível
@@ -363,9 +363,9 @@ uv run python -m build
 
 **Implementação**
 
-- Trocar `Em Produção` por `Protótipo / Em desenvolvimento` até o gate de produção ser atingido.
+- Trocar todo rótulo que afirme estado produtivo por `Protótipo / Em desenvolvimento` até o gate correspondente ser atingido.
 - Remover referências a arquivos inexistentes.
-- Corrigir links `file:///` absolutos.
+- Corrigir links locais absolutos dependentes do caminho da máquina.
 - Criar matriz `Capacidade | Implementada | Experimental | Planejada`.
 - Marcar adapters fake como dívida técnica até sua remoção.
 
@@ -384,6 +384,10 @@ uv run python -m build
   - instalação e smoke test da wheel.
 - Proibir merge quando qualquer job obrigatório falhar.
 
+**Estado comprovado em 2026-08-04:** concluída. O PR principal `#1` passou em Windows/Linux; `main`
+exige o aggregate `CI required`; o PR controlado `#2` ficou bloqueado no vermelho e foi restaurado
+para verde antes de ser fechado sem merge. Evidências detalhadas e URLs permanecem no `TASK.md`.
+
 **Gate de saída da Fase 0**
 
 - Preflight F0.0 concluído e ambiente registrado.
@@ -391,6 +395,7 @@ uv run python -m build
 - Testes podem ser reproduzidos por um único comando.
 - Nenhum documento declara produção.
 - Nenhum erro de sintaxe ou encoding permanece.
+- CI Windows/Linux executa os gates obrigatórios e bloqueia merge quando `CI required` falha.
 
 ---
 
@@ -1635,12 +1640,12 @@ O projeto só poderá ser chamado de infraestrutura operacional quando todos os 
 
 ## Engenharia e release
 
-- [ ] CI em Windows e Linux.
-- [ ] Lockfile versionado.
-- [ ] Wheel testada fora do repositório.
+- [x] CI em Windows e Linux.
+- [x] Lockfile versionado.
+- [x] Wheel testada fora do repositório.
 - [ ] E2E cobre feature, falha, resume, promoção e rollback.
-- [ ] Documentação corresponde ao comportamento observado.
-- [ ] Não existem erros de sintaxe, mojibake ou build artifacts versionados.
+- [x] Documentação corresponde ao comportamento observado.
+- [x] Não existem erros de sintaxe, mojibake ou build artifacts versionados.
 
 ---
 

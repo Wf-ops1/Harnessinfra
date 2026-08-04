@@ -1,13 +1,14 @@
 """Sanitizador e redator automático de segredos em textos e logs."""
 
 import re
-from typing import Dict, List, Optional
+from typing import ClassVar
+
 
 class Redactor:
     """Substitui segredos e tokens sensíveis por placeholders de redação."""
 
     # Padrões regex para chaves conhecidas
-    _patterns: List[re.Pattern] = [
+    _patterns: ClassVar[list[re.Pattern[str]]] = [
         re.compile(r"sk-[a-zA-Z0-9]{32,}", re.IGNORECASE),          # OpenAI API Keys
         re.compile(r"sk-ant-[a-zA-Z0-9_-]{32,}", re.IGNORECASE),    # Anthropic API Keys
         re.compile(r"eyJ[a-zA-Z0-9_-]{10,}\.eyJ[a-zA-Z0-9_-]{10,}\.[a-zA-Z0-9_-]+"), # JWTs
@@ -16,7 +17,7 @@ class Redactor:
     ]
 
     @classmethod
-    def redact_text(cls, text: str, dynamic_secrets: Optional[Dict[str, str]] = None) -> str:
+    def redact_text(cls, text: str, dynamic_secrets: dict[str, str] | None = None) -> str:
         """Sanitiza o texto removendo padrões conhecidos e valores dinâmicos de memória."""
         if not text:
             return text

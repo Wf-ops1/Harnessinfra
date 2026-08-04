@@ -1,5 +1,6 @@
 from datetime import datetime
-from typing import Literal, List, Optional
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field
 
 SnapshotStatus = Literal["pending", "ready", "failed", "corrupted"]
@@ -18,13 +19,13 @@ class KnowledgeTransaction(BaseModel):
     status: str = Field(description="Status da transação")
     created_at: datetime = Field(description="Timestamp de criação")
     staging_path: str = Field(description="Caminho de staging")
-    artifact_ids: List[str] = Field(description="IDs dos artefatos")
-    transaction_id: Optional[str] = Field(default=None, description="ID único da transação atômica")
-    commit_sha: Optional[str] = Field(default=None, description="Hash do commit Git")
-    snapshot_status: Optional[SnapshotStatus] = Field(default=None, description="Estado do snapshot")
-    artifacts: Optional[List[ArtifactVersionItem]] = Field(default=None, description="Artefatos atualizados")
-    visibility: Optional[str] = Field(default="atomic", description="Visibilidade")
-    triggered_by: Optional[str] = Field(default=None, description="execution_id motivador")
+    artifact_ids: list[str] = Field(description="IDs dos artefatos")
+    transaction_id: str | None = Field(default=None, description="ID único da transação atômica")
+    commit_sha: str | None = Field(default=None, description="Hash do commit Git")
+    snapshot_status: SnapshotStatus | None = Field(default=None, description="Estado do snapshot")
+    artifacts: list[ArtifactVersionItem] | None = Field(default=None, description="Artefatos atualizados")
+    visibility: str | None = Field(default="atomic", description="Visibilidade")
+    triggered_by: str | None = Field(default=None, description="execution_id motivador")
 
 
 class JournalState(BaseModel):

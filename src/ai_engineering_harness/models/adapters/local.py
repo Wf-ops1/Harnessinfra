@@ -1,13 +1,15 @@
 """Adaptador para provedores locais (Ollama, vLLM)."""
 
-from typing import Any, Dict, List, Optional
+from typing import Any
+
 from ai_engineering_harness.models.provider import BaseLLMProvider, LLMResponse
+
 
 class LocalAdapter(BaseLLMProvider):
     def __init__(self, model_name: str = "llama3"):
         super().__init__(provider_id="local", model_name=model_name)
 
-    def complete(self, prompt: str, system_prompt: Optional[str] = None) -> LLMResponse:
+    def complete(self, prompt: str, system_prompt: str | None = None) -> LLMResponse:
         content = f"[Local {self.model_name}] Response to: {prompt[:30]}..."
         return LLMResponse(
             content=content,
@@ -18,7 +20,7 @@ class LocalAdapter(BaseLLMProvider):
             total_tokens=20
         )
 
-    def call_tools(self, prompt: str, tools: List[Dict[str, Any]], system_prompt: Optional[str] = None) -> LLMResponse:
+    def call_tools(self, prompt: str, tools: list[dict[str, Any]], system_prompt: str | None = None) -> LLMResponse:
         return LLMResponse(
             content="Local tool invocation",
             provider=self.provider_id,
@@ -26,7 +28,7 @@ class LocalAdapter(BaseLLMProvider):
             tool_calls=[{"name": tools[0]["name"] if tools else "default_tool", "args": {}}]
         )
 
-    def structured_output(self, prompt: str, response_schema: Dict[str, Any]) -> LLMResponse:
+    def structured_output(self, prompt: str, response_schema: dict[str, Any]) -> LLMResponse:
         return LLMResponse(
             content='{"status": "ok"}',
             provider=self.provider_id,

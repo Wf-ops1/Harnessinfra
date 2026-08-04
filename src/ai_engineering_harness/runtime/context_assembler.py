@@ -1,27 +1,27 @@
 """Context Assembler — Fase 2 do Ciclo Agentic."""
 
 import json
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Dict, Any, List, Optional
+from typing import Any
+
 import yaml
 
 
 class InsufficientContextError(ValueError):
     """Exceção lançada quando a pontuação de contexto fica abaixo do limiar da política."""
-    pass
 
 
 @dataclass
 class ContextPackage:
-    knowledge_refs: List[Any] = field(default_factory=list)
-    structural_snapshot: Dict[str, Any] = field(default_factory=dict)
-    relevant_symbols: List[str] = field(default_factory=list)
+    knowledge_refs: list[Any] = field(default_factory=list)
+    structural_snapshot: dict[str, Any] = field(default_factory=dict)
+    relevant_symbols: list[str] = field(default_factory=list)
     confidence_score: float = 0.0
-    dimensions: Dict[str, float] = field(default_factory=dict)
-    gaps: List[str] = field(default_factory=list)
+    dimensions: dict[str, float] = field(default_factory=dict)
+    gaps: list[str] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
@@ -39,11 +39,11 @@ class ContextAssembler:
             try:
                 data = yaml.safe_load(self.policy_file.read_text(encoding="utf-8")) or {}
                 return float(data.get("minimum_confidence", 0.72))
-            except Exception:
-                pass
+            except (OSError, TypeError, ValueError, yaml.YAMLError):
+                return 0.72
         return 0.72
 
-    def _load_knowledge_references(self) -> List[Dict[str, Any]]:
+    def _load_knowledge_references(self) -> list[dict[str, Any]]:
         knw_dir = self.project_root / ".harness" / "knowledge" / "artifacts"
         refs = []
         if knw_dir.exists():
@@ -51,22 +51,20 @@ class ContextAssembler:
                 refs.append({"name": p.name, "path": str(p)})
         return refs
 
-    def _load_structural_snapshot(self, commit_sha: str = "HEAD") -> Dict[str, Any]:
+    def _load_structural_snapshot(self, commit_sha: str = "HEAD") -> dict[str, Any]:
         snapshot_file = self.project_root / ".harness" / "state" / "structural-index" / f"{commit_sha}.json"
         if snapshot_file.exists():
             try:
                 return json.loads(snapshot_file.read_text(encoding="utf-8"))
-            except Exception:
-                pass
+            except (json.JSONDecodeError, OSError, TypeError):
+                return {"commit_sha": commit_sha, "symbols": []}
         return {"commit_sha": commit_sha, "symbols": []}
 
-    def _evaluate_confidence(self, context_data: Dict[str, Any]) -> float:
-        refs = context_data.get("knowledge_refs", [])
-        snapshot = context_data.get("structural_snapshot", {})
+    def _evaluate_confidence(self, context_data: dict[str, Any]) -> float:
         score = 0.85
         return round(max(0.0, min(1.0, score)), 2)
 
-    def assemble(self, execution_id: str, intent: str = "", force_confidence: Optional[float] = None) -> ContextPackage:
+    def assemble(self, execution_id: str, intent: str = "", force_confidence: float | None = None) -> ContextPackage:
         exec_dir = self.project_root / ".harness" / "state" / "executions" / execution_id
         exec_dir.mkdir(parents=True, exist_ok=True)
         context_file = exec_dir / "context.json"

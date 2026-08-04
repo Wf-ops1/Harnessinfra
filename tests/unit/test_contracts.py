@@ -1,14 +1,17 @@
 """Testes unitários de validação e serialização dos contratos Pydantic nativos (TASK-1.2)."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+
 import pytest
 from pydantic import ValidationError
-from ai_engineering_harness.contracts.events import ExecutionEvent, KnowledgeSyncEvent
-from ai_engineering_harness.contracts.nodes import ArchitectureAnalysis, CodeGenNode, ContextSufficiencyReport
-from ai_engineering_harness.contracts.transactions import KnowledgeTransaction, JournalState
+
+from ai_engineering_harness.contracts.events import ExecutionEvent
+from ai_engineering_harness.contracts.nodes import ContextSufficiencyReport
+from ai_engineering_harness.contracts.transactions import KnowledgeTransaction
+
 
 def test_execution_event_serialization():
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     event = ExecutionEvent(
         event_id="evt-100",
         execution_id="exec-42",
@@ -35,7 +38,7 @@ def test_context_sufficiency_report():
     assert report.score >= report.threshold_required
 
 def test_knowledge_transaction_strict_validation():
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     tx = KnowledgeTransaction(
         tx_id="tx-99",
         status="COMMITTED",

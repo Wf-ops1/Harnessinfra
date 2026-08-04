@@ -2,8 +2,10 @@
 
 import json
 from pathlib import Path
-from typing import Dict, Any
+from typing import Any
+
 from ai_engineering_harness.workspace.sandbox import SandboxProvider
+
 
 class ExternalWorktreeManager:
     """Cria e gerencia Worktrees Git externos para isolamento de alterações."""
@@ -22,7 +24,7 @@ class ExternalWorktreeManager:
         ref_dir = self.project_root / ".harness" / "state" / "worktree-references"
         ref_dir.mkdir(parents=True, exist_ok=True)
 
-        ref_data: Dict[str, Any] = {
+        ref_data: dict[str, Any] = {
             "execution_id": execution_id,
             "worktree_path": str(worktree_path),
             "base_commit_sha": base_commit_sha,

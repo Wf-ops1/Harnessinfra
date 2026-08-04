@@ -1,3 +1,7 @@
 """AI-Engineering-Harness: Motor Agentic Autônomo e Instalável."""
 
-__version__ = "0.1.0"
+from ai_engineering_harness.versioning import PACKAGE_VERSION
+
+__version__ = PACKAGE_VERSION
+
+__all__ = ["__version__"]

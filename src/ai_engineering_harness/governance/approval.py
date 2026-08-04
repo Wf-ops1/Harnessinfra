@@ -2,7 +2,7 @@
 
 import json
 from pathlib import Path
-from typing import Dict, Any, Optional
+
 
 class ApprovalManager:
     """Gerencia a solicitação e confirmação de aprovação humana."""
@@ -33,7 +33,7 @@ class ApprovalManager:
         req_file.write_text(json.dumps(data, indent=2), encoding="utf-8")
         return True
 
-    def get_approval_status(self, execution_id: str) -> Optional[str]:
+    def get_approval_status(self, execution_id: str) -> str | None:
         req_file = self.project_root / ".harness" / "state" / "executions" / execution_id / "approval_request.json"
         if not req_file.is_file():
             return None

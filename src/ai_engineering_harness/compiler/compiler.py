@@ -1,23 +1,24 @@
 """Compilador estático de grafos em YAML para artefatos MAF JSON versionados com loops governados."""
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
+
 import yaml
+
+from ai_engineering_harness.versioning import ARTIFACT_SCHEMA_VERSION, PACKAGE_VERSION
+
 
 class GraphCompiler:
     """Compila e valida grafos YAML gerando MAF JSON executável em .harness/state/compiled/."""
-
-    HARNESS_VERSION = "0.1.0"
-    ARTIFACT_SCHEMA_VERSION = "1.0"
 
     def __init__(self, project_root: Path):
         self.project_root = project_root
         self.output_dir = project_root / ".harness" / "state" / "compiled"
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
-    def validate_loops(self, graph_spec: Dict[str, Any]) -> None:
+    def validate_loops(self, graph_spec: dict[str, Any]) -> None:
         """Valida que todos os loops no grafo possuem limites e condições de parada."""
         nodes = graph_spec.get("nodes", {})
         nodes_iterable = []
@@ -48,13 +49,13 @@ class GraphCompiler:
 
         compiled_artifact = {
             "header": {
-                "artifact_schema_version": self.ARTIFACT_SCHEMA_VERSION,
-                "harness_version": self.HARNESS_VERSION,
-                "compiler_version": self.HARNESS_VERSION,
+                "artifact_schema_version": ARTIFACT_SCHEMA_VERSION,
+                "package_version": PACKAGE_VERSION,
+                "compiler_version": PACKAGE_VERSION,
                 "runtime_provider": "maf",
-                "runtime_adapter_version": "0.1.0",
+                "runtime_adapter_version": PACKAGE_VERSION,
                 "workflow": workflow_name,
-                "compiled_at_iso": datetime.now(timezone.utc).isoformat()
+                "compiled_at_iso": datetime.now(UTC).isoformat()
             },
             "graph": graph_spec
         }

@@ -1,15 +1,18 @@
 """Catálogo de adaptadores de provedores configurados."""
 
-from typing import Dict, Type
-from ai_engineering_harness.models.provider import BaseLLMProvider
-from ai_engineering_harness.models.adapters.openai import OpenAIAdapter
+from collections.abc import Callable
+from typing import ClassVar
+
 from ai_engineering_harness.models.adapters.anthropic import AnthropicAdapter
 from ai_engineering_harness.models.adapters.local import LocalAdapter
+from ai_engineering_harness.models.adapters.openai import OpenAIAdapter
+from ai_engineering_harness.models.provider import BaseLLMProvider
+
 
 class ProviderRegistry:
     """Registro estático e fábrica de adaptadores de provedores."""
 
-    _registry: Dict[str, Type[BaseLLMProvider]] = {
+    _registry: ClassVar[dict[str, Callable[[], BaseLLMProvider]]] = {
         "openai": OpenAIAdapter,
         "anthropic": AnthropicAdapter,
         "local": LocalAdapter,

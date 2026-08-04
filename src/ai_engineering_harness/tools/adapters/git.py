@@ -1,7 +1,9 @@
 """Adaptador para comandos Git seguros."""
 
 from pathlib import Path
+
 from ai_engineering_harness.tools.adapters.terminal import TerminalAdapter
+
 
 class GitAdapter:
     """Executa comandos Git com validação prévia de segurança."""

@@ -2,15 +2,15 @@
 
 import json
 from pathlib import Path
-import pytest
+
+from ai_engineering_harness.compiler.compiler import GraphCompiler
 from ai_engineering_harness.core.detector import StackDetector
 from ai_engineering_harness.doctor.checker import DoctorChecker
-from ai_engineering_harness.compiler.compiler import GraphCompiler
 from ai_engineering_harness.indexer.codebase_memory_adapter import CodebaseMemoryAdapter
-from ai_engineering_harness.runtime.engine import RuntimeEngine
-from ai_engineering_harness.verification.engine import VerificationEngine
 from ai_engineering_harness.knowledge.synchronizer import KnowledgeSynchronizer
 from ai_engineering_harness.observability.audit import AuditTrailManager
+from ai_engineering_harness.runtime.engine import RuntimeEngine
+from ai_engineering_harness.verification.engine import VerificationEngine
 
 
 def test_full_lifecycle_e2e_python(tmp_path: Path):
@@ -66,5 +66,5 @@ def test_full_lifecycle_e2e_python(tmp_path: Path):
     # 9. Audit Trail & Hash Chain Verification
     audit = AuditTrailManager(project_root=tmp_path, execution_id="exec-e2e-100")
     audit.log_event("WORKFLOW_COMPLETED", {"status": "SUCCESS"})
-    is_valid, msg = audit.verify_integrity()
+    is_valid, _ = audit.verify_integrity()
     assert is_valid is True

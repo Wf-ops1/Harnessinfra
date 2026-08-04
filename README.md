@@ -1,48 +1,117 @@
-# AI-Engineering-Harness
+# AI Engineering Harness
 
-> **Motor Agentic Autônomo, Local-First e Instalável**
+> **Status atual: Protótipo / Em desenvolvimento**
 
-O **AI-Engineering-Harness** transforma qualquer repositório de software em um ambiente governado por agentes autônomos locais através da fórmula:
+O AI Engineering Harness é hoje uma base Python instalável para experimentar um harness de engenharia
+agentic local-first. O repositório já possui empacotamento reproduzível, CLI, contratos, compiladores,
+FSM, verificadores, auditoria e testes. A execução autônoma segura sobre um repositório externo ainda
+não está pronta: integrações de modelo e MCP são simuladas, o isolamento Git não cria um worktree real
+e promoção/rollback não cumprem ainda o contrato operacional do produto.
 
-$$\text{Harness} = \text{BMAD} \longrightarrow \text{Graph Engineering} \longrightarrow \text{MAF} \longrightarrow \text{Serena + Codebase-Memory} \longrightarrow \text{Quality/Ops}$$
+Não use `harness run`, `harness doctor` ou `harness rollback` como garantia de segurança em um
+repositório valioso. Até os gates F1-F7 serem concluídos, execute esses comandos somente em cópias
+descartáveis.
 
----
+## Objetivo do produto
 
-## ⚡ Ciclo de Vida Agentic Autônomo
+A arquitetura-alvo continua sendo:
 
-O Harness executa o desenvolvimento de software através de um ciclo rigoroso de 11 estágios com verificação determinística e diário de auditoria append-only:
+\[
+\text{Harness} =
+\text{BMAD} \longrightarrow
+\text{Graph Engineering} \longrightarrow
+\text{Runtime Agentic} \longrightarrow
+\text{Tools/Memory} \longrightarrow
+\text{Quality/Ops}
+\]
 
-1. **Context Assembly (`ContextAssembler`):** Validação semântica e estrutural do contexto antes de qualquer ação.
-2. **Planejamento Tático (`Planner`):** Geração do plano de execução `plan.json` assinado pela persona **Winston (Architect)**.
-3. **Execução Segura (`AgentExecutor` + `ToolRouter`):** Agente **Amelia (Developer)** interage através do guardião de permissões `ToolRouter` (MCP Serena / Terminal).
-4. **Verificação Poliglota (`VerificationEngine`):** Gates determinísticos de tipo (`mypy`), estilo (`ruff`) e testes (`pytest`).
-5. **Loop de Reparo Automático:** Retentativas governadas por limites de custo e iterações (`retry_cost_policy.yaml`).
-6. **Promoção e Evidência (`PromotionManager`):** Registro de `evidence.json`, reindexação AST e sync de conhecimento.
-7. **Compensação Append-Only (`RollbackManager`):** Reversão controlada com rastreabilidade 100% preservada na Hash Chain SHA-256.
+Quando concluído, o pacote deverá permitir instalar uma CLI ou integração de IDE, inicializar um
+repositório externo, executar alterações dentro de um worktree isolado, bloquear efeitos não
+autorizados, verificar o resultado, exigir aprovação, promover por Git e reverter com evidência
+auditável. Isso é a direção do produto, não uma descrição do estado entregue.
 
----
+## Matriz de capacidade
 
-## 🚀 Instalação Rápida em Qualquer Repositório
+| Capacidade | Implementada | Experimental | Planejada |
+|---|---|---|---|
+| Ambiente e pacote | `uv.lock`, build de wheel, metadata e toolchain reproduzível | Bootstrap ainda depende de instalar `uv` | Distribuição e instalação externa suportadas como produto |
+| Versionamento | Package version única e schemas graph/artifact/policy separados | Compatibilidade ainda é comparação exata | Migrações compatíveis e política de evolução |
+| CLI e scaffold | `--help`, `--version` e `init` existem e têm testes | Demais comandos exercitam componentes do protótipo | UX estável para CLI e IDE em repositórios externos |
+| Compilação de grafos | Contratos e validadores existem | Há dois caminhos de compilação e o runtime não é governado integralmente pelas arestas | Compilador único, determinístico e fail-closed na F1 |
+| Runtime/FSM | Estados, contexto, plano, evidência e diário local existem | O fluxo é orquestrado por sequência fixa e pode concluir com efeitos simulados | Execução persistida e retomável dirigida pelo artefato na F2 |
+| Providers LLM | Interfaces, registry e router existem | OpenAI, Anthropic e local fabricam respostas; não fazem chamadas reais | Providers remoto e local reais, com erros tipados, na F3 |
+| Serena e Codebase-Memory | Interfaces/adapters existem | Serena apenas cria/toca arquivo; memória retorna `mock_ast` | Transporte MCP real ou adapter local explicitamente configurado |
+| Verificação e auditoria | Subprocessos de gates e hash chain local possuem testes | Há caminhos de gate vazio e garantias ainda incompletas | Gates fail-closed, redaction e recovery operacional |
+| Doctor | Relatório e modelo de probe existem | Todos os seis estágios retornam saudáveis sem testar componentes | Probes reais de configuração, alcance, autenticação e capacidade |
+| Worktree, promoção e rollback | Estruturas e comandos prototípicos existem | Worktree é diretório comum; promoção usa dry-run/SHA sintético; rollback é parcial | `git worktree`, candidate commit, cherry-pick e `git revert` reais |
+| CI e release | GitHub Actions executa quality/tests/package em Windows e Linux; `main` exige `CI required`, com bloqueio e restauração comprovados | A CI prova o baseline técnico, não as capacidades operacionais ainda simuladas | Distribuição pública e processo de release operacional na F7 |
+
+## Dívidas técnicas críticas
+
+As seguintes implementações são deliberadamente tratadas como dívida técnica, não como capacidades
+operacionais:
+
+- [adapters de modelos](src/ai_engineering_harness/models/adapters/) retornam conteúdo e contagens de
+  tokens fabricados;
+- [SerenaAdapter](src/ai_engineering_harness/tools/adapters/serena.py) não abre conexão MCP nem aplica
+  edição semântica;
+- [CodebaseMemoryAdapter](src/ai_engineering_harness/indexer/codebase_memory_adapter.py) persiste uma
+  AST simulada;
+- [HealthProbe](src/ai_engineering_harness/doctor/probes.py) declara todos os estágios saudáveis sem
+  executar probes;
+- [PromotionManager](src/ai_engineering_harness/runtime/promotion_manager.py) produz SHA sintético em
+  dry-run e possui fallback sintético no caminho live;
+- [ExternalWorktreeManager](src/ai_engineering_harness/workspace/git_worktree.py) cria diretório, não
+  um worktree Git;
+- [TerminalAdapter](src/ai_engineering_harness/tools/adapters/terminal.py) recebe string e usa
+  `shell=True`, contrário ao contrato final de segurança.
+
+## Ambiente de desenvolvimento
+
+Pré-requisitos:
+
+- Python 3.11, 3.12, 3.13 ou 3.14;
+- `uv`;
+- Git.
+
+Após clonar:
 
 ```bash
-# 1. Instalar o harness em modo editável ou via pip
-pip install -e .
-
-# 2. Inicializar a estrutura .harness/ no repositório de produto
-harness init
-
-# 3. Executar o probe de saúde dos 6 estágios
-harness doctor
-
-# 4. Executar um workflow agentic autônomo
-harness run new-feature
+uv sync --all-extras
+uv lock --check
+uv run python -m pytest
+uv run python -m mypy src
+uv run python -m ruff check .
+uv run python -m compileall -q src compiler tests
+uv run python -m build
+uv run python tests/ci/smoke_wheel.py
 ```
 
----
+Para inspecionar a superfície da CLI sem executar o runtime:
 
-## 📚 Documentação e Guias
+```bash
+uv run harness --version
+uv run harness --help
+```
 
-- **Modelo Operacional & Ciclo Agentic:** [agentic_operating_model.md](file:///c:/Users/walla/OneDrive/Desktop/ai-engineering-harness/docs/agentic_operating_model.md)
-- **Matriz de Auditoria do Ciclo:** [agentic_lifecycle_audit.md](file:///c:/Users/walla/OneDrive/Desktop/ai-engineering-harness/docs/agentic_lifecycle_audit.md)
-- **Especificação Arquitetural:** [harness_architecture_spec.md](file:///c:/Users/walla/OneDrive/Desktop/ai-engineering-harness/docs/harness_architecture_spec.md)
-- **Guia do Usuário CLI:** [user_guide.md](file:///c:/Users/walla/OneDrive/Desktop/ai-engineering-harness/docs/user_guide.md)
+`harness init` escreve uma pasta `.harness/` no diretório atual. Enquanto o produto estiver em
+desenvolvimento, teste o scaffold apenas em um repositório descartável.
+
+## Contrato de versionamento
+
+A versão autoral do pacote fica em `pyproject.toml`. Em runtime,
+`ai_engineering_harness.__version__` e `harness --version` leem a metadata instalada.
+`graph_schema_version`, `artifact_schema_version` e `policy_schema_version` evoluem de forma
+independente; `definition_version` identifica apenas a revisão de uma definição.
+
+## Fonte de verdade
+
+- [TASK.md](TASK.md): painel de execução, evidências, gates e próxima ação;
+- [Plano operacional](docs/plano_implementacao_harness_operacional.md): implementação necessária até
+  o MVP operacional;
+- [Modelo operacional](docs/agentic_operating_model.md): fluxo atual versus fluxo-alvo;
+- [Auditoria do ciclo](docs/agentic_lifecycle_audit.md): estado concreto de cada etapa;
+- [Especificação arquitetural](docs/harness_architecture_spec.md): arquitetura-alvo e lacunas;
+- [Guia do usuário](docs/user_guide.md): comandos seguros e limitações atuais;
+- [Walkthrough](docs/walkthrough.md): estrutura real e fluxo observado;
+- [Auditoria técnica](docs/walkthrough_audit.md): pendências comprovadas.

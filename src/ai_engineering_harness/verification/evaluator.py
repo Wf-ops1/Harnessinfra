@@ -1,11 +1,12 @@
 """Avaliador de comandos de verificação mapeados por linguagem."""
 
-from typing import Dict, Optional
+from typing import ClassVar
+
 
 class VerificationEvaluator:
     """Mapeia os tipos abstratos de gate para os comandos nativos da stack."""
 
-    _commands_by_language: Dict[str, Dict[str, str]] = {
+    _commands_by_language: ClassVar[dict[str, dict[str, str]]] = {
         "python": {
             "typecheck": "mypy .",
             "lint": "ruff check .",
@@ -38,7 +39,7 @@ class VerificationEvaluator:
         }
     }
 
-    _aliases: Dict[str, str] = {
+    _aliases: ClassVar[dict[str, str]] = {
         "py": "python",
         "js": "typescript/javascript",
         "ts": "typescript/javascript",
@@ -49,9 +50,8 @@ class VerificationEvaluator:
     }
 
     @classmethod
-    def get_command(cls, language: str, gate_type: str) -> Optional[str]:
+    def get_command(cls, language: str, gate_type: str) -> str | None:
         lang_key = language.lower().strip()
         lang_key = cls._aliases.get(lang_key, lang_key)
         lang_gates = cls._commands_by_language.get(lang_key, {})
         return lang_gates.get(gate_type)
-

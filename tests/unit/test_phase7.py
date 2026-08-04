@@ -2,11 +2,12 @@
 
 import json
 from pathlib import Path
-import pytest
+
+from ai_engineering_harness.artifacts.generator import ArtifactGenerator
+from ai_engineering_harness.cli.commands.rollback import RollbackManager
 from ai_engineering_harness.knowledge.transaction import KnowledgeTransactionManager, TransactionState
 from ai_engineering_harness.observability.audit import AuditTrailManager
-from ai_engineering_harness.cli.commands.rollback import RollbackManager
-from ai_engineering_harness.artifacts.generator import ArtifactGenerator
+
 
 def test_knowledge_transaction_5_steps(tmp_path: Path):
     mgr = KnowledgeTransactionManager(project_root=tmp_path)

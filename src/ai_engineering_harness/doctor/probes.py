@@ -1,7 +1,9 @@
 """Probes não destrutivos de 6 estágios (Configured -> Installed -> Reachable -> Authenticated -> Capable -> Healthy)."""
 
-from typing import Dict, Any
+from typing import Any
+
 from pydantic import BaseModel, ConfigDict
+
 
 class ProbeStageResult(BaseModel):
     model_config = ConfigDict(strict=True, frozen=True)
@@ -15,13 +17,13 @@ class ComponentProbeResult(BaseModel):
 
     component_name: str
     is_healthy: bool
-    stages: Dict[str, ProbeStageResult]
+    stages: dict[str, ProbeStageResult]
 
 class HealthProbe:
     """Executa verificações não destrutivas de somente-leitura."""
 
     @classmethod
-    def probe_component(cls, name: str, config: Dict[str, Any]) -> ComponentProbeResult:
+    def probe_component(cls, name: str, config: dict[str, Any]) -> ComponentProbeResult:
         stages = {}
 
         # 1. Configured

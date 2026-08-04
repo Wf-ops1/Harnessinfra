@@ -1,16 +1,17 @@
 """Executor de personas de agentes conectados ao Models Router e Tool Router."""
 
 from pathlib import Path
-from typing import Dict, Any, Optional
-from ai_engineering_harness.models.router import ModelRouter
+from typing import Any
+
 from ai_engineering_harness.models.provider import LLMResponse
+from ai_engineering_harness.models.router import ModelRouter
 from ai_engineering_harness.tools.router import ToolRouter
 
 
 class AgentExecutor:
     """Executa o raciocínio da persona atribuída ao nó (Winston, Amelia, etc.) e interage via ToolRouter."""
 
-    def __init__(self, agent_name: str, router: ModelRouter, tool_router: Optional[ToolRouter] = None, project_root: Optional[Path] = None):
+    def __init__(self, agent_name: str, router: ModelRouter, tool_router: ToolRouter | None = None, project_root: Path | None = None):
         self.agent_name = agent_name
         self.router = router
         self.tool_router = tool_router
@@ -46,7 +47,7 @@ class AgentExecutor:
             primary_provider_id=primary_provider
         )
 
-    def execute_tool(self, tool_name: str, payload: Dict[str, Any]) -> Any:
+    def execute_tool(self, tool_name: str, payload: dict[str, Any]) -> Any:
         if not self.tool_router:
             raise PermissionError(f"[POLICY ERROR] Nenhum ToolRouter associado ao executor do agente '{self.agent_name}'.")
         return self.tool_router.dispatch(tool_name, payload)

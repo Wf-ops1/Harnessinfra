@@ -1,40 +1,64 @@
-# Manual de Operação e Guia do Usuário — AI-Engineering-Harness
+# Guia de Uso do Protótipo — AI Engineering Harness
 
-O **AI-Engineering-Harness** é um motor agentic local-first, instalável via `pip install ai-engineering-harness`, capaz de executar workflows completos de engenharia sobre qualquer repositório de software através de uma pasta leve `.harness/`.
+> **Status: uso de desenvolvimento em ambiente descartável**
 
----
+O pacote ainda não está publicado como ferramenta operacional nem é seguro para automatizar mudanças
+em um repositório valioso. Este guia descreve como inspecionar e testar o protótipo no clone do
+projeto.
 
-## 🚀 Instalação e Inicialização
+## Preparar o ambiente
 
 ```bash
-# 1. Instalar o pacote
-pip install -e .
-
-# 2. Inicializar a pasta .harness/ no repositório do seu projeto
-harness init
-
-# 3. Testar a saúde do ambiente (Probe de 6 Estágios)
-harness doctor
+uv sync --all-extras
+uv lock --check
+uv run harness --version
+uv run harness --help
 ```
 
----
+Para validar o baseline:
 
-## 🛠️ Principais Comandos CLI
+```bash
+uv run python -m pytest
+uv run python -m mypy src
+uv run python -m ruff check .
+uv run python -m compileall -q src compiler tests
+uv run python -m build
+```
 
-- `harness init`: Cria a estrutura de metadados `.harness/` no projeto local.
-- `harness doctor`: Testa Serena MCP, Codebase-Memory MCP, Git e LLM Providers.
-- `harness compile <spec.yaml>`: Compila um grafo YAML em artefato MAF JSON em `.harness/state/compiled/`.
-- `harness index`: Atualiza o snapshot AST vinculado ao Git Commit SHA.
-- `harness run <workflow>`: Executa um workflow agentic autônomo.
-- `harness status <exec_id>`: Consulta o status da FSM de uma execução em andamento.
-- `harness approve <exec_id>`: Aprova a promoção de alterações em estado `AWAITING_APPROVAL`.
-- `harness verify`: Executa as verificações determinísticas poliglotas aplicáveis ao projeto.
-- `harness audit <exec_id>`: Valida a integridade da Hash Chain dos logs de auditoria.
-- `harness rollback <exec_id>`: Executa a reversão em 2 fases (Código / Efeitos).
+## Comandos e limitações
 
----
+| Comando | O que faz hoje | Estado/limitação |
+|---|---|---|
+| `harness --version` | Lê a versão da metadata instalada | Implementado |
+| `harness init` | Cria `.harness/` e copia defaults disponíveis | Implementado como scaffold; testar somente em repo descartável |
+| `harness doctor` | Renderiza quatro componentes em seis estágios | Simulado: retorna saudável sem conectividade real |
+| `harness compile <yaml>` | Compila pelo `GraphCompiler` do pacote | Experimental: contratos ainda serão unificados na F1 |
+| `harness index` | Persiste snapshot ligado ao texto `HEAD` | Simulado: AST é fabricada |
+| `harness run <workflow>` | Executa a sequência do runtime e grava estado/evidência | Experimental: modelos, edição, memória e promoção são simulados |
+| `harness status <id>` | Lê `workflow-state.json` | Experimental, restrito ao armazenamento local atual |
+| `harness inspect <id>` | Exibe estado, hash chain e aprovação | Experimental |
+| `harness approve <id>` | Persiste decisão de aprovação | Não retoma/promove a execução pelo protocolo final |
+| `harness verify` | Executa gates Python selecionados | Experimental: cobertura e política fail-closed ainda incompletas |
+| `harness audit <id>` | Verifica/exporta o diário local | Implementação local; não prova efeitos reais |
+| `harness rollback <id>` | Registra compensação e pode chamar `git revert` | Não usar em repo valioso; worktree e segurança Git ainda faltam |
 
-## 🏛️ Separação Harness vs Produto
+## Teste controlado de `init`
 
-- **Motor Instalado (`src/ai_engineering_harness/`):** Contém o runtime, compilador, governança e verificadores.
-- **Projeto Local (`.harness/`):** Guarda unicamente a configuração, conhecimento (`knowledge/`), estado (`state/`) e artefatos (`artifacts/`).
+Crie um repositório descartável e execute o binário instalado pelo ambiente do clone. Confirme os
+arquivos gerados antes de removê-los. Não aponte o protótipo para um checkout com trabalho não
+commitado.
+
+## O que ainda não está disponível
+
+- instalação pública estável por `pipx`, `uv tool` ou extensão de IDE;
+- provider LLM real;
+- Serena/Codebase-Memory reais;
+- edição confinada a worktree Git;
+- promoção por candidate commit e cherry-pick;
+- retomada após aprovação/crash;
+- rollback seguro e gates pós-reversão;
+- doctor confiável.
+
+Acompanhe a ordem de implementação no
+[plano operacional](plano_implementacao_harness_operacional.md) e o estado executável no
+[TASK.md](../TASK.md).

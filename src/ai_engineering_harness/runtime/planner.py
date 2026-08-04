@@ -1,28 +1,28 @@
 """Planner Module — Fase 3 do Ciclo Agentic."""
 
 import json
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Dict, Any, List, Optional
+from typing import Any
+
 from ai_engineering_harness.runtime.context_assembler import ContextPackage
 
 
 class InvalidPlanError(ValueError):
     """Exceção lançada quando um plano de execução não atende aos critérios mínimos de validação."""
-    pass
 
 
 @dataclass
 class PlanDocument:
     goal: str
-    scope: List[str] = field(default_factory=list)
-    affected_modules: List[str] = field(default_factory=list)
-    risks: List[str] = field(default_factory=list)
-    applicable_gates: List[str] = field(default_factory=list)
+    scope: list[str] = field(default_factory=list)
+    affected_modules: list[str] = field(default_factory=list)
+    risks: list[str] = field(default_factory=list)
+    applicable_gates: list[str] = field(default_factory=list)
     rollback_strategy: str = "append_only_audit_compensation"
-    completion_criteria: List[str] = field(default_factory=list)
+    completion_criteria: list[str] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
@@ -43,9 +43,7 @@ class Planner:
             return False
         if not plan.affected_modules:
             return False
-        if not plan.applicable_gates:
-            return False
-        return True
+        return bool(plan.applicable_gates)
 
     def create_plan(
         self,

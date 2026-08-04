@@ -1,8 +1,9 @@
 """Visualizador de Grafos de Execução em Sintaxe Mermaid."""
 
 from pathlib import Path
-from typing import Dict, Any
+
 import yaml
+
 
 class GraphVisualizer:
     """Converte especificações YAML de Grafos em Diagramas Mermaid Flowchart."""

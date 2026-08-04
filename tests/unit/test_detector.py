@@ -1,7 +1,9 @@
 """Testes unitários para o módulo StackDetector (TASK-1.4)."""
 
 from pathlib import Path
+
 from ai_engineering_harness.core.detector import StackDetector
+
 
 def test_detect_python_stack(tmp_path: Path):
     (tmp_path / "pyproject.toml").touch()

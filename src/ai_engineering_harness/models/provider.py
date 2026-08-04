@@ -1,8 +1,10 @@
 """Interface base para provedores de modelos LLM."""
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional
+from typing import Any
+
 from pydantic import BaseModel, ConfigDict, Field
+
 
 class LLMResponse(BaseModel):
     model_config = ConfigDict(strict=True, frozen=True)
@@ -10,7 +12,7 @@ class LLMResponse(BaseModel):
     content: str
     provider: str
     model_name: str
-    tool_calls: List[Dict[str, Any]] = Field(default_factory=list)
+    tool_calls: list[dict[str, Any]] = Field(default_factory=list)
     prompt_tokens: int = 0
     completion_tokens: int = 0
     total_tokens: int = 0
@@ -23,13 +25,13 @@ class BaseLLMProvider(ABC):
         self.model_name = model_name
 
     @abstractmethod
-    def complete(self, prompt: str, system_prompt: Optional[str] = None) -> LLMResponse:
+    def complete(self, prompt: str, system_prompt: str | None = None) -> LLMResponse:
         pass
 
     @abstractmethod
-    def call_tools(self, prompt: str, tools: List[Dict[str, Any]], system_prompt: Optional[str] = None) -> LLMResponse:
+    def call_tools(self, prompt: str, tools: list[dict[str, Any]], system_prompt: str | None = None) -> LLMResponse:
         pass
 
     @abstractmethod
-    def structured_output(self, prompt: str, response_schema: Dict[str, Any]) -> LLMResponse:
+    def structured_output(self, prompt: str, response_schema: dict[str, Any]) -> LLMResponse:
         pass

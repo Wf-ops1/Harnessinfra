@@ -2,9 +2,10 @@
 
 import hashlib
 import json
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Dict, Any, Tuple
-from datetime import datetime, timezone
+from typing import Any
+
 
 class AuditTrailManager:
     """Gerencia o log append-only event-journal.jsonl com SHA-256 encadeado."""
@@ -26,8 +27,8 @@ class AuditTrailManager:
         last_entry = json.loads(lines[-1])
         return last_entry.get("current_hash", self.GENESIS_HASH)
 
-    def log_event(self, event_type: str, payload: Dict[str, Any]) -> Dict[str, Any]:
-        timestamp = datetime.now(timezone.utc).isoformat()
+    def log_event(self, event_type: str, payload: dict[str, Any]) -> dict[str, Any]:
+        timestamp = datetime.now(UTC).isoformat()
 
         event_data = {
             "event_type": event_type,
@@ -48,7 +49,7 @@ class AuditTrailManager:
 
         return event_data
 
-    def verify_integrity(self) -> Tuple[bool, str]:
+    def verify_integrity(self) -> tuple[bool, str]:
         """Verifica a integridade da Hash Chain percorrendo todas as linhas."""
         if not self.journal_file.is_file():
             return True, "Journal vazio."
@@ -90,7 +91,7 @@ class AuditTrailManager:
 
     def export_sarif(self) -> str:
         """Converte os eventos do audit log para o formato de relatório SARIF v2.1.0."""
-        is_valid, msg = self.verify_integrity()
+        is_valid, _ = self.verify_integrity()
         lines = []
         if self.journal_file.is_file():
             lines = [line for line in self.journal_file.read_text(encoding="utf-8").strip().split("\n") if line]
@@ -134,4 +135,3 @@ class AuditTrailManager:
             ]
         }
         return json.dumps(sarif_doc, indent=2)
-

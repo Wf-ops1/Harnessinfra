@@ -1,10 +1,12 @@
 """Testes unitários para verificação do CLI Runtime, FSM State, Visualizer e Audit Export."""
 
 from pathlib import Path
+
 from click.testing import CliRunner
+
 from ai_engineering_harness.cli.main import main
 from ai_engineering_harness.compiler.visualizer import GraphVisualizer
-from ai_engineering_harness.observability.audit import AuditTrailManager
+
 
 def test_graph_visualizer(tmp_path: Path):
     spec_file = tmp_path / "test_graph.yaml"
@@ -49,7 +51,7 @@ def test_cli_run_status_inspect_lifecycle():
 
         # Extrair o ID da execução
         output_lines = res_run.output.split("\n")
-        exec_line = [line for line in output_lines if "ID:" in line or "exec-" in line][0]
+        exec_line = next(line for line in output_lines if "ID:" in line or "exec-" in line)
         exec_id = exec_line.split("ID:")[-1].strip()
 
         # 3. Status

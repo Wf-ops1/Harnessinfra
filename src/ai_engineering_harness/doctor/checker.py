@@ -1,7 +1,8 @@
 """Orquestrador do comando harness doctor."""
 
-from typing import List
-from ai_engineering_harness.doctor.probes import HealthProbe, ComponentProbeResult
+
+from ai_engineering_harness.doctor.probes import ComponentProbeResult, HealthProbe
+
 
 class DoctorChecker:
     """Orquestra os testes dos componentes do Harness."""
@@ -9,7 +10,7 @@ class DoctorChecker:
     def __init__(self, config: dict):
         self.config = config
 
-    def check_all(self) -> List[ComponentProbeResult]:
+    def check_all(self) -> list[ComponentProbeResult]:
         components = ["Serena MCP", "Codebase-Memory MCP", "Git CLI", "LLM Providers"]
         results = []
         for comp in components:

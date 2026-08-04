@@ -1,12 +1,13 @@
 """Gerenciador seguro de secrets exclusivamente em memória."""
 
 import os
-from typing import Optional
+from typing import ClassVar
+
 
 class SecretManager:
     """Carrega chaves e tokens de variáveis de ambiente sem persistir no disco."""
 
-    _sensitive_keys = [
+    _sensitive_keys: ClassVar[list[str]] = [
         "OPENAI_API_KEY",
         "ANTHROPIC_API_KEY",
         "SERENA_MCP_TOKEN",
@@ -15,7 +16,7 @@ class SecretManager:
     ]
 
     @classmethod
-    def get_secret(cls, key: str, default: Optional[str] = None) -> Optional[str]:
+    def get_secret(cls, key: str, default: str | None = None) -> str | None:
         """Recupera o segredo do ambiente de forma segura."""
         return os.environ.get(key, default)
 

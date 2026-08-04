@@ -1,50 +1,54 @@
-# Relatório Oficial de Auditoria do Projeto — AI-Engineering-Harness
+# Relatório de Auditoria de Estado — AI Engineering Harness
 
-> **Data da Auditoria:** 03 de Agosto de 2026  
-> **Auditores Principais:**  
-> - 🏛️ **Winston** (System Architect)  
-> - 🛠️ **Amelia** (Senior Software Engineer)  
-> - 📝 **Paige** (Technical Writer)  
-> **Status:** 🟢 **APROVADO COM RECOMENDAÇÕES PONTUAIS**
+> **Data da revisão:** 4 de agosto de 2026
+> **Status: Protótipo / Em desenvolvimento**
+> **Fonte de evidência:** código, testes e Git local; sem inferir capacidade por nome de classe
 
----
+## Resumo executivo
 
-## 1. Resumo Executivo
+A revisão F0.5 concluiu que o repositório é uma base de harness com boa quantidade de estrutura
+interna, mas ainda não é a infraestrutura segura e instalável descrita como objetivo do produto.
+Documentos anteriores misturavam arquitetura desejada com comportamento entregue e usavam contagens
+de testes antigas como prova de efeitos que os testes não exercitavam.
 
-O projeto **AI-Engineering-Harness** foi submetido a uma auditoria completa cobrindo arquitetura de software, conformidade com os princípios BMAD/MAF, integridade do Graph Compiler, qualidade de código, suíte de testes unitários/E2E e experiência do desenvolvedor (DX).
+O baseline F0.4 foi comprovado com 65 testes e 6 subtests, além de empacotamento, versionamento,
+lint, tipos e build validados anteriormente. Essa evidência sustenta a base de desenvolvimento; não
+sustenta claims de providers, MCP, worktree, promoção ou rollback reais.
 
-O sistema encontra-se altamente robusto, atendendo rigorosamente à fórmula arquitetural:
-$$\text{Harness} = \text{BMAD} \longrightarrow \text{Graph Engineering} \longrightarrow \text{MAF} \longrightarrow \text{Serena + Codebase-Memory} \longrightarrow \text{Quality/Ops}$$
+## Achados comprovados
 
----
+| ID | Achado | Evidência no código | Consequência |
+|---|---|---|---|
+| DOC-001 | Providers não consultam modelos | [models/adapters/](../src/ai_engineering_harness/models/adapters/) constroem `LLMResponse` fixa | O runtime não executa raciocínio real |
+| DOC-002 | Serena não é MCP | [serena.py](../src/ai_engineering_harness/tools/adapters/serena.py) cria/toca arquivo e retorna `True` | “Edição semântica” não foi implementada |
+| DOC-003 | Índice AST é simulado | [codebase_memory_adapter.py](../src/ai_engineering_harness/indexer/codebase_memory_adapter.py) usa `mock_ast` | Reindexação não representa a codebase |
+| DOC-004 | Doctor sempre aprova | [probes.py](../src/ai_engineering_harness/doctor/probes.py) constrói todos os estágios como OK | Saída do doctor não é diagnóstico |
+| DOC-005 | Promoção é sintética | [engine.py](../src/ai_engineering_harness/runtime/engine.py) força `dry_run=True`; [promotion_manager.py](../src/ai_engineering_harness/runtime/promotion_manager.py) cria SHA textual | `COMPLETED` pode existir sem commit entregue |
+| DOC-006 | Worktree não é Git | [git_worktree.py](../src/ai_engineering_harness/workspace/git_worktree.py) usa somente `mkdir` e JSON | Não há isolamento do checkout original |
+| DOC-007 | Terminal viola contrato final | [terminal.py](../src/ai_engineering_harness/tools/adapters/terminal.py) aceita string e usa `shell=True` | Argumentos e quoting não são fail-closed |
+| DOC-008 | Documentação não era portátil | Nove links dependiam do caminho local de uma máquina | Links quebravam após clone em outro diretório |
+| DOC-009 | Árvores documentais estavam obsoletas | Referências a `contracts/`, `policies/`, `graphs/specs/` e `observability/log_integrity.py` não resolviam | A estrutura descrita não correspondia ao repo |
 
-## 2. Auditoria Arquitetural (Winston)
+## Capacidades que possuem evidência
 
-### 2.1. Invariantes e Contratos Pydantic
-- **Imutabilidade de Contratos:** Os contratos definidos sob [contracts/](file:///c:/Users/walla/OneDrive/Desktop/ai-engineering-harness/contracts) garantem tipagem forte para eventos e nós do grafo.
-- **Design-Time Validation:** A compilação em design-time via `compiler/compile.py` previne falhas em runtime ao validar dependências de ferramentas e injeção de verification gates antes do deploy do grafo.
+- pacote Python instalável em ambiente de desenvolvimento e wheel testada externamente na F0.4;
+- uma fonte de package version e namespaces separados para schemas;
+- contratos Pydantic, defaults, FSM e artefatos locais;
+- execução real de alguns subprocessos de verificação;
+- diário local encadeado por SHA-256;
+- suíte automatizada que cobre contratos internos do protótipo.
 
-### 2.2. Segurança e Hash Chain Auditoria
-- **Audit Logging:** Mecanismo de integridade baseado em Hash Chain imutável em `observability/log_integrity.py` assegura auditabilidade completa de ações dos agentes.
-- **Isolamento de Ferramentas:** Sandboxing configurado sob `policies/sandbox_policy.yaml`.
+## O que falta para chamar de infraestrutura operacional
 
----
+1. compilador único e artefato canônico;
+2. runtime dirigido pelo grafo, persistido e retomável;
+3. providers e ferramentas reais com erro tipado;
+4. escrita confinada a worktree Git real;
+5. gates obrigatórios sem sucesso vazio;
+6. aprovação retomável, candidate commit e promoção explícita;
+7. segurança, budgets, secrets e políticas no caminho crítico;
+8. doctor e recovery confiáveis;
+9. E2E em repositório externo, instalação limpa e processo de release.
 
-## 3. Auditoria de Engenharia & Qualidade (Amelia)
-
-### 3.1. Suíte de Testes
-- **Status dos Testes:** 40 de 40 testes aprovados (100% de sucesso).
-- **Tempo de Execução:** ~1.08 segundos via `py -m pytest`.
-
-### 3.2. Achado Crítico & Correção Proposta
-- 🐛 **Bug de Codificação no Terminal Windows (`UnicodeEncodeError` no CLI):**
-  - **Sintoma:** O comando `harness doctor` falhava com `UnicodeEncodeError` ao tentar renderizar ícones Unicode (`✔` e `✖`) em shells Windows padrão com codificação `cp1252`.
-  - **Solução Recomendada:** Atualizar [report.py](file:///c:/Users/walla/OneDrive/Desktop/ai-engineering-harness/src/ai_engineering_harness/doctor/report.py) para utilizar rótulos com estilização Rich em vez de caracteres Unicode crus incompatíveis com consoles legados.
-
----
-
-## 4. Matriz de Recomendações
-
-1. **[Arquitetura] Persistence Abstraction Layer:** Implementar abstração `StateStorageProvider` para suporte a SQLite/Redis em ambientes de CI/CD concorrentes.
-2. **[Engenharia] Standardized Terminal Encoding:** Garantir suporte universal a encoding UTF-8 no CLI `harness`.
-3. **[Qualidade] Tipagem Estática no CI:** Integrar `mypy` no fluxo de verificação.
+O detalhamento e os critérios de aceite estão no
+[plano de implementação](plano_implementacao_harness_operacional.md).

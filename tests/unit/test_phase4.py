@@ -1,12 +1,14 @@
 """Testes unitários para a Fase 4 (Tools Router, Sandbox e Indexer Adapter)."""
 
-import sys
 from pathlib import Path
+
 import pytest
-from ai_engineering_harness.tools.router import ToolRouter
-from ai_engineering_harness.workspace.sandbox import SandboxProvider
-from ai_engineering_harness.workspace.git_worktree import ExternalWorktreeManager
+
 from ai_engineering_harness.indexer.codebase_memory_adapter import CodebaseMemoryAdapter
+from ai_engineering_harness.tools.router import ToolRouter
+from ai_engineering_harness.workspace.git_worktree import ExternalWorktreeManager
+from ai_engineering_harness.workspace.sandbox import SandboxProvider
+
 
 def test_tool_router_permission():
     router = ToolRouter(allowed_tools=["serena_edit"])

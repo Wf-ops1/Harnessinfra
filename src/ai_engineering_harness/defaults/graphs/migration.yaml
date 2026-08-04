@@ -1,7 +1,8 @@
 # graphs/specs/migration.yaml
 graph:
   name: migration
-  version: "3.2.0"
+  graph_schema_version: "1.0"
+  definition_version: "3.2.0"
   description: "Grafo de alteração de schema e migração de banco com rollback garantido (Modo 5: Migração de Banco)"
 
 policies:

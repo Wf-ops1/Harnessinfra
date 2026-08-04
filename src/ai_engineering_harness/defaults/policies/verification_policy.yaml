@@ -1,6 +1,7 @@
 # policies/verification_policy.yaml
 policy_id: feature-completion-v1
-version: "3.2.0"
+policy_schema_version: "1.0"
+definition_version: "3.2.0"
 applies_to:
   - new-feature
   - bug-fix

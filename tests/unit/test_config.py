@@ -1,7 +1,9 @@
 """Testes unitários para o módulo ConfigResolver em 6 níveis (TASK-1.3)."""
 
 from pathlib import Path
+
 from ai_engineering_harness.core.config import ConfigResolver
+
 
 def test_config_resolver_hierarchy(tmp_path: Path):
     # Setup .harness structure

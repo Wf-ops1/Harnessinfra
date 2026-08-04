@@ -1,7 +1,7 @@
 """Formatador e estruturador de resultados de verificação."""
 
-from typing import Dict, List
 from pydantic import BaseModel, ConfigDict
+
 
 class GateResult(BaseModel):
     model_config = ConfigDict(strict=True, frozen=True)
@@ -18,4 +18,4 @@ class VerificationSuiteResult(BaseModel):
     all_passed: bool
     total_gates: int
     passed_gates: int
-    gate_results: List[GateResult]
+    gate_results: list[GateResult]

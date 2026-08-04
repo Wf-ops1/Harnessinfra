@@ -1,8 +1,10 @@
 """Schemas de eventos de execução e sincronização de conhecimento."""
 
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any
+
 from pydantic import BaseModel, ConfigDict, Field
+
 
 class ExecutionEvent(BaseModel):
     model_config = ConfigDict(strict=True, frozen=True)
@@ -11,9 +13,9 @@ class ExecutionEvent(BaseModel):
     execution_id: str = Field(description="ID da execução vinculada")
     event_type: str = Field(description="Tipo de evento (ex: STEP_STARTED, STEP_COMPLETED)")
     timestamp: datetime = Field(description="Timestamp ISO do evento")
-    payload: Dict[str, Any] = Field(default_factory=dict, description="Dados específicos do evento")
-    previous_hash: Optional[str] = Field(default=None, description="SHA-256 do evento anterior no Hash Chain")
-    current_hash: Optional[str] = Field(default=None, description="SHA-256 deste evento encadeado")
+    payload: dict[str, Any] = Field(default_factory=dict, description="Dados específicos do evento")
+    previous_hash: str | None = Field(default=None, description="SHA-256 do evento anterior no Hash Chain")
+    current_hash: str | None = Field(default=None, description="SHA-256 deste evento encadeado")
 
 class KnowledgeSyncEvent(BaseModel):
     model_config = ConfigDict(strict=True, frozen=True)

@@ -1,10 +1,10 @@
 """FSM de Estado do Workflow e Persistência Local em Tempo Real."""
 
 import json
+from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
-from typing import Dict, Any, Optional, Set
-from datetime import datetime, timezone
+from typing import Any
 
 ROLLBACK_REQUESTED = "ROLLBACK_REQUESTED"
 ROLLBACK_CODE_COMPLETED = "ROLLBACK_CODE_COMPLETED"
@@ -14,7 +14,6 @@ EXECUTION_COMPENSATED = "EXECUTION_COMPENSATED"
 
 class InvalidStateTransitionError(ValueError):
     """Exceção lançada quando ocorre uma transição inválida no FSM."""
-    pass
 
 
 class WorkflowState(str, Enum):
@@ -35,7 +34,7 @@ class WorkflowState(str, Enum):
     FAILED_RETRY_EXHAUSTED = "FAILED_RETRY_EXHAUSTED"
 
 
-VALID_TRANSITIONS: Dict[WorkflowState, Set[WorkflowState]] = {
+VALID_TRANSITIONS: dict[WorkflowState, set[WorkflowState]] = {
     WorkflowState.INITIATED: {
         WorkflowState.CONTEXT_ASSEMBLING,
         WorkflowState.PLANNING,
@@ -118,16 +117,16 @@ class WorkflowStateMachine:
         self.current_state = WorkflowState.INITIATED
         self._save_state()
 
-    def _save_state(self, metadata: Optional[Dict[str, Any]] = None) -> None:
+    def _save_state(self, metadata: dict[str, Any] | None = None) -> None:
         data = {
             "execution_id": self.execution_id,
             "state": self.current_state.value if isinstance(self.current_state, WorkflowState) else str(self.current_state),
-            "updated_at_iso": datetime.now(timezone.utc).isoformat(),
+            "updated_at_iso": datetime.now(UTC).isoformat(),
             "metadata": metadata or {}
         }
         self.state_file.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
-    def transition_to(self, new_state: WorkflowState, metadata: Optional[Dict[str, Any]] = None) -> None:
+    def transition_to(self, new_state: WorkflowState, metadata: dict[str, Any] | None = None) -> None:
         target_state = new_state
         if isinstance(new_state, str) and not isinstance(new_state, WorkflowState):
             try:
