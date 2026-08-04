@@ -147,8 +147,8 @@ para preparar o próprio dossiê é permitida; alteração de código da tarefa 
 
 **Objetivo:** transformar YAMLs declarativos em artefatos executáveis, validados e determinísticos.
 
-**Status da fase:** `in_progress` — F1.1 concluída dentro do gate congelado; a próxima retomada deve
-preparar somente a auditoria e o gate de defensabilidade da F1.2 antes de qualquer nova implementação.
+**Status da fase:** `preparing` — F1.1 concluída; auditoria e gate da F1.2 preparados. A F1.2 permanece
+`pending`, sem implementação, até nova execução confirmar o checkpoint local `checkpoint/f1.2-ready`.
 
 ### Coordenação e ambiente observado
 
@@ -157,15 +157,15 @@ preparar somente a auditoria e o gate de defensabilidade da F1.2 antes de qualqu
 | **Executor ativo** | `Codex` — responsável por implementar, validar, manter checkpoints e criar commits locais |
 | **Auditor/revisor** | `Antigravity` — somente-leitura por padrão; só edita quando o usuário solicitar explicitamente ou transferir a execução |
 | **Workspace** | `C:\Users\walla\OneDrive\Desktop\ai-engineering-harness` |
-| **Git** | `available` — branch local `phase/f1-graph-contract` criada em `4e3a3531cea44aadcebb9ff3b3e763b4e53adba6`, mesmo commit observado em `origin/main`; `checkpoint/pre-f1.1-defensibility` aponta para esse baseline; nenhuma branch/tag da F1 foi publicada |
+| **Git** | `available` — branch local `phase/f1-contract-registry` criada em `d61d4e36109f685ef237c5256e046cc71654d719`; `checkpoint/pre-f1.2-defensibility` aponta para esse baseline F1.1 concluído; nenhuma branch/tag da F1 foi publicada |
 | **python_command** | `& 'C:\Users\walla\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe'` — Python `3.12.13` |
 | **uv_command** | `& '.\build\f0.6-tools\uv\bin\uv.exe'` — uv `0.11.32` restaurado de forma isolada/ignorada, sem PATH ou instalação global; `lock --check` e `sync --all-extras --locked` verdes |
-| **Dependências do projeto** | `.venv` ressincronizada pelo uv 0.11.32 com Python 3.12.13 e `uv.lock`; 73 testes + 6 subtests, mypy em 86 arquivos, Ruff, compileall, build e smoke isolado da wheel revalidados nesta retomada |
+| **Dependências do projeto** | `.venv` gerida pelo uv 0.11.32 com Python 3.12.13 e `uv.lock`; 98 testes + 6 subtests, mypy em 87 arquivos, Ruff, compileall, build e smoke isolado da wheel verdes no baseline F1.2 |
 | **Regra de escrita** | apenas um agente escreve por vez |
 
 ---
 
-## 6. Tarefa Atual — F1.1
+## 6. Fase 1 — Estado e tarefa atual
 
 ### F1.1 — Definir schema tipado do grafo
 
@@ -395,6 +395,242 @@ defensibility:
 | **Quais testes provam falha segura?** | Casos negativos rejeitam duplicidade, referências quebradas, ausência de terminais, inalcançabilidade, ciclo sem retry, valores vazios/zero, coerção, extras e combinações incompatíveis. |
 | **A wheel instalada externamente foi testada?** | Sim; instalação uv isolada importou os dez símbolos a partir do `site-packages`, fora do checkout. |
 | **A documentação foi atualizada?** | Sim; este painel registra resultado, limites e retomada. Compiladores, runtime e YAMLs ainda não consomem o schema e permanecem para F1.2–F1.5. |
+
+---
+
+### F1.2 — Criar registry seguro de contratos
+
+| Campo | Detalhe |
+|---|---|
+| **Status** | `pending` — gate `READY`; nenhum arquivo de implementação F1.2 foi alterado |
+| **Objetivo** | Substituir resolução arbitrária por path por um catálogo explícito, produzir schema/digest determinísticos e bloquear execução de Python externo salvo confiança e aprovação exatas |
+| **Arquivos potencialmente alteráveis** | `contracts/registry.py` (novo), `contracts/graph.py`, `contracts/__init__.py`, adapter legado `compiler/validators/contract_validator.py`, testes focados, `pyproject.toml`, `uv.lock` e `TASK.md` |
+| **Dependências** | F1.1 concluída; Pydantic v2 disponível; validação normativa de JSON Schema exigirá dependência direta `jsonschema` v4 registrada no lock |
+
+#### Auditoria concreta da F1.2
+
+| Superfície | Comportamento observado | Lacuna frente ao plano | Risco/compatibilidade |
+|---|---|---|---|
+| `compiler/validators/contract_validator.py` legado | Divide `path#Classe`, procura o path na raiz, pacote ou `.harness` e chama `spec_from_file_location` + `exec_module` sem receber decisão de confiança | Executa código Python escolhido pelo projeto durante validação | Execução de código de topo antes de qualquer gate; precisa virar adapter fail-closed sem loader por arquivo |
+| Prova controlada em `build/f1.2-audit/` | Um arquivo cujo topo levanta `F1.2_AUDIT_TOP_LEVEL_CODE_EXECUTED` foi efetivamente executado pelo validator e encapsulado em `ContractValidationError` | Confirma explorabilidade, não apenas presença de API perigosa | Artefatos da prova estão ignorados por Git; nenhum código versionado foi criado |
+| `src/ai_engineering_harness/compiler/compiler.py` | Valida somente bloco `loop`; compilou um YAML com `missing/schema.json` e `missing/module.py#Payload` e escreveu JSON com exit 0 | Contrato inexistente não interrompe o caminho oficial | Integração completa permanece F1.4; F1.2 entregará o resolver seguro consumível pelo compilador |
+| Contratos internos | Há modelos Pydantic espalhados em `contracts/nodes`, `events` e `transactions`, sem catálogo único; `ContextSufficiencyReport` existe em dois módulos | Lookup por nome curto é ambíguo | Nome canônico deve ser totalmente qualificado; aliases só podem ser allowlist exata |
+| Grafos default | Cinco YAMLs contêm 24 referências e 11 pares `contracts/...py#Classe` distintos | Formato legado mistura identidade e path executável | Preservar somente os 11 aliases internos conhecidos, resolvidos por mapping; não importar seus paths nem editar YAMLs na F1.2 |
+| `GraphSpec`/`CompiledGraphArtifact` | Referências são strings; o artefato possui apenas versões e grafo, sem schema/digest resolvido | Aceite F1.2 não é representável | Adicionar visão resolvida compatível, mantendo construção F1.1 existente válida |
+| Fronteira de confiança | `TrustBoundaryEvaluator` expõe `allow_python_contracts`, mas considera um arquivo `.harness/trusted_repository` suficiente e nenhum compilador/validator consulta o resultado | Não há aprovação exata vinculada ao módulo | Registry deve receber confiança e allowlist de aprovação explicitamente; integração de trust/policy fica para F5 |
+| JSON Schema e testes | `jsonschema` não está em `pyproject.toml`, `uv.lock` nem `.venv`; não há teste de registry, contrato malicioso ou contrato inexistente | Falta validação normativa e prova fail-closed | Adicionar dependência direta v4 e testes focados sem relaxar gates existentes |
+
+#### Gate de defensabilidade da F1.2
+
+| Campo | Estado atual |
+|---|---|
+| **Gate** | `READY` — problema, baseline, API, confiança, compatibilidade, aceite e rollback congelados |
+| **Checkpoint anterior** | `checkpoint/pre-f1.2-defensibility` → `d61d4e36109f685ef237c5256e046cc71654d719` |
+| **Checkpoint de liberação** | `checkpoint/f1.2-ready` será criado no commit exclusivamente documental deste dossiê |
+| **Próximo passo permitido** | Em nova execução, implementar somente o escopo congelado; descoberta fora dele reabre o gate |
+
+```yaml
+defensibility:
+  task_id: "F1.2"
+  gate: "READY"
+  executor: "Codex"
+  authorized_at: "2026-08-04T12:56:59-03:00"
+  problem_statement: >-
+    O projeto não possui catálogo seguro de contratos: o validator legado executa Python escolhido
+    por path durante a compilação, enquanto o compilador oficial aceita referências inexistentes;
+    nenhum caminho produz schema e digest resolvidos no artefato.
+  evidence:
+    - command: >-
+        rg -n -i "importlib|spec_from_file_location|module_from_spec|exec_module|contract.?registry"
+        src compiler tests
+      observed: >-
+        o único loader de contratos está em compiler/validators/contract_validator.py e chama
+        spec_from_file_location, module_from_spec e exec_module; nenhum ContractRegistry existe
+      location: "compiler/validators/contract_validator.py:1-56"
+    - command: ".venv/Scripts/python.exe build/f1.2-audit/run_legacy_probe.py"
+      observed: >-
+        exit 0; ContractValidationError contém F1.2_AUDIT_TOP_LEVEL_CODE_EXECUTED, provando que o
+        corpo de malicious_contract.py foi executado durante a validação
+      location: "build/f1.2-audit/ — prova ignorada por Git"
+    - command: >-
+        GraphCompiler(Path('build/f1.2-audit')).compile_graph(
+        Path('build/f1.2-audit/missing-contract.yaml'), 'missing-contract')
+      observed: >-
+        exit 0; escreveu .harness/state/compiled/missing-contract.json preservando referências
+        missing/schema.json e missing/module.py#Payload sem resolvê-las
+      location: "src/ai_engineering_harness/compiler/compiler.py:39-66"
+    - command: >-
+        rg -o --no-filename "contracts/...py#Classe" defaults/graphs; ordenar e contar
+      observed: "24 ocorrências, 11 referências únicas; todas no formato legado path#Classe"
+      location: "src/ai_engineering_harness/defaults/graphs/*.yaml"
+    - command: >-
+        CompiledGraphArtifact.model_fields.keys(); busca de jsonschema em pyproject.toml e uv.lock;
+        busca de ContractValidator/contract registry tests em tests/
+      observed: >-
+        artefato contém somente artifact_schema_version, package_version e graph; jsonschema e
+        testes de segurança do registry estão ausentes
+  git_baseline:
+    branch: "phase/f1-contract-registry"
+    head: "d61d4e36109f685ef237c5256e046cc71654d719"
+    base_checkpoint: "checkpoint/f1.1-complete"
+    rollback_checkpoint: "checkpoint/pre-f1.2-defensibility"
+    worktree: "limpa; somente build/, dist/ e provas ignoradas produzidas pelas verificações"
+    remote_boundary: "nenhuma branch ou tag F1 publicada"
+  baseline_verification:
+    - command: "<uv_command> lock --check"
+      observed: "exit 0"
+    - command: >-
+        <uv_command> run python -m pytest -q -p no:cacheprovider
+        --basetemp build/f1.2-audit/full-pytest
+      observed: "exit 0; 98 testes e 6 subtests passaram"
+    - command: "<uv_command> run python -m mypy src"
+      observed: "exit 0; sem issues em 87 arquivos"
+    - command: >-
+        <uv_command> run python -m ruff check .;
+        <uv_command> run python -m compileall -q src compiler tests
+      observed: "ambos exit 0"
+    - command: >-
+        <uv_command> run python -m build; adicionar o diretório do uv registrado somente ao PATH
+        do processo; <uv_command> run python tests/ci/smoke_wheel.py
+      observed: >-
+        build exit 0; smoke exit 0 após expor o uv ao subprocesso; metadata, package e CLI 0.1.0,
+        import originado de site-packages fora do checkout
+  frozen_contract:
+    catalog: >-
+      ContractRegistry mantém mapping explícito de nomes totalmente qualificados para classes
+      Pydantic internas já importadas pelo pacote; lookup nunca deriva import ou path do nome pedido
+    canonical_internal_name: >-
+      ai_engineering_harness.contracts.<subpacote>.<modulo>.<Classe>; nome curto é proibido porque
+      ContextSufficiencyReport possui duas definições atuais
+    legacy_aliases: >-
+      os 11 path#Classe usados pelos defaults serão aliases exatos para entradas internas conhecidas;
+      qualquer outro .py#Classe será rejeitado sem tocar no filesystem
+    external_json_schema: >-
+      referência explícita jsonschema:<path-relativo>[#<JSON-Pointer>], restrita ao schema root
+      configurado, extensão .json, path real contido no root e documento validado por jsonschema v4
+    trusted_python: >-
+      referência python:<modulo>:<Classe> só pode importar após repository_trusted=true e presença
+      da referência exata em approved_python_contracts; faltar qualquer condição falha antes do import
+    python_loader: >-
+      spec_from_file_location, module_from_spec e exec_module por path são proibidos; módulo aprovado
+      usa import normal por nome e o símbolo deve ser subclasse Pydantic BaseModel
+    resolved_contract: >-
+      ResolvedContractSpec estrito contém canonical_name, requested_reference, source, JSON Schema e
+      digest sha256:<hex> calculado sobre JSON UTF-8 canônico com sort_keys e separadores compactos
+    artifact: >-
+      CompiledGraphArtifact recebe campo aditivo resolved_contracts com default vazio para preservar
+      F1.1; o passo resolve_many da F1.2 deve preenchê-lo e falhar antes da criação se houver referência ausente
+    compatibility: >-
+      validate_compatibility é chamado somente para pares output/input declarados; digest idêntico é
+      compatível e schemas object são comparados conservadoramente por campos required e tipos aceitos;
+      composição ou prova indeterminada falha com ContractCompatibilityError, nunca assume compatibilidade
+    errors:
+      - "ContractRegistryError — base tipada"
+      - "InvalidContractReferenceError — sintaxe, path ou símbolo inválido"
+      - "ContractNotFoundError — referência sem entrada resolvível"
+      - "UntrustedPythonContractError — Python sem confiança/aprovação exatas"
+      - "InvalidContractSchemaError — JSON inválido, schema inválido, símbolo não Pydantic ou digest inconsistente"
+      - "ContractCompatibilityError — incompatibilidade ou impossibilidade de prova segura"
+  frozen_scope:
+    allowed:
+      - "src/ai_engineering_harness/contracts/registry.py — criar catálogo, modelos, erros, resolução, digest e compatibilidade"
+      - "src/ai_engineering_harness/contracts/graph.py — adicionar resolved_contracts ao artefato sem quebrar construção F1.1"
+      - "src/ai_engineering_harness/contracts/__init__.py — reexportar exclusivamente a API pública F1.2"
+      - "compiler/validators/contract_validator.py — remover loader arbitrário e delegar ao registry seguro preservando adapter legado"
+      - "tests/unit/test_contract_registry.py — criar testes positivos, negativos, segurança, digest, aliases e compatibilidade"
+      - "tests/unit/test_graph_contracts.py — ampliar somente round-trip/compatibilidade aditiva do artefato"
+      - "pyproject.toml e uv.lock — adicionar somente jsonschema v4 como dependência direta e relock consistente"
+      - "TASK.md — transições, evidências, resultado e checkpoints F1.2"
+      - "build/f1.2-*; build/; dist/; C:/tmp — temporários ignorados/confinados de verificação"
+    excluded:
+      - "src/ai_engineering_harness/compiler/**, compiler/compile.py e CLI — integração e unificação F1.4"
+      - "src/ai_engineering_harness/defaults/graphs/*.yaml e contratos payload existentes — migração não necessária graças a aliases exatos"
+      - "policies, roles e tools — F1.3; enforcement de permissions — F5"
+      - "security/trust.py, approval e config — integração da fronteira de confiança F5"
+      - "runtime, persistência, worktree, providers, indexador e knowledge"
+      - "normalização integral, escrita atômica e versões do artefato — F1.5"
+      - "push, PR, merge, tag remota ou alteração de branch protection"
+  compatibility_strategy:
+    f1_1_api: >-
+      todos os dez exports e construções válidas F1.1 permanecem; resolved_contracts é aditivo e serializável
+    default_graphs: >-
+      24 ocorrências continuam textualmente intactas; somente os 11 aliases internos exatos resolvem,
+      sem transformar paths fornecidos pelo projeto em imports
+    legacy_adapter: >-
+      ContractValidator e ContractValidationError permanecem importáveis; validate conserva retorno True
+      em sucesso e converte erros do registry em ContractValidationError, mas nunca executa arquivo por path
+    official_compiler: >-
+      não será alterado nem falsamente declarado seguro na F1.2; F1.4 deverá conectar resolve_many ao caminho oficial
+    dependency: >-
+      jsonschema passa a dependência direta na major v4, registrada em pyproject e uv.lock; nenhum fallback
+      permissivo será usado quando indisponível
+  frozen_acceptance:
+    - command: >-
+        <uv_command> run python -m pytest tests/unit/test_contract_registry.py
+        tests/unit/test_graph_contracts.py tests/unit/test_public_module_imports.py -q
+      expected: >-
+        exit 0; catálogo interno, 11 aliases, JSON Schema, Python aprovado, artifact round-trip,
+        digest determinístico e compatibilidade conservadora passam
+    - command: >-
+        testes negativos para referência ausente/malformada, alias arbitrário, escape/symlink de path,
+        JSON/schema inválido, duplicidade, símbolo não Pydantic, digest adulterado e incompatibilidade
+      expected: "cada caso levanta o erro tipado congelado; nenhum inválido é omitido ou normalizado"
+    - command: >-
+        teste com arquivo Python malicioso em repositório não confiável e spy no mecanismo de import
+      expected: >-
+        UntrustedPythonContractError antes de qualquer import; corpo não executa e sentinel não existe,
+        inclusive quando a referência aparece na allowlist mas repository_trusted=false
+    - command: >-
+        rg -n "spec_from_file_location|module_from_spec|exec_module"
+        compiler/validators/contract_validator.py src/ai_engineering_harness/contracts
+      expected: "exit 1; loader arbitrário por arquivo completamente ausente do escopo F1.2"
+    - command: "<uv_command> lock --check; <uv_command> sync --all-extras --locked"
+      expected: "ambos exit 0; jsonschema é dependência direta resolvida no lock"
+    - command: "<uv_command> run python -m pytest -q"
+      expected: "exit 0; 98+ testes, 6 subtests e todos os novos testes F1.2 passam"
+    - command: >-
+        <uv_command> run python -m mypy src; <uv_command> run python -m ruff check .;
+        <uv_command> run python -m compileall -q src compiler tests; git diff --check
+      expected: "todos exit 0; sem redução de regras, ignores ou skips"
+    - command: >-
+        <uv_command> run python -m build; <uv_command> run python tests/ci/smoke_wheel.py;
+        smoke isolado importa ContractRegistry, ResolvedContractSpec e erros públicos
+      expected: >-
+        wheel/sdist limpas; instalação fora do checkout; versões 0.1.0; API F1.1 preservada e API F1.2 importável
+  rollback:
+    triggers:
+      - "qualquer arquivo Python externo executar sem confiança e aprovação exatas"
+      - "path absoluto, traversal, symlink escape ou alias não cadastrado resolver"
+      - "contrato ausente, schema inválido ou incompatibilidade não falhar fechado"
+      - "digest variar para schema semanticamente idêntico após canonicalização"
+      - "API F1.1, default conhecido, lock, teste, build ou smoke regredir"
+      - "critério congelado precisar ser removido, ignorado ou enfraquecido"
+    procedure: >-
+      interromper e preservar logs; antes de commit inverter somente hunks F1.2 por apply_patch;
+      depois de commit usar git revert nos commits exclusivos da F1.2; nunca resetar nem descartar
+      trabalho preexistente; preservar checkpoint/pre-f1.2-defensibility
+    verify: >-
+      git status --short; git diff checkpoint/pre-f1.2-defensibility --
+      src/ai_engineering_harness/contracts compiler/validators/contract_validator.py
+      tests/unit/test_contract_registry.py tests/unit/test_graph_contracts.py pyproject.toml uv.lock TASK.md;
+      repetir testes focados, busca de loaders, suíte integral, qualidade, build e smoke
+  external_boundary: >-
+    nenhum push, PR, merge, tag remota ou mudança de proteção está autorizado nesta tarefa sem
+    pedido explícito adicional do usuário
+```
+
+#### Checklist de liberação da F1.2
+
+```text
+[x] Execução arbitrária por path comprovada com prova controlada
+[x] Caminho oficial permissivo e ausência de schema/digest comprovados
+[x] Baseline Git limpo, branch e checkpoint de rollback registrados
+[x] API, identidade, aliases, confiança, digest e compatibilidade congelados
+[x] Escopo permitido e fora de escopo congelados por arquivo/capacidade
+[x] Critérios positivos, negativos, regressão integral e smoke congelados
+[x] Rollback não destrutivo e fronteira externa definidos
+[x] Nenhum código, YAML de produção ou schema F1.2 implementado nesta preparação
+```
 
 ---
 
@@ -1453,13 +1689,13 @@ de `main`.
 ```
 Data:              2026-08-04
 Fase:              F1
-Tarefa:            F1.1 — schema tipado do grafo
-Estado:            completed — gate READY → COMPLETED; todos os critérios congelados aprovados
-Arquivos alterados: contracts/graph.py, contracts/__init__.py, tests/unit/test_graph_contracts.py e TASK.md
-Validações:         28 testes focados; 98 testes + 6 subtests integrais; mypy 87 arquivos; Ruff, compileall, diff-check, build e smoke isolado verdes
-Checkpoint:         checkpoint/pre-f1.1-defensibility no baseline 4e3a3531cea44aadcebb9ff3b3e763b4e53adba6; checkpoint/f1.1-ready no dossiê; checkpoint/f1.1-complete no commit final
-Observação:         branch local phase/f1-graph-contract; nenhuma branch/tag F1 publicada; compiladores, runtime e defaults não foram alterados nem integrados
-Resultado:          API pública tipada, estrita e imutável criada; topologia inválida falha com ValidationError; integração permanece deliberadamente fora da F1.1
+Tarefa:            F1.2 — auditoria e gate de registry seguro preparados
+Estado:            pending — gate READY; nenhuma implementação F1.2 iniciada
+Arquivos alterados: TASK.md somente; provas controladas confinadas a build/f1.2-audit e ignoradas por Git
+Validações:         98 testes + 6 subtests; mypy 87 arquivos; Ruff, compileall, lock, build e smoke isolado verdes; execução arbitrária e aceite indevido reproduzidos
+Checkpoint:         checkpoint/f1.1-complete e checkpoint/pre-f1.2-defensibility em d61d4e36109f685ef237c5256e046cc71654d719; checkpoint/f1.2-ready no commit documental deste dossiê
+Observação:         branch local phase/f1-contract-registry; nenhuma branch/tag F1 publicada; compilador oficial, runtime, defaults e código F1.2 não foram alterados
+Resultado:          catálogo, aliases, JSON Schema, trust/aprovação, erros, digest, compatibilidade, aceite, escopo e rollback F1.2 congelados
 ```
 
 ---
@@ -1467,13 +1703,14 @@ Resultado:          API pública tipada, estrita e imutável criada; topologia i
 ## 11. Próxima Ação Exata
 
 ```text
-PREPARAR F1.2 — SOMENTE AUDITORIA E GATE DE DEFENSABILIDADE, SEM IMPLEMENTAR:
-1. Confirmar branch phase/f1-graph-contract, worktree limpo e checkpoint/f1.1-complete no commit final da F1.1.
-2. Reler integralmente a F1.2 do plano e o handoff da F1.1; manter um único executor.
-3. Auditar o import dinâmico legado, referências atuais de contratos, consumidores e a fronteira de confiança do registry.
-4. Congelar problema, evidências, escopo permitido/proibido, API, compatibilidade, aceite positivo/negativo, rollback e checkpoint de liberação da F1.2.
-5. Não alterar código da F1.2 até o gate estar `READY` e uma retomada posterior confirmar o checkpoint local de liberação.
-6. Não fazer push, PR, merge, tag remota ou alteração de proteção sem autorização explícita.
+IMPLEMENTAR F1.2 — SOMENTE EM NOVA EXECUÇÃO E DENTRO DO GATE CONGELADO:
+1. Confirmar branch phase/f1-contract-registry, worktree sem mudanças alheias e checkpoint/f1.2-ready resolvendo para o commit documental do dossiê.
+2. Reler integralmente a F1.2, este dossiê e os triggers de recongelamento; manter um único executor.
+3. Alterar somente os arquivos listados em frozen_scope.allowed e preservar todos os itens excluded.
+4. Implementar primeiro erros/modelo/catalog/aliases; depois JSON Schema e trust explícito; por fim adapter legado, compatibilidade e artifact field aditivo.
+5. Executar testes focados e busca de loaders antes da suíte integral, lock/sync, mypy, Ruff, compileall, build e smoke da wheel.
+6. Se qualquer descoberta exigir compilador oficial, CLI, defaults, trust engine, runtime ou contrato diferente, interromper e recongelar antes de editar fora do escopo.
+7. Não fazer push, PR, merge, tag remota ou alteração de proteção sem autorização explícita.
 ```
 
 ---
