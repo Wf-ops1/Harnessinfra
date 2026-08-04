@@ -1,29 +1,41 @@
-# Auditoria do Ciclo de Vida Agentic — Matriz Desejado vs. Implementado
+# Auditoria do Ciclo de Vida Agentic — Desejado vs. Implementado
 
-Este documento detalha o mapeamento entre o modelo teórico do ciclo agentic e a implementação real no repositório `AI-Engineering-Harness`.
+> **Status da auditoria: Protótipo / Em desenvolvimento**
 
----
+A matriz abaixo classifica efeitos observáveis no código atual. “Experimental” significa que existe
+estrutura executável ou teste, mas a etapa ainda depende de simulação, sequência fixa ou garantia
+incompleta. “Planejada” aponta para a fase responsável no plano operacional.
 
-## 📊 Matriz de Conformidade do Ciclo Agentic
+| Etapa | Componente atual | Evidência existente | Estado real | Lacuna para o produto |
+|---|---|---|---|---|
+| Disparo | CLI `run` | Cria `execution_id` e chama o runtime | Experimental | Falta validar repositório, configuração e precondições fail-closed |
+| Contexto | `ContextAssembler` | Persiste `context.json` | Experimental | Score é heurístico; contexto estrutural/semântico real fica para F4 |
+| Plano | `Planner` | Persiste `plan.json` | Experimental | Não nasce de provider real nem governa efeitos com pre/postcondições completas |
+| Agente/modelo | `AgentExecutor` e adapters | Router e tipos existem | Simulado | Adapters fabricam respostas e não executam modelo real; F3 |
+| Ferramentas | `ToolRouter` e adapters | Allowlist e dispatch possuem testes | Simulado/inseguro | Serena não é MCP e terminal usa `shell=True`; F3/F5 |
+| Verificação | `VerificationEngine` | Executa subprocessos para gates selecionados | Experimental | Lista vazia pode passar; política fail-closed e gates completos ficam para F4 |
+| Reparo | Loop no `RuntimeEngine` | Respeita limite de tentativas | Experimental | Repete a mesma chamada; não produz e verifica patch corretivo real |
+| Aprovação | `ApprovalManager` | Solicitação/decisão são persistidas | Experimental | Aprovar não retoma/promove por protocolo persistido; F2/F3/F5 |
+| Promoção | `PromotionManager` | Registra evento e retorna string | Simulado | Runtime força dry-run e recebe SHA sintético; caminho live possui fallbacks sintéticos |
+| Memória | `CodebaseMemoryAdapter` | Snapshot local por commit | Simulado | Retorna `mock_ast`; backend estrutural real fica para F3/F4 |
+| Knowledge sync | `KnowledgeSynchronizer` | Transação local em etapas | Experimental | Falta integrar backend real, idempotência/recovery e política no caminho crítico |
+| Evidência | `RuntimeEngine` e audit trail | `evidence.json` e hash chain locais | Experimental | Evidência pode registrar SHA/efeitos simulados e não prova alteração entregue |
+| Rollback | `RollbackManager` | Eventos de compensação e chamada de Git existem | Experimental/inseguro | Worktree não é real; revert recebe string via shell; recovery e gates faltam |
+| Doctor | `HealthProbe` | Formato de seis estágios e relatório | Simulado | Todos os estágios retornam OK sem probe; F6 |
 
-| Fase do Ciclo | Componente Responsável | Estado no FSM | Artefato Gerado | Status de Implementação |
-| :--- | :--- | :--- | :--- | :--- |
-| **0. Disparo da Intent** | CLI `harness run` / API | `INITIATED` | Registo de Execução | 🟢 100% Funcional |
-| **1. Context Assembly** | `ContextAssembler` | `CONTEXT_ASSEMBLING` | `context.json` | 🟢 100% Funcional (Dual-Gate & threshold) |
-| **2. Planejamento Tático** | `Planner` (Winston) | `GENERATING_PLAN` | `plan.json` | 🟢 100% Funcional (Persona Architect) |
-| **3. Raciocínio & Ferramentas** | `AgentExecutor` (Amelia) | `EXECUTING` | Código / AST Diff | 🟢 100% Funcional (via `ToolRouter`) |
-| **4. Verificação Determinística** | `VerificationEngine` | `VERIFYING` | Suite Result | 🟢 100% Funcional (Polyglot gates) |
-| **5. Loop de Reparo** | `RuntimeEngine` | `EXECUTING` ↔ `VERIFYING` | Logs de Retentativa | 🟢 100% Funcional (`retry_max` em política) |
-| **6. Aprovação Humana** | `ApprovalManager` | `AWAITING_APPROVAL` | `approval-request.json` | 🟢 100% Funcional (Conditional gate) |
-| **7. Promoção de Código** | `PromotionManager` | `PROMOTING` | Commit SHA / Evento | 🟢 100% Funcional (Dry-run & Live mode) |
-| **8. Reindexação de Memória** | `CodebaseMemoryAdapter` | `REINDEXING` | Snapshot de AST | 🟢 100% Funcional |
-| **9. Sincronização de Knowledge** | `KnowledgeSynchronizer` | `KNOWLEDGE_SYNC` | Transação KI | 🟢 100% Funcional (5-step zero crash) |
-| **10. Evidência & Fechamento** | `RuntimeEngine` | `GENERATING_EVIDENCE` → `COMPLETED` | `evidence.json` | 🟢 100% Funcional |
-| **11. Compensação / Rollback** | `RollbackManager` | Eventos de Diário | Event-Journal append-only | 🟢 100% Funcional (Sem alteração de histórico) |
+## Interpretação correta dos testes
 
----
+Os testes atuais provam contratos internos e caminhos do protótipo. Eles não provam conectividade com
+OpenAI, Anthropic, Ollama, Serena ou Codebase-Memory; não provam isolamento por worktree; e não provam
+promoção/reversão sobre um repositório externo. O E2E atual usa diretório temporário, adapters
+simulados, gates limitados e promoção dry-run.
 
-## 🛡️ Garantias de Arquitetura
+## Gate para mudar uma linha para “implementada”
 
-1. **Agentes vs. Ferramentas:** Agentes (Winston, Amelia) agem como decisores/executores morais e conectam-se obrigatoriamente através do `ToolRouter`. Ferramentas como `Serena` e `Terminal` são capacidades passivas invocadas com controle de permissões.
-2. **Audit Trail Append-Only:** Todas as transições, promoções e compensações de rollback geram eventos encadeados por SHA-256 no diário de auditoria `event-journal.jsonl`.
+Uma etapa só muda para implementada quando:
+
+1. o efeito real correspondente existir;
+2. indisponibilidade gerar erro tipado e estado bloqueado;
+3. side effects estiverem confinados e auditados;
+4. houver teste de sucesso e de falha segura;
+5. o E2E externo comprovar o comportamento sem mocks.

@@ -363,9 +363,9 @@ uv run python -m build
 
 **Implementação**
 
-- Trocar `Em Produção` por `Protótipo / Em desenvolvimento` até o gate de produção ser atingido.
+- Trocar todo rótulo que afirme estado produtivo por `Protótipo / Em desenvolvimento` até o gate correspondente ser atingido.
 - Remover referências a arquivos inexistentes.
-- Corrigir links `file:///` absolutos.
+- Corrigir links locais absolutos dependentes do caminho da máquina.
 - Criar matriz `Capacidade | Implementada | Experimental | Planejada`.
 - Marcar adapters fake como dívida técnica até sua remoção.
 

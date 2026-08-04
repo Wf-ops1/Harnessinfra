@@ -1,56 +1,88 @@
-# Modelo Operacional Agentic — Narrative & Architecture
+# Modelo Operacional Agentic — Estado Atual e Arquitetura-Alvo
 
-O **AI-Engineering-Harness** é a infraestrutura de engenharia local-first projetada para sustentar o ciclo autônomo de desenvolvimento de software governado por IA.
+> **Status: Protótipo / Em desenvolvimento**
 
----
+Este documento separa o fluxo que o código executa hoje do fluxo que o produto deverá garantir. A
+presença de uma classe, estado da FSM ou teste unitário não significa que a integração externa ou o
+efeito operacional correspondente já exista.
 
-## 🚀 Fluxo de Execução do Ciclo Agentic
+## Fluxo observado no protótipo
 
 ```mermaid
 sequenceDiagram
     autonumber
-    actor User as Desenvolvedor / CLI
+    actor User as Desenvolvedor
+    participant CLI as CLI
     participant Engine as RuntimeEngine
-    participant FSM as WorkflowStateMachine
-    participant Ctx as ContextAssembler
-    participant Plan as Planner (Winston)
-    participant Agent as AgentExecutor (Amelia)
-    participant Router as ToolRouter
-    participant Verifier as VerificationEngine
+    participant Model as Adapter LLM simulado
+    participant Verify as VerificationEngine
     participant Promo as PromotionManager
+    participant Memory as CodebaseMemoryAdapter
     participant Audit as AuditTrailManager
 
-    User->>Engine: harness run <workflow>
-    Engine->>FSM: INITIATED ➔ CONTEXT_ASSEMBLING
-    Engine->>Ctx: assemble(execution_id, intent)
-    Ctx-->>Engine: ContextPackage (confidence >= 0.72)
-    Engine->>FSM: GENERATING_PLAN
-    Engine->>Plan: create_plan(context)
-    Plan-->>Engine: plan.json (PlanDocument)
-    Engine->>FSM: EXECUTING
-    Engine->>Agent: execute_node(intent)
-    Agent->>Router: execute_tool(serena_edit / terminal_run)
-    Router-->>Agent: Resultado de Execução
-    Engine->>FSM: VERIFYING
-    Engine->>Verifier: verify(active_gates)
-    alt Sucesso na Verificação
-        Engine->>FSM: PROMOTING
-        Engine->>Promo: promote(execution_id)
-        Promo-->>Engine: Commit SHA / Evento
-        Engine->>FSM: REINDEXING ➔ KNOWLEDGE_SYNC ➔ GENERATING_EVIDENCE
-        Engine->>FSM: COMPLETED
-    else Falha e Exaustão de Retentativas
-        Engine->>FSM: FAILED_RETRY_EXHAUSTED
-    end
-    Engine->>Audit: log_event(WORKFLOW_COMPLETED)
+    User->>CLI: harness run workflow
+    CLI->>Engine: run_workflow
+    Engine->>Engine: contexto e plano locais
+    Engine->>Model: complete
+    Model-->>Engine: resposta fabricada
+    Engine->>Verify: executar gates configurados
+    Verify-->>Engine: resultado real ou lista vazia
+    Engine->>Promo: promote(dry_run=true)
+    Promo-->>Engine: SHA sintético
+    Engine->>Memory: query_ast
+    Memory-->>Engine: mock_ast persistido
+    Engine->>Audit: eventos e evidence.json
 ```
 
----
+O fluxo exercita contratos e persistência local, mas não modifica código por um modelo real, não cria
+candidate commit em worktree e não promove por cherry-pick. O estado `COMPLETED` do protótipo não
+deve ser interpretado como entrega real da intenção do usuário.
 
-## 🛠️ Princípios Fundamentais
+## Fluxo-alvo
 
-1. **Local-First & Instalável:** O pacote `ai-engineering-harness` é totalmente instalável via `pip install -e .` e inicializável em qualquer repositório de produto via `harness init`.
-2. **Separação Rígida Agente/Ferramenta:**
-   - **Agente (Persona):** Raciocínio, tomada de decisão e invocação de habilidades (ex: Winston, Amelia).
-   - **ToolRouter:** Guardião de segurança e permissões para execução de chamadas MCP/terminal.
-3. **Audit Trail Tamper-Evident:** Registro append-only encadeado por SHA-256 no diário de eventos.
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as Desenvolvedor
+    participant Engine as Runtime persistido
+    participant Worktree as Worktree Git externo
+    participant Model as Provider real
+    participant Tools as ToolRouter fail-closed
+    participant Verify as Gates reais
+    participant Approval as Aprovação humana
+    participant Git as Promoção Git
+    participant Audit as Evidência auditável
+
+    User->>Engine: intenção
+    Engine->>Worktree: criar a partir do base SHA
+    Engine->>Model: solicitar ação autorizada
+    Model->>Tools: argv e paths validados
+    Tools->>Worktree: alterar somente dentro do isolamento
+    Engine->>Verify: executar gates obrigatórios
+    Verify-->>Engine: resultado sem sucesso vazio
+    Engine->>Approval: pausar e persistir
+    Approval-->>Engine: decisão autenticada
+    Engine->>Git: candidate commit e cherry-pick
+    Git-->>Audit: SHAs, diff, gates e decisão
+```
+
+## Contratos que já possuem base
+
+- empacotamento e ambiente de desenvolvimento reproduzíveis;
+- contratos Pydantic, defaults e versionamento de schemas;
+- FSM e arquivos locais de contexto, plano, estado e evidência;
+- execução de subprocessos de verificação;
+- hash chain local para o diário de eventos.
+
+## Lacunas que impedem uso seguro
+
+- providers LLM não fazem chamadas externas ou locais reais;
+- Serena e Codebase-Memory não se conectam a MCP;
+- `doctor` não mede saúde;
+- `ExternalWorktreeManager` não chama `git worktree`;
+- promoção e rollback não possuem o protocolo Git final;
+- terminal aceita comando como string com shell implícito;
+- persistência, recovery, budgets, secrets e políticas ainda não controlam todo o caminho crítico.
+
+O plano concreto para fechar essas lacunas está em
+[plano_implementacao_harness_operacional.md](plano_implementacao_harness_operacional.md).

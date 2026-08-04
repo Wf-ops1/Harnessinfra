@@ -1,70 +1,67 @@
-# Especificação Arquitetural — AI-Engineering-Harness
+# Especificação Arquitetural — AI Engineering Harness
 
-> **Status:** Congelada / Em Produção  
-> **Versão:** 1.0.0  
-> **Arquitetos Responsáveis:** 🏛️ Winston & 📝 Paige
+> **Status: Arquitetura-alvo / Em desenvolvimento**
+> **Revisão documental:** 1.0.0 — não confundir com package ou schema version
 
----
+## 1. Visão do produto
 
-## 1. Visão Geral do Sistema
+O produto pretende ser uma infraestrutura local-first instalável por CLI ou IDE. Um repositório
+externo deverá receber configuração leve em `.harness/`, enquanto execução, ferramentas, Git,
+políticas e evidências permanecerão controlados pelo motor instalado.
 
-O **AI-Engineering-Harness** é um motor agentic local-first, determinístico e instalável via Python (`pip install -e .`). Ele rege a execução de agentes de IA sobre qualquer repositório de software através de um ambiente isolado `.harness/`.
+No estado atual, essa visão está parcialmente materializada como harness de testes e contratos. O
+projeto ainda não oferece isolamento ou autonomia suficientes para uso cotidiano sem supervisão.
 
-### A Equação do Harness
-$$\text{Harness} = \text{BMAD} \longrightarrow \text{Graph Engineering} \longrightarrow \text{MAF} \longrightarrow \text{Serena + Codebase-Memory} \longrightarrow \text{Quality/Ops}$$
+## 2. Arquitetura-alvo
 
 ```mermaid
 flowchart TD
-    A[BMAD Personas / Specs em defaults/] --> B[Graph Compiler - Design Time]
-    B --> C[MAF Runtime - State Machine Execution]
-    C --> D[AgentExecutor -> ToolRouter -> Serena/Terminal]
-    D --> E[Verification Gates - Deterministic Quality/Ops]
-    E --> F[Audit Log Hash Chain & Git Commits]
+    A["Intent e configuração do produto"] --> B["Compilador único e validado"]
+    B --> C["Artefato executável versionado"]
+    C --> D["Runtime persistido e retomável"]
+    D --> E["Provider real + ToolRouter fail-closed"]
+    E --> F["Worktree Git externo"]
+    F --> G["Gates obrigatórios"]
+    G --> H["Aprovação e promoção Git"]
+    H --> I["Evidência, observabilidade e recovery"]
 ```
 
----
+## 3. Mapeamento atual
 
-## 2. Componentes Fundamentais
+| Camada | Base existente | Estado | Limite principal |
+|---|---|---|---|
+| Package e defaults | `pyproject.toml`, `uv.lock`, `src/ai_engineering_harness/defaults/` | Implementada como base | Distribuição de produto e compatibilidade externa ainda não fechadas |
+| Contratos | `src/ai_engineering_harness/contracts/` | Implementada como modelos internos | Modelos canônicos GraphSpec/PolicySpec/CompiledArtifact ainda serão unificados |
+| Compilação | `compiler/` e `src/ai_engineering_harness/compiler/` | Experimental | Dois compiladores e validações incompletas |
+| Runtime | `src/ai_engineering_harness/runtime/` | Experimental | Ordem fixa, adapters simulados e promoção dry-run |
+| Ferramentas/modelos | `tools/`, `models/`, `indexer/` | Simulada | Sem chamadas reais; terminal não cumpre contrato final |
+| Verificação | `verification/` | Experimental | Gates reais existem, mas fail-closed e matriz completa ainda faltam |
+| Governança/segurança | `governance/`, `security/` | Experimental | Enforcement não cobre todo side effect |
+| Auditoria | `observability/audit.py` | Experimental | Hash chain local não prova efeitos externos nem recovery |
+| Workspace Git | `workspace/` | Simulada | Cria diretório e referência; não cria worktree Git |
 
-### 2.1. Layer 1: Contracts, Defaults & Templates (`src/ai_engineering_harness/defaults/`)
-- Contratos Pydantic imutáveis definem a validação estrita em `src/ai_engineering_harness/contracts/`.
-- Especificações e templates declarativos em YAML para agentes, grafos, ferramentas e políticas residem em `src/ai_engineering_harness/defaults/`.
+## 4. Separação Harness vs. produto
 
-### 2.2. Layer 2: Design-Time Graph Compiler (`compiler/`)
-- O Graph Compiler (`compiler/compile.py`) valida a conformidade dos contratos, ferramentas e políticas em *design-time*.
-- Injeta automaticamente *Verification Gates* poliglotas determinísticos antes de gerar o artefato executável MAF JSON em `.harness/state/compiled/`.
+- **Motor instalado:** código sob `src/ai_engineering_harness/`, contratos, defaults e CLI.
+- **Configuração do produto:** `.harness/agents/`, `.harness/graphs/specs/`,
+  `.harness/policies/` e `.harness/tools/`.
+- **Estado local:** `.harness/state/` e `.harness/artifacts/`.
+- **Isolamento futuro:** worktree externo associado a `execution_id`; ainda não implementado.
 
-### 2.3. Layer 3: MAF Runtime & Agentes (`src/ai_engineering_harness/runtime/`)
-- Executa o ciclo de vida de 11 estágios da FSM com `ContextAssembler`, `Planner` e `AgentExecutor`.
-- `ToolRouter` garante o controle de permissões para chamadas MCP/terminal.
-- Controla a aprovação em duas fases (`AWAITING_APPROVAL`) e a promoção (`PromotionManager`).
+`harness init` cria/copia a estrutura local, mas isso não torna o repositório governado ou seguro por
+si só.
 
-### 2.4. Layer 4: Ferramentas & Memória (`Serena MCP` & `Codebase-Memory MCP`)
-- **Serena MCP:** Interface com a codebase para edições de código e manipulação precisa.
-- **Codebase-Memory MCP:** Indexador semântico de código AST vinculado ao SHA do Git Commit atual.
+## 5. Invariantes do contrato final
 
-### 2.5. Layer 5: Governança, Segurança e Observabilidade (`defaults/policies/` & `observability/`)
-- Políticas rígidas de ferramentas (`tool_policy.yaml`) e suficiência de contexto (`context_sufficiency.yaml`).
-- Auditoria com **Hash Chain** imutável encadeada por SHA-256 no diário `event-journal.jsonl`.
+- nenhuma escrita fora do worktree autorizado;
+- comandos como `argv: list[str]`, `shell=False`;
+- gate obrigatório ausente ou não executado termina em erro;
+- adapters indisponíveis falham com erro tipado;
+- dry-run não usa semântica de promoção concluída;
+- aprovação, orçamento e política controlam side effects;
+- secrets são redigidos antes da persistência;
+- estado necessário para retomar sobrevive a crash;
+- promoção e rollback usam operações Git explícitas com SHAs reais.
 
----
-
-## 3. Separação de Responsabilidades (Harness vs Produto)
-
-- **Motor Central (`src/ai_engineering_harness/`):** Código-fonte compilado e instalado do motor (runtime, compilador, defaults).
-- **Workspace Local (`.harness/`):** Diretório gerado por `harness init` no repositório de destino:
-  - `.harness/agents/`: Templates de personas e system prompts copiados de `defaults/`.
-  - `.harness/graphs/specs/`: Grafos compiláveis.
-  - `.harness/policies/`: Políticas ativas do repositório local.
-  - `.harness/tools/`: Configurações locais de ferramentas.
-  - `.harness/state/`: Estado FSM (`executions/`), indexador AST (`structural-index/`) e grafos compilados (`compiled/`).
-
----
-
-## 4. Diagnóstico de Saúde e Probes (`harness doctor`)
-
-O comando `harness doctor` executa um probe de 6 estágios sobre 4 componentes vitais:
-1. **Serena MCP** (Status, conectividade, integridade de tools).
-2. **Codebase-Memory MCP** (Conexão ao índice AST local).
-3. **Git CLI** (Presença e permissões no workspace).
-4. **LLM Providers** (Conectividade e API Keys).
+Essas invariantes são requisitos do plano. Enquanto qualquer uma não estiver garantida no caminho
+crítico, o projeto permanece protótipo.
