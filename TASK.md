@@ -58,6 +58,89 @@ Uma **fase** só avança quando todos os gates de saída estão verdes.
 
 ---
 
+## 4.1. Protocolo Obrigatório de Defensabilidade
+
+Este protocolo é um **gate anterior à implementação**. Nenhuma tarefa pode mudar de `pending`
+para `in_progress`, e nenhum arquivo de código pode ser alterado em nome dela, até que exista um
+dossiê de execução preenchido e marcado como `READY`.
+
+O plano principal define **o que** deve ser construído. Este protocolo define **quando há evidência e
+condições suficientes para autorizar a execução**, sem substituir nem reduzir os critérios do plano.
+
+### 4.1.1. Condições obrigatórias antes de `in_progress`
+
+| Condição | Evidência mínima exigida |
+|---|---|
+| **Problema comprovado** | Comando e saída reproduzível, teste falhando, import/compilação falhando, ou referência exata a arquivo e trecho que demonstre uma lacuna objetiva. Para capacidade ausente, busca e inspeção devem provar que ela não existe ou é simulada. Impressão, hipótese ou intenção do plano não bastam. |
+| **Baseline conhecido** | Branch, `HEAD`, `git status --short` e mudanças preexistentes registrados. Alteração alheia à tarefa deve ser preservada e explicitamente excluída do escopo. |
+| **Escopo congelado** | Objetivo, arquivos/áreas permitidos, itens fora de escopo, dependências e efeitos esperados registrados antes da primeira edição. |
+| **Critérios congelados** | Comandos de verificação, resultado esperado e condição de falha definidos antes da implementação. Critério não pode ser enfraquecido para fazer a tarefa passar. |
+| **Rollback executável** | Checkpoint Git existente, gatilhos de abortar/reverter, procedimento não destrutivo e validação pós-rollback registrados. |
+| **Responsabilidade explícita** | Executor único, data/hora da liberação e estado do gate registrados. |
+
+### 4.1.2. Dossiê obrigatório por tarefa
+
+Antes da transição para `in_progress`, adicionar à própria tarefa ou ao último checkpoint um bloco com
+todos os campos abaixo:
+
+```yaml
+defensibility:
+  task_id: "F0.x"
+  gate: "READY | BLOCKED"
+  executor: "nome"
+  authorized_at: "YYYY-MM-DDTHH:MM:SS-03:00"
+  problem_statement: "fato observável que precisa ser corrigido"
+  evidence:
+    - command: "comando read-only ou teste de reprodução"
+      observed: "exit code e resultado relevante"
+      location: "arquivo:linha, quando aplicável"
+  baseline:
+    branch: "branch atual"
+    head: "commit completo ou abreviado inequívoco"
+    status: "clean ou lista de mudanças preexistentes preservadas"
+    checkpoint: "tag ou commit existente"
+  frozen_scope:
+    allowed: ["arquivos/áreas autorizados"]
+    excluded: ["itens explicitamente fora de escopo"]
+  frozen_acceptance:
+    - command: "comando exato"
+      expected: "exit code e resultado esperado"
+  rollback:
+    triggers: ["condições objetivas para interromper ou reverter"]
+    procedure: "git revert dos commits da tarefa ou restauração não destrutiva explicitamente aprovada"
+    verify: "comandos que comprovam retorno ao baseline funcional"
+```
+
+### 4.1.3. Regra de congelamento e mudança de escopo
+
+1. O dossiê começa como `BLOCKED` enquanto qualquer campo obrigatório estiver ausente ou sem evidência.
+2. Somente com todas as condições satisfeitas o gate muda para `READY`; no mesmo checkpoint, a tarefa
+   pode mudar para `in_progress`.
+3. Se uma descoberta exigir novo arquivo, novo efeito, dependência não prevista ou mudança de critério,
+   interromper a implementação, registrar a descoberta e recongelar escopo, aceite e rollback.
+4. Se a ampliação for material, criar um novo checkpoint Git antes de retomar.
+5. Nunca remover, ignorar ou tornar mais fraco um critério que falhou. Corrigir a implementação ou
+   registrar um bloqueio.
+6. Rollback não autoriza `git reset --hard`, descarte amplo ou sobrescrita de trabalho preexistente.
+   Preferir commits isolados e `git revert`; qualquer restauração destrutiva exige autorização explícita
+   e alvo previamente verificado.
+
+### 4.1.4. Gate de liberação
+
+```text
+[ ] Problema comprovado com evidência reproduzível
+[ ] Baseline Git e mudanças preexistentes registrados
+[ ] Escopo permitido e fora de escopo congelados
+[ ] Critérios de aceite exatos e resultados esperados congelados
+[ ] Checkpoint Git existente e estratégia de rollback validável
+[ ] Executor único e horário de autorização registrados
+```
+
+Se qualquer item estiver desmarcado, a tarefa permanece `pending` ou `blocked`. Alteração documental
+para preparar o próprio dossiê é permitida; alteração de código da tarefa não é.
+
+---
+
 ## 5. Fase Atual
 
 **→ FASE 0 — Baseline honesta, executável e reproduzível**
@@ -65,7 +148,8 @@ Uma **fase** só avança quando todos os gates de saída estão verdes.
 **Objetivo:** garantir que o pacote compile, instale, rode testes reproduzivelmente
 e não anuncie capacidades inexistentes.
 
-**Status da fase:** `in_progress` — F0.0 concluída; próxima tarefa executável: F0.1.
+**Status da fase:** `in_progress` — F0.0 e o protocolo de defensabilidade foram concluídos; F0.1
+permanece `pending` até seu gate pré-execução ser comprovado e marcado como `READY`.
 
 ### Coordenação e ambiente observado
 
@@ -112,6 +196,14 @@ e não anuncie capacidades inexistentes.
 | **Critérios de aceite** | comando Python registrado executa `-m compileall -q src compiler tests` com exit 0; import de `ai_engineering_harness.migrations` com exit 0 |
 | **Comandos de verificação** | `& 'C:\Users\walla\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe' -m compileall -q src compiler tests`; depois `& 'C:\Users\walla\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe' -c "import ai_engineering_harness.migrations"` |
 | **Dependências** | F0.0 concluída |
+
+#### Gate de defensabilidade da F0.1
+
+| Campo | Estado atual |
+|---|---|
+| **Gate** | `BLOCKED` — dossiê ainda não preenchido; nenhuma alteração Python autorizada |
+| **Checkpoint candidato** | `checkpoint/pre-f0.1-defensibility` — deve existir antes da coleta e congelamento final das evidências |
+| **Próximo passo permitido** | Somente inspeções read-only, reprodução dos erros e preenchimento do dossiê conforme seção 4.1 |
 
 ---
 
@@ -218,7 +310,7 @@ e não anuncie capacidades inexistentes.
 
 | Data | ID | Decisão | Motivo | Impacto |
 |------|----|----------|--------|---------|
-| — | — | *Nenhuma decisão registrada ainda* | — | — |
+| 2026-08-03 | DEC-001 | Adotar gate obrigatório de defensabilidade antes de toda transição para `in_progress` | Impedir implementação baseada apenas em hipótese e garantir aceite e recuperação definidos antes de editar código | Toda tarefa deve comprovar problema, congelar escopo/aceite e registrar checkpoint/rollback |
 
 > Registre aqui toda decisão arquitetural que diverge do plano. Formato: data ISO, ID (ADR-XXX), descrição, motivo, arquivos impactados.
 
@@ -244,12 +336,13 @@ e não anuncie capacidades inexistentes.
 ```
 Data:              2026-08-03
 Fase:              F0
-Tarefa:            F0.0
+Tarefa:            GOV-001 — protocolo de defensabilidade pré-execução
 Estado:            completed
 Arquivos alterados: TASK.md
-Validações:         executor Codex definido; branch phase/f0-baseline criada a partir do baseline 6eef8e0; Python 3.12.13 disponível
-Observação:         dependências completas do projeto ainda não instaladas; responsabilidade da F0.3
-Resultado:          F0.1 liberada para execução
+Validações:         Markdown/UTF-8 e consistência interna; git diff --check; checkpoint Git nomeado após o commit
+Checkpoint:         checkpoint/pre-f0.1-defensibility na branch phase/f0-baseline
+Observação:         nenhuma alteração Python realizada; F0.1 continua pending e seu gate está BLOCKED
+Resultado:          nenhuma tarefa pode entrar em in_progress sem problema comprovado, critérios congelados e rollback
 ```
 
 ---
@@ -257,14 +350,14 @@ Resultado:          F0.1 liberada para execução
 ## 11. Próxima Ação Exata
 
 ```text
-INICIAR F0.1:
-1. Criar um checkpoint Git local para a troca de executor e conclusão da F0.0.
-2. Inspecionar `src/ai_engineering_harness/migrations/runner.py` e corrigir a assinatura inválida.
-3. Executar `compileall` com o `python_command` registrado e anotar todos os erros.
-4. Corrigir imports quebrados encontrados no escopo da F0.1.
-5. Adicionar teste que importe todos os módulos públicos.
-6. Executar os dois critérios de aceite da F0.1.
-7. Atualizar este TASK.md e criar commit local da F0.1.
+PREPARAR O GATE DE DEFENSABILIDADE DA F0.1 — AINDA NÃO ALTERAR PYTHON:
+1. Confirmar `checkpoint/pre-f0.1-defensibility`, branch, HEAD e working tree.
+2. Fazer inspeção read-only de `src/ai_engineering_harness/migrations/runner.py`.
+3. Executar a reprodução baseline (`compileall` e import) e registrar comandos, exit codes e erros.
+4. Preencher o dossiê da F0.1: problema, evidências, baseline, escopo permitido/excluído,
+   critérios de aceite exatos e rollback.
+5. Validar todos os itens da seção 4.1.4; manter `BLOCKED` se qualquer item faltar.
+6. Somente depois do gate `READY`, mudar F0.1 para `in_progress` e iniciar a correção Python.
 ```
 
 ---
