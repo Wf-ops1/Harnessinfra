@@ -12,7 +12,7 @@ class MigrationRunner:
     def __init__(self, project_root: Path):
         self.project_root = project_root
 
-    def check_and_migrate_manifest((self) -> bool:
+    def check_and_migrate_manifest(self) -> bool:
         project_yaml = self.project_root / ".harness" / "project.yaml"
         if not project_yaml.is_file():
             return False
