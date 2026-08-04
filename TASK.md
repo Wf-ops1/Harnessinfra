@@ -427,13 +427,110 @@ defensibility:
 
 | Campo | Detalhe |
 |-------|---------|
-| **Status** | `pending` |
+| **Status** | `in_progress` — gate de defensabilidade `READY`; implementação autorizada em 2026-08-04T00:15:37-03:00 |
 | **Objetivo** | Qualquer máquina limpa consegue instalar, testar e construir o pacote com um único conjunto de comandos |
 | **Arquivos envolvidos** | `pyproject.toml`, `uv.lock`, `README.md` |
 | **Implementação esperada** | (1) Adotar `uv` como gerenciador de ambiente; (2) criar e versionar `uv.lock`; (3) completar deps dev: pytest, pytest-cov, mypy, ruff, build; (4) usar `python -m ...` nos comandos internos; (5) definir versões Python suportadas; (6) documentar bootstrap no README |
 | **Critérios de aceite** | Em máquina limpa: `uv sync --all-extras` OK; `uv run python -m pytest` OK; `uv run python -m mypy src` OK; `uv run python -m ruff check .` OK; `uv run python -m build` OK |
 | **Comandos de verificação** | Executar separadamente: `uv sync --all-extras`; `uv run python -m pytest`; `uv run python -m mypy src`; `uv run python -m ruff check .`; `uv run python -m build` |
 | **Dependências** | F0.1, F0.2 |
+
+#### Gate de defensabilidade da F0.3
+
+| Campo | Estado atual |
+|---|---|
+| **Gate** | `READY` — ausência de ferramentas/lock reproduzida, bootstrap e rollback congelados |
+| **Checkpoint de rollback** | `checkpoint/f0.2-complete` → `cda665b8352ecd73537483c922b6dcdd2956197c` |
+| **Checkpoint de liberação** | `checkpoint/f0.3-ready` — tag criada no commit documental deste dossiê |
+| **Autorização de ambiente** | Usuário: `continue` em 2026-08-04; limitada a `.venv`, `C:/tmp` e artefatos locais de build, sem instalação global ou perfil de shell |
+
+```yaml
+defensibility:
+  task_id: "F0.3"
+  gate: "READY"
+  executor: "Codex"
+  authorized_at: "2026-08-04T00:15:37-03:00"
+  problem_statement: >-
+    Uma máquina/sessão limpa não consegue instalar, testar, tipar, lintar ou construir o projeto
+    pelos comandos oficiais porque uv e uv.lock não existem, as dependências dev estão incompletas
+    e o README documenta somente pip install -e .
+  evidence:
+    - command: "Get-Command uv, python, py"
+      observed: "uv=MISSING; python=MISSING; py=MISSING no PATH"
+      location: "shell PowerShell da execução"
+    - command: "Test-Path uv.lock; busca por *lock*"
+      observed: "uv.lock=False; nenhum lockfile"
+      location: "raiz do repositório"
+    - command: >-
+        python_command -m pytest; -m mypy src; -m ruff check .; -m build
+      observed: "todos exit 1 com No module named"
+      location: "runtime Python 3.12.13 registrado"
+    - command: "inspeção de pyproject.toml"
+      observed: >-
+        extra dev contém apenas pytest e mypy; faltam pytest-cov, ruff e build;
+        requires-python não possui limite/test matrix explícita
+      location: "pyproject.toml"
+    - command: "rg bootstrap/tooling README.md"
+      observed: "somente pip install -e .; sem uv sync, testes, mypy, ruff ou build"
+      location: "README.md:25"
+    - command: "git ls-files src/*.egg-info/**"
+      observed: "seis arquivos de metadata gerada estão versionados"
+      location: "src/ai_engineering_harness.egg-info/"
+  baseline:
+    branch: "phase/f0-baseline"
+    head: "cda665b8352ecd73537483c922b6dcdd2956197c"
+    status: "clean"
+    checkpoint: "checkpoint/f0.2-complete"
+  frozen_decisions:
+    manager: "uv"
+    execution_tool: "uv 0.11.32 isolado em C:/tmp; uv_command registrado após instalação"
+    project_environment: ".venv ignorado"
+    cache: "C:/tmp/ai-engineering-harness-uv-cache"
+    python_support: ">=3.11,<3.15; tool targets no mínimo Python 3.11"
+    lock_policy: "uv.lock versionado; sync/run verificados também contra lock atualizado"
+  frozen_scope:
+    allowed:
+      - "pyproject.toml — dependências dev, faixa Python e configuração pytest/mypy/ruff"
+      - "uv.lock — lockfile gerado pelo uv"
+      - "README.md — somente bootstrap, comandos de desenvolvimento e faixa Python"
+      - ".gitignore — caches/build/metadata gerada"
+      - "src/ai_engineering_harness.egg-info/** — remover metadata gerada versionada"
+      - "src/**/*.py e tests/**/*.py — somente correções mecânicas provadas por pytest/mypy/ruff"
+      - "TASK.md — transições, evidências, handoff e checkpoints"
+      - ".venv, dist, build e C:/tmp — efeitos locais/ignorados de sync e verificação"
+    excluded:
+      - "mudança funcional, refactor arquitetural ou correção de integrações simuladas"
+      - "F0.4 versionamento, F0.5 revisão de claims/links e F0.6 CI"
+      - "instalação global, alteração de PATH/perfil do usuário ou download de outro Python"
+      - "enfraquecer testes, mypy ou ruff para ocultar falhas comprovadas"
+  frozen_acceptance:
+    - command: "<uv_command> sync --all-extras"
+      expected: "exit 0; projeto e deps dev instalados em .venv"
+    - command: "<uv_command> lock --check"
+      expected: "exit 0; pyproject e uv.lock consistentes"
+    - command: "<uv_command> run python -m pytest"
+      expected: "exit 0; zero testes falhando"
+    - command: "<uv_command> run python -m mypy src"
+      expected: "exit 0"
+    - command: "<uv_command> run python -m ruff check ."
+      expected: "exit 0"
+    - command: "<uv_command> run python -m build"
+      expected: "exit 0; sdist e wheel criadas"
+    - command: "<uv_command> run python -m compileall -q src compiler tests"
+      expected: "exit 0"
+  rollback:
+    triggers:
+      - "necessidade de mudança funcional para satisfazer ferramenta"
+      - "dependência requer instalação global, perfil de shell ou Python fora da faixa"
+      - "critério precisa ser removido/enfraquecido ou novo arquivo sai do escopo"
+      - "sync/build altera arquivo versionado não previsto"
+    procedure: >-
+      interromper; preservar logs; não usar reset; mover .venv para C:/tmp após validar o path;
+      antes do commit inverter hunks F0.3 com apply_patch; depois do commit usar git revert
+    verify: >-
+      git status --short; git diff checkpoint/f0.2-complete; python_command -m compileall -q
+      src compiler tests; checkpoints F0.2 continuam apontando para commits íntegros
+```
 
 ---
 
@@ -513,6 +610,7 @@ defensibility:
 | Data | ID | Decisão | Motivo | Impacto |
 |------|----|----------|--------|---------|
 | 2026-08-03 | DEC-001 | Adotar gate obrigatório de defensabilidade antes de toda transição para `in_progress` | Impedir implementação baseada apenas em hipótese e garantir aceite e recuperação definidos antes de editar código | Toda tarefa deve comprovar problema, congelar escopo/aceite e registrar checkpoint/rollback |
+| 2026-08-04 | DEC-002 | Adotar `uv`, `uv.lock` e Python `>=3.11,<3.15` como contrato do ambiente | Eliminar bootstrap ad hoc e tornar sync/test/lint/typecheck/build reproduzíveis | F0.3 cria ambiente local `.venv`; F0.6 deverá validar a faixa Python na CI |
 
 > Registre aqui toda decisão arquitetural que diverge do plano. Formato: data ISO, ID (ADR-XXX), descrição, motivo, arquivos impactados.
 
@@ -538,13 +636,13 @@ defensibility:
 ```
 Data:              2026-08-04
 Fase:              F0
-Tarefa:            F0.2 — padronizar encoding
-Estado:            completed
-Arquivos alterados: .editorconfig; src/ai_engineering_harness/cli/main.py; tests/unit/test_encoding.py; docs/plano_implementacao_harness_operacional.md; TASK.md
-Validações:         compileall exit 0; rg mojibake exit 1/sem resultados; 4 testes encoding verdes; 85 imports públicos verdes; git diff --check
-Checkpoint:         checkpoint/f0.2-complete na branch phase/f0-baseline; rollback em checkpoint/f0.2-ready
-Observação:         todos os textos já eram UTF-8 válido; nenhuma regravação em massa; dependências somente em C:/tmp
-Resultado:          UTF-8 imposto; CLI compatível com utf-8/cp1252/cp850; critério de mojibake não autorreferente
+Tarefa:            F0.3 — gate de ambiente reproduzível
+Estado:            in_progress — gate READY; implementação ainda não iniciada
+Arquivos alterados: TASK.md
+Validações:         uv/lock ausentes; quatro módulos dev exit 1; pyproject/README/metadata gerada inspecionados; baseline Git limpo
+Checkpoint:         checkpoint/f0.3-ready na branch phase/f0-baseline; rollback em checkpoint/f0.2-complete
+Observação:         instalação autorizada somente em .venv/C:/tmp; nenhum arquivo de implementação F0.3 alterado neste checkpoint
+Resultado:          F0.3 em in_progress dentro do escopo, ambiente e critérios congelados
 ```
 
 ---
@@ -552,13 +650,13 @@ Resultado:          UTF-8 imposto; CLI compatível com utf-8/cp1252/cp850; crit�
 ## 11. Próxima Ação Exata
 
 ```text
-PREPARAR O GATE DE DEFENSABILIDADE DA F0.3 — AINDA NÃO ALTERAR O AMBIENTE:
-1. Confirmar `checkpoint/f0.2-complete`, branch, HEAD e working tree limpo.
-2. Detectar novamente `uv`, build tools e dependências dev sem instalar nada.
-3. Reproduzir os comandos atuais de bootstrap, testes, mypy, ruff e build; registrar cada ausência/falha.
-4. Inspecionar `pyproject.toml`, documentação de bootstrap e existência de lockfile.
-5. Congelar gerenciador, versões Python, arquivos, comandos de aceite e rollback no dossiê F0.3.
-6. Somente com gate `READY` e autorização de mudança de ambiente, iniciar bootstrap e lockfile reproduzíveis.
+EXECUTAR F0.3 DENTRO DO ESCOPO CONGELADO:
+1. Criar o commit documental e a tag `checkpoint/f0.3-ready` deste gate.
+2. Instalar uv 0.11.32 somente em C:/tmp e registrar `uv_command`; não alterar PATH/perfil.
+3. Atualizar pyproject, README e .gitignore; remover metadata egg-info gerada do versionamento.
+4. Gerar uv.lock e sincronizar .venv usando o Python registrado, sem baixar outro runtime.
+5. Executar pytest, mypy e ruff; corrigir apenas falhas mecânicas comprovadas dentro do escopo.
+6. Executar build e todos os critérios congelados, responder handoff e criar checkpoint/f0.3-complete.
 ```
 
 ---
