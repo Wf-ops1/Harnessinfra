@@ -302,14 +302,14 @@ Ambos devem encerrar com código `0`.
 **Implementação**
 
 - Converter arquivos Python, Markdown, YAML, TOML e JSON para UTF-8 válido.
-- Corrigir textos como `AutÃ´nomo`, `âœ”`, `Ã­ndice` e equivalentes.
+- Corrigir sequências resultantes de dupla decodificação UTF-8/Windows-1252 e equivalentes.
 - Remover lógica baseada em símbolos já corrompidos.
 - Adicionar `.editorconfig` com `charset = utf-8`.
 - Validar CLI em Windows com console UTF-8 e console legado.
 
 **Critérios de aceite**
 
-- `rg 'Ã|âœ|ðŸ' src docs README.md` não deve retornar mojibake conhecido.
+- `rg '\x{00C3}|\x{00E2}\x{0153}|\x{00F0}\x{0178}' src docs README.md` não deve retornar mojibake conhecido.
 - `harness --help`, `harness doctor` e mensagens de erro devem renderizar sem exceção.
 
 ### Tarefa F0.3 — Tornar o ambiente reproduzível

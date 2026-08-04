@@ -148,7 +148,7 @@ para preparar o próprio dossiê é permitida; alteração de código da tarefa 
 **Objetivo:** garantir que o pacote compile, instale, rode testes reproduzivelmente
 e não anuncie capacidades inexistentes.
 
-**Status da fase:** `in_progress` — F0.0 e F0.1 concluídas; próxima tarefa: F0.2, que permanece
+**Status da fase:** `in_progress` — F0.0, F0.1 e F0.2 concluídas; próxima tarefa: F0.3, que permanece
 `pending` até seu próprio gate de defensabilidade ser comprovado e marcado como `READY`.
 
 ### Coordenação e ambiente observado
@@ -160,7 +160,7 @@ e não anuncie capacidades inexistentes.
 | **Workspace** | `C:\Users\walla\OneDrive\Desktop\ai-engineering-harness` |
 | **Git** | `available` — branch de execução `phase/f0-baseline`, criada a partir de `main`/`origin/main` no baseline `6eef8e0`; remote `https://github.com/Wf-ops1/Harnessinfra.git` |
 | **python_command** | `& 'C:\Users\walla\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe'` — Python `3.12.13` |
-| **Dependências do projeto** | runtime suficiente para F0.1; `yaml`, `click`, `rich`, `httpx` e `pytest` ainda não estão disponíveis neste runtime e serão tratadas na F0.3 |
+| **Dependências do projeto** | runtime base disponível; dependências declaradas usadas isoladamente em `C:\tmp\ai-engineering-harness-f0.1-deps`; ambiente reproduzível e deps dev serão tratados na F0.3 |
 | **Regra de escrita** | apenas um agente escreve por vez |
 
 ---
@@ -302,7 +302,7 @@ defensibility:
 
 | Campo | Detalhe |
 |-------|---------|
-| **Status** | `in_progress` — gate de defensabilidade `READY`; implementação autorizada em 2026-08-04T00:04:54-03:00 |
+| **Status** | `completed` — critérios congelados executados e aprovados |
 | **Objetivo** | Eliminar mojibake UTF-8 em todos os arquivos do projeto |
 | **Arquivos envolvidos** | Todos os `.py`, `.md`, `.yaml`, `.toml`, `.json`; novo `.editorconfig` |
 | **Implementação esperada** | (1) Converter todos os arquivos para UTF-8 válido; (2) corrigir strings corrompidas (`AutÃ´nomo`, `âœ”`, `Ã­ndice`); (3) remover lógica baseada em símbolos corrompidos; (4) criar `.editorconfig` com `charset = utf-8`; (5) validar CLI em Windows UTF-8 e console legado |
@@ -314,7 +314,7 @@ defensibility:
 
 | Campo | Estado atual |
 |---|---|
-| **Gate** | `READY` — lacunas reproduzidas, baseline conhecido, escopo/aceite congelados e rollback definido |
+| **Gate** | `READY → COMPLETED` — execução permaneceu no escopo e todos os critérios congelados passaram |
 | **Checkpoint de rollback** | `checkpoint/f0.1-complete` → `823406ce3f647e049bae51eb41f02e02b73e6351` |
 | **Checkpoint de liberação** | `checkpoint/f0.2-ready` — tag criada no commit documental que contém este dossiê |
 | **Próximo passo permitido** | Implementar somente o escopo congelado abaixo; qualquer ampliação reabre o gate |
@@ -404,6 +404,23 @@ defensibility:
       tests/unit/test_encoding.py docs/plano_implementacao_harness_operacional.md TASK.md; repetir o baseline
 ```
 
+#### Resultado e handoff da F0.2
+
+| Pergunta obrigatória | Resposta |
+|---|---|
+| **Qual comportamento anterior foi substituído?** | O repositório não impunha UTF-8, a busca de mojibake encontrava seus próprios exemplos e `--help`/`doctor` encerravam com `UnicodeEncodeError` em CP850. |
+| **Qual é o novo contrato público?** | Textos rastreados do escopo devem ser UTF-8 estrito; editores recebem `charset = utf-8`; `--help` e `doctor` devem encerrar com código 0 em UTF-8, CP1252 e CP850. |
+| **Quais erros tipados podem ocorrer?** | Nenhum erro público novo. O `UnicodeEncodeError` comprovado nos caminhos validados foi eliminado. |
+| **Quais side effects são produzidos?** | Apenas subprocessos read-only do CLI e caches ignorados de compilação durante os testes. |
+| **Onde o estado é persistido e como retoma após crash?** | Regras persistidas em `.editorconfig`; regressões em `tests/unit/test_encoding.py`; retomada pelos checkpoints Git e por este painel. |
+| **Qual política autoriza a ação?** | DEC-001 e o dossiê F0.2 congelado em `checkpoint/f0.2-ready`. |
+| **Como secrets são protegidos?** | Não há acesso a secrets nesta tarefa. |
+| **Quais eventos são emitidos?** | Nenhum evento de domínio; não aplicável a encoding e renderização do CLI. |
+| **Quais testes provam sucesso?** | Quatro testes de encoding/CLI verdes; busca de mojibake sem resultados; `compileall` e teste dos 85 módulos públicos verdes. |
+| **Quais testes provam falha segura?** | Baseline CP850 provou `--help` e `doctor` com exit 1 sem efeitos persistentes; a regressão agora exige exit 0 e decodificação estrita. |
+| **A wheel instalada externamente foi testada?** | Não; fora do escopo F0.2. Será coberta após o bootstrap reproduzível da F0.3. |
+| **A documentação foi atualizada?** | Sim; plano e `TASK.md` não mantêm mais um critério autorreferente. |
+
 ---
 
 ### F0.3 — Tornar o ambiente reproduzível
@@ -469,7 +486,7 @@ defensibility:
 [ ] Pacote compila e instala em ambiente limpo
 [ ] Testes reproduzíveis por um único comando
 [ ] Nenhum documento declara produção
-[ ] Nenhum erro de sintaxe ou encoding permanece
+[x] Nenhum erro de sintaxe ou encoding permanece
 ```
 
 ---
@@ -521,13 +538,13 @@ defensibility:
 ```
 Data:              2026-08-04
 Fase:              F0
-Tarefa:            F0.2 — gate de defensabilidade pré-execução
-Estado:            in_progress — gate READY; implementação ainda não iniciada
-Arquivos alterados: TASK.md
-Validações:         UTF-8 estrito válido; .editorconfig ausente; mojibake autorreferente no plano; CLI CP850 exit 1 comprovado
-Checkpoint:         checkpoint/f0.2-ready na branch phase/f0-baseline; rollback em checkpoint/f0.1-complete
-Observação:         escopo cirúrgico; nenhuma regravação em massa autorizada
-Resultado:          implementação F0.2 autorizada somente dentro do escopo congelado
+Tarefa:            F0.2 — padronizar encoding
+Estado:            completed
+Arquivos alterados: .editorconfig; src/ai_engineering_harness/cli/main.py; tests/unit/test_encoding.py; docs/plano_implementacao_harness_operacional.md; TASK.md
+Validações:         compileall exit 0; rg mojibake exit 1/sem resultados; 4 testes encoding verdes; 85 imports públicos verdes; git diff --check
+Checkpoint:         checkpoint/f0.2-complete na branch phase/f0-baseline; rollback em checkpoint/f0.2-ready
+Observação:         todos os textos já eram UTF-8 válido; nenhuma regravação em massa; dependências somente em C:/tmp
+Resultado:          UTF-8 imposto; CLI compatível com utf-8/cp1252/cp850; critério de mojibake não autorreferente
 ```
 
 ---
@@ -535,13 +552,13 @@ Resultado:          implementação F0.2 autorizada somente dentro do escopo con
 ## 11. Próxima Ação Exata
 
 ```text
-EXECUTAR F0.2 DENTRO DO ESCOPO CONGELADO:
-1. Criar o commit documental e a tag `checkpoint/f0.2-ready` deste gate.
-2. Adicionar `.editorconfig` com UTF-8 e regras textuais determinísticas.
-3. Remover somente a pontuação CLI comprovadamente incompatível com CP850.
-4. Tornar os exemplos/comando de mojibake do plano não autorreferentes.
-5. Adicionar o teste de regressão de encoding e CLI multi-encoding.
-6. Executar todos os critérios congelados, responder o handoff, atualizar este TASK.md e criar o checkpoint final F0.2.
+PREPARAR O GATE DE DEFENSABILIDADE DA F0.3 — AINDA NÃO ALTERAR O AMBIENTE:
+1. Confirmar `checkpoint/f0.2-complete`, branch, HEAD e working tree limpo.
+2. Detectar novamente `uv`, build tools e dependências dev sem instalar nada.
+3. Reproduzir os comandos atuais de bootstrap, testes, mypy, ruff e build; registrar cada ausência/falha.
+4. Inspecionar `pyproject.toml`, documentação de bootstrap e existência de lockfile.
+5. Congelar gerenciador, versões Python, arquivos, comandos de aceite e rollback no dossiê F0.3.
+6. Somente com gate `READY` e autorização de mudança de ambiente, iniciar bootstrap e lockfile reproduzíveis.
 ```
 
 ---
