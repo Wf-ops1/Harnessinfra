@@ -1074,6 +1074,23 @@ consegue reproduzir: `compiler/compile.py` começa com shebang, mas o índice Gi
 
 Evidência remota: <https://github.com/Wf-ops1/Harnessinfra/actions/runs/30878935976>.
 
+#### Recongelamento F0.6-R2 — prova controlada de branch protection
+
+A existência da regra remota não prova, isoladamente, que um merge é bloqueado quando o check
+obrigatório falha. A prova será executada em PR e branch separados, sem merge e sem alteração direta
+de `main`.
+
+| Campo | Decisão congelada |
+|---|---|
+| **Problema a provar** | `main` deve recusar merge quando `CI required` não conclui com `success`, inclusive para administrador |
+| **Branch/PR de prova** | `proof/f0.6-required-check` partindo do HEAD verde de `phase/f0-baseline`, em PR separado para `main` |
+| **Falha permitida** | Adicionar somente `tests/unit/test_ci_required_block.py`, com um teste que falha de forma intencional e identificável |
+| **Explicitamente proibido** | Alterar workflow, matriz, código de produto, testes existentes ou proteção para fabricar o resultado; realizar merge; fazer push direto em `main`; usar bypass administrativo |
+| **Critério de bloqueio** | Jobs de testes e aggregate `CI required` falham; PR informa estado não mesclável/bloqueado enquanto o check obrigatório está vermelho |
+| **Restauração obrigatória** | Reverter o commit de falha na própria branch de prova, publicar o revert e exigir novo run integralmente verde |
+| **Fechamento da prova** | Confirmar PR novamente liberado pelos checks, fechar o PR sem merge e preservar URLs/commits como evidência |
+| **Rollback** | `git revert <commit-de-falha>`; se a regra remota divergir do contrato, interromper e restaurar a proteção anterior antes de continuar |
+
 #### Resultado local e handoff parcial da F0.6
 
 | Verificação local | Resultado |
