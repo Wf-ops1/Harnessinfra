@@ -15,6 +15,8 @@ from pydantic import (
     model_validator,
 )
 
+from .registry import ResolvedContractSpec
+
 _NonEmptyStr: TypeAlias = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 
 
@@ -225,8 +227,20 @@ class GraphSpec(_StrictFrozenModel):
 
 
 class CompiledGraphArtifact(_StrictFrozenModel):
-    """Minimal typed artifact envelope for the F1.1 graph contract."""
+    """Typed artifact envelope with an additive resolved-contract view."""
 
     artifact_schema_version: _NonEmptyStr
     package_version: _NonEmptyStr
     graph: GraphSpec
+    resolved_contracts: tuple[ResolvedContractSpec, ...] = ()
+
+    @field_validator("resolved_contracts", mode="before")
+    @classmethod
+    def freeze_resolved_contracts(cls, value: object) -> object:
+        return tuple(value) if isinstance(value, list) else value
+
+    @model_validator(mode="after")
+    def validate_resolved_contract_integrity(self) -> Self:
+        for contract in self.resolved_contracts:
+            contract.verify_integrity()
+        return self

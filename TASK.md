@@ -147,8 +147,8 @@ para preparar o próprio dossiê é permitida; alteração de código da tarefa 
 
 **Objetivo:** transformar YAMLs declarativos em artefatos executáveis, validados e determinísticos.
 
-**Status da fase:** `preparing` — F1.1 concluída; auditoria e gate da F1.2 preparados. A F1.2 permanece
-`pending`, sem implementação, até nova execução confirmar o checkpoint local `checkpoint/f1.2-ready`.
+**Status da fase:** `in_progress` — F1.1 e F1.2 concluídas dentro dos gates congelados; a próxima
+retomada deve preparar somente a auditoria e o gate de defensabilidade da F1.3.
 
 ### Coordenação e ambiente observado
 
@@ -402,7 +402,7 @@ defensibility:
 
 | Campo | Detalhe |
 |---|---|
-| **Status** | `pending` — gate `READY`; nenhum arquivo de implementação F1.2 foi alterado |
+| **Status** | `completed` — gate `READY → COMPLETED`; implementação e critérios congelados aprovados |
 | **Objetivo** | Substituir resolução arbitrária por path por um catálogo explícito, produzir schema/digest determinísticos e bloquear execução de Python externo salvo confiança e aprovação exatas |
 | **Arquivos potencialmente alteráveis** | `contracts/registry.py` (novo), `contracts/graph.py`, `contracts/__init__.py`, adapter legado `compiler/validators/contract_validator.py`, testes focados, `pyproject.toml`, `uv.lock` e `TASK.md` |
 | **Dependências** | F1.1 concluída; Pydantic v2 disponível; validação normativa de JSON Schema exigirá dependência direta `jsonschema` v4 registrada no lock |
@@ -424,7 +424,7 @@ defensibility:
 
 | Campo | Estado atual |
 |---|---|
-| **Gate** | `READY` — problema, baseline, API, confiança, compatibilidade, aceite e rollback congelados |
+| **Gate** | `READY → COMPLETED` — execução permaneceu no escopo, incluindo o recongelamento R1, e todos os critérios passaram |
 | **Checkpoint anterior** | `checkpoint/pre-f1.2-defensibility` → `d61d4e36109f685ef237c5256e046cc71654d719` |
 | **Checkpoint de liberação** | `checkpoint/f1.2-ready` será criado no commit exclusivamente documental deste dossiê |
 | **Próximo passo permitido** | Em nova execução, implementar somente o escopo congelado; descoberta fora dele reabre o gate |
@@ -631,6 +631,49 @@ defensibility:
 [x] Rollback não destrutivo e fronteira externa definidos
 [x] Nenhum código, YAML de produção ou schema F1.2 implementado nesta preparação
 ```
+
+#### Recongelamento F1.2-R1 — stubs de tipagem do JSON Schema
+
+O primeiro `mypy` focado após adicionar `jsonschema` comprovou que a distribuição não expõe stubs
+consumíveis pelo gate atual (`import-untyped` em `jsonschema.exceptions` e `jsonschema.validators`).
+
+| Campo | Decisão congelada |
+|---|---|
+| **Problema comprovado** | `mypy src/ai_engineering_harness/contracts` falhou com dois erros `import-untyped` e recomendou `types-jsonschema` |
+| **Escopo adicional permitido** | Adicionar somente `types-jsonschema` em `[project.optional-dependencies].dev` e atualizar `uv.lock`/`TASK.md` |
+| **Comportamento preservado** | `jsonschema` continua a única nova dependência de runtime; nenhuma regra mypy, ignore ou configuração será alterada |
+| **Critério** | Mypy focado e integral passam sem `ignore_missing_imports`, `type: ignore` ou exclusão de módulo |
+| **Rollback** | Reverter as linhas exclusivas de `types-jsonschema` em `pyproject.toml`, `uv.lock` e este registro; preservar o restante da F1.2 |
+
+#### Resultado e handoff da F1.2
+
+| Verificação final | Resultado |
+|---|---|
+| Casos focados de registry, grafo e imports públicos | exit 0; 63 testes passaram |
+| Suíte integral | exit 0; 135 testes + 6 subtests passaram |
+| `mypy src` | exit 0; sem issues em 88 arquivos; `types-jsonschema` usado somente no extra dev |
+| `ruff check .`, `compileall` e `git diff --check` | todos exit 0 |
+| Busca de loaders arbitrários | zero ocorrências de `spec_from_file_location`, `module_from_spec` ou `exec_module` no adapter/contratos |
+| Lock e ambiente | `uv lock --check` e `uv sync --all-extras --locked` exit 0; 41 pacotes resolvidos |
+| Build e smoke padrão | wheel/sdist geradas; zero bytecode; metadata, pacote e CLI em `0.1.0`, fora do checkout |
+| Smoke público adicional | `18/18` símbolos F1.1/F1.2 e `jsonschema 4.26.0` importados da wheel em `site-packages` |
+| Escopo congelado | nove arquivos versionados do allowlist; compilador oficial, CLI, defaults, runtime e trust engine intocados |
+
+| Pergunta obrigatória | Resposta |
+|---|---|
+| **Qual comportamento anterior foi substituído?** | O validator legado executava qualquer `path.py#Classe`, enquanto o caminho oficial aceitava referências inexistentes; agora a resolução disponível é fechada por catálogo e fonte explícita. |
+| **Qual é o novo contrato público?** | `ContractRegistry`, `ResolvedContractSpec` e seis erros tipados; 19 nomes internos canônicos, 11 aliases legados exatos, `jsonschema:<path>#<pointer>` confinado e `python:<módulo>:<Classe>` sob dupla autorização. |
+| **Quais erros tipados podem ocorrer?** | `InvalidContractReferenceError`, `ContractNotFoundError`, `UntrustedPythonContractError`, `InvalidContractSchemaError` e `ContractCompatibilityError`, todos derivados de `ContractRegistryError`. |
+| **Quais side effects são produzidos?** | Registry interno não produz side effect; JSON Schema apenas lê arquivo confinado; Python externo só pode executar após `repository_trusted=true` e aprovação exata. Testes/build usam somente temporários ignorados. |
+| **Onde o estado é persistido?** | Catálogo/aliases em código, dependências em `pyproject.toml`/`uv.lock`, schemas/digests em `ResolvedContractSpec`, testes neste repositório e checkpoints Git locais. |
+| **Como a operação é retomada após crash?** | Retomar de `checkpoint/f1.2-complete`; confirmar branch/worktree e preparar o dossiê F1.3 antes de implementar políticas ou ferramentas. |
+| **Qual política autoriza a ação?** | Dossiê F1.2 `READY`, `checkpoint/f1.2-ready` e recongelamento F1.2-R1 para stubs sem ignores. |
+| **Como secrets são protegidos?** | Nenhuma referência, schema, erro ou digest requer secret; a F1.2 não acessa credenciais nem persiste conteúdo secreto. |
+| **Quais eventos são emitidos?** | Nenhum evento externo ou de domínio; resolução retorna valor ou erro síncrono antes da futura integração com compilador/runtime. |
+| **Quais testes provam sucesso?** | Catálogo 19/aliases 11, JSON Pointer, digest canônico, Python explicitamente aprovado, artifact round-trip, compatibilidade estrutural e adapter legado conhecido. |
+| **Quais testes provam falha segura?** | Contrato ausente, alias arbitrário, traversal/symlink, JSON/schema/pointer inválido, digest adulterado, incompatibilidade e Python sem ambas as autorizações falham; o sentinel malicioso nunca é criado. |
+| **A wheel instalada externamente foi testada?** | Sim; smoke uv isolado importou `18/18` símbolos, `jsonschema 4.26.0` e confirmou origem fora do checkout. |
+| **A documentação foi atualizada?** | Sim; este painel registra implementação, recongelamento, provas e limites. O compilador oficial só consumirá `resolve_many` na F1.4 e a integração do trust engine permanece F5. |
 
 ---
 
@@ -1689,13 +1732,13 @@ de `main`.
 ```
 Data:              2026-08-04
 Fase:              F1
-Tarefa:            F1.2 — auditoria e gate de registry seguro preparados
-Estado:            pending — gate READY; nenhuma implementação F1.2 iniciada
-Arquivos alterados: TASK.md somente; provas controladas confinadas a build/f1.2-audit e ignoradas por Git
-Validações:         98 testes + 6 subtests; mypy 87 arquivos; Ruff, compileall, lock, build e smoke isolado verdes; execução arbitrária e aceite indevido reproduzidos
-Checkpoint:         checkpoint/f1.1-complete e checkpoint/pre-f1.2-defensibility em d61d4e36109f685ef237c5256e046cc71654d719; checkpoint/f1.2-ready no commit documental deste dossiê
-Observação:         branch local phase/f1-contract-registry; nenhuma branch/tag F1 publicada; compilador oficial, runtime, defaults e código F1.2 não foram alterados
-Resultado:          catálogo, aliases, JSON Schema, trust/aprovação, erros, digest, compatibilidade, aceite, escopo e rollback F1.2 congelados
+Tarefa:            F1.2 — registry seguro de contratos
+Estado:            completed — gate READY → COMPLETED; todos os critérios congelados e R1 aprovados
+Arquivos alterados: registry.py, graph.py, contracts/__init__.py, adapter legado, dois testes, pyproject.toml, uv.lock e TASK.md
+Validações:         63 testes focados; 135 testes + 6 subtests integrais; mypy 88 arquivos; Ruff, compileall, loader-search, lock/sync, build e dois smokes verdes
+Checkpoint:         checkpoint/pre-f1.2-defensibility em d61d4e36109f685ef237c5256e046cc71654d719; checkpoint/f1.2-ready no dossiê; checkpoint/f1.2-complete no commit final
+Observação:         branch local phase/f1-contract-registry; nenhuma branch/tag F1 publicada; compilador oficial, CLI, defaults, runtime e trust engine não foram integrados
+Resultado:          catálogo fail-closed, JSON Schema confinado, Python sob confiança+aprovação, digest, artifact view e compatibilidade conservadora entregues
 ```
 
 ---
@@ -1703,13 +1746,13 @@ Resultado:          catálogo, aliases, JSON Schema, trust/aprovação, erros, d
 ## 11. Próxima Ação Exata
 
 ```text
-IMPLEMENTAR F1.2 — SOMENTE EM NOVA EXECUÇÃO E DENTRO DO GATE CONGELADO:
-1. Confirmar branch phase/f1-contract-registry, worktree sem mudanças alheias e checkpoint/f1.2-ready resolvendo para o commit documental do dossiê.
-2. Reler integralmente a F1.2, este dossiê e os triggers de recongelamento; manter um único executor.
-3. Alterar somente os arquivos listados em frozen_scope.allowed e preservar todos os itens excluded.
-4. Implementar primeiro erros/modelo/catalog/aliases; depois JSON Schema e trust explícito; por fim adapter legado, compatibilidade e artifact field aditivo.
-5. Executar testes focados e busca de loaders antes da suíte integral, lock/sync, mypy, Ruff, compileall, build e smoke da wheel.
-6. Se qualquer descoberta exigir compilador oficial, CLI, defaults, trust engine, runtime ou contrato diferente, interromper e recongelar antes de editar fora do escopo.
+PREPARAR F1.3 — SOMENTE AUDITORIA E GATE DE DEFENSABILIDADE, SEM IMPLEMENTAR:
+1. Confirmar branch phase/f1-contract-registry, worktree limpo e checkpoint/f1.2-complete no commit final da F1.2.
+2. Reler integralmente a F1.3 do plano e o handoff da F1.2; manter um único executor.
+3. Auditar o `pass`/comportamento do policy validator, catálogos atuais de roles/tools, policies default, referências e consumidores.
+4. Congelar problema, evidências, escopo permitido/proibido, schemas estritos, compatibilidade, aceite positivo/negativo, rollback e checkpoint F1.3.
+5. Não alterar código F1.3 até o gate estar `READY` e uma retomada posterior confirmar o checkpoint local de liberação.
+6. Se a F1.3 exigir integração do compilador oficial/CLI da F1.4 ou enforcement runtime/F5, separar explicitamente antes de congelar.
 7. Não fazer push, PR, merge, tag remota ou alteração de proteção sem autorização explícita.
 ```
 

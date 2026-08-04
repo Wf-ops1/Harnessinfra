@@ -12,16 +12,34 @@ from .graph import (
     TerminalStateSpec,
     ToolPermissionSpec,
 )
+from .registry import (
+    ContractCompatibilityError,
+    ContractNotFoundError,
+    ContractRegistry,
+    ContractRegistryError,
+    InvalidContractReferenceError,
+    InvalidContractSchemaError,
+    ResolvedContractSpec,
+    UntrustedPythonContractError,
+)
 
 __all__ = [
     "AgentNodeSpec",
     "CompiledGraphArtifact",
+    "ContractCompatibilityError",
+    "ContractNotFoundError",
+    "ContractRegistry",
+    "ContractRegistryError",
     "DeterministicNodeSpec",
     "GraphMetadata",
     "GraphSpec",
     "HumanApprovalNodeSpec",
+    "InvalidContractReferenceError",
+    "InvalidContractSchemaError",
     "NodeSpec",
+    "ResolvedContractSpec",
     "RetryPolicySpec",
     "TerminalStateSpec",
     "ToolPermissionSpec",
+    "UntrustedPythonContractError",
 ]

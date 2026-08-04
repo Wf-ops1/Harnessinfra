@@ -166,6 +166,7 @@ def test_compiled_artifact_round_trip() -> None:
 
     assert restored == artifact
     assert restored.graph.graph.graph_schema_version == GRAPH_SCHEMA_VERSION
+    assert restored.resolved_contracts == ()
 
 
 def test_duplicate_id_is_rejected_across_nodes_and_terminals() -> None:
