@@ -73,7 +73,7 @@ O grafo acima descreve transições de software, não efeitos garantidos. Em par
 | P1 | Grafo não governa runtime | Dois compiladores e sequência fixa | F1/F2 |
 | P1 | Aprovação sem resume seguro | Estado e protocolo incompletos | F2/F5 |
 | P1 | Evidência insuficiente | Pode registrar identificadores sintéticos | F6/F7 |
-| P1 | Ausência de CI obrigatória | Gates somente locais | F0.6 |
+| P1 | CI ainda não cobre comportamento operacional completo | Pipeline obrigatória cobre o baseline, mas providers, worktree, promoção e recovery reais ainda não existem | F1–F7 |
 
 ## 6. Gates para considerar o produto operacional
 

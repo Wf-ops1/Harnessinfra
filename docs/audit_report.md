@@ -47,7 +47,7 @@ sustenta claims de providers, MCP, worktree, promoção ou rollback reais.
 5. gates obrigatórios sem sucesso vazio;
 6. aprovação retomável, candidate commit e promoção explícita;
 7. segurança, budgets, secrets e políticas no caminho crítico;
-8. doctor/recovery confiáveis e CI Windows/Linux;
+8. doctor e recovery confiáveis;
 9. E2E em repositório externo, instalação limpa e processo de release.
 
 O detalhamento e os critérios de aceite estão no

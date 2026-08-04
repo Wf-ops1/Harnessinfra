@@ -57,7 +57,7 @@ commitado.
 - promoção por candidate commit e cherry-pick;
 - retomada após aprovação/crash;
 - rollback seguro e gates pós-reversão;
-- doctor confiável e CI obrigatória Windows/Linux.
+- doctor confiável.
 
 Acompanhe a ordem de implementação no
 [plano operacional](plano_implementacao_harness_operacional.md) e o estado executável no

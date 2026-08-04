@@ -148,8 +148,8 @@ para preparar o próprio dossiê é permitida; alteração de código da tarefa 
 **Objetivo:** garantir que o pacote compile, instale, rode testes reproduzivelmente
 e não anuncie capacidades inexistentes.
 
-**Status da fase:** `in_progress` — F0.0 a F0.5 concluídas; F0.6 está validada local e remotamente na
-branch de fase. Abertura de PR, proteção de `main` e prova controlada de merge bloqueado exigem nova autorização.
+**Status da fase:** `completed` — F0.0 a F0.6 concluídas na branch de fase; PR principal aberto e
+verde, `main` protegida por `CI required` e bloqueio de merge comprovado. O merge permanece separado.
 
 ### Coordenação e ambiente observado
 
@@ -916,7 +916,7 @@ defensibility:
 
 | Campo | Detalhe |
 |-------|---------|
-| **Status** | `in_progress` — implementação e correção F0.6-R1 validadas remotamente; PR, branch protection e prova de merge bloqueado permanecem obrigatórios |
+| **Status** | `completed` — CI Windows/Linux verde, PR principal aberto, `main` protegida e bloqueio/restauração comprovados em PR separado |
 | **Objetivo** | Pipeline automatizado impede merge com falhas em encoding, lint, tipos, testes ou build |
 | **Arquivos envolvidos** | `.github/workflows/*.yml` (ou equivalente CI) |
 | **Implementação esperada** | Pipeline Windows + Linux com jobs: encoding/compileall; ruff; mypy; testes unitários; E2E locais; build da wheel; instalação e smoke test. Merge bloqueado quando job obrigatório falha |
@@ -928,10 +928,10 @@ defensibility:
 
 | Campo | Estado atual |
 |---|---|
-| **Gate** | `CORRECTION_REMOTE_VALIDATED` — run corretivo concluiu 11/11 jobs com sucesso; gate final depende de branch protection e prova de merge bloqueado |
+| **Gate** | `CORRECTION_REMOTE_VALIDATED → COMPLETED` — 11/11 jobs verdes; `CI required` obrigatório; falha controlada bloqueou merge e o revert restaurou estado verde |
 | **Checkpoint de rollback** | `checkpoint/f0.5-complete` → `7cd6d81137b64914b8f53f6067f76f42cfde2711` |
 | **Checkpoint de liberação** | `checkpoint/f0.6-ready` — tag criada no commit deste dossiê antes do primeiro workflow |
-| **Fronteira externa** | Publicação somente de `phase/f0-baseline` autorizada e executada; `main`, tags, PR e branch protection não foram alterados; F0.6 não pode ser `completed` sem execução remota verde e proteção comprovada |
+| **Fronteira externa** | PR principal `#1` aberto sem merge; `main` exige `CI required` em modo estrito inclusive para administradores; PR de prova `#2` fechado sem merge; conteúdo de `main` e tags remotas não foram alterados |
 
 ```yaml
 defensibility:
@@ -1002,8 +1002,8 @@ defensibility:
         name: "CI required"
         contract: "always runs and fails unless quality, tests and package all succeeded"
     branch_protection: >-
-      main deverá exigir o check estável CI required após ele existir no GitHub; configuração remota
-      não faz parte do commit local e precisa de autorização/credencial
+      main exige o check estável CI required, strict=true e enforce_admins=true; force-push e exclusão
+      permanecem desabilitados; nenhuma exigência adicional de review foi introduzida
   frozen_scope:
     allowed:
       - ".github/workflows/ci.yml — workflow GitHub Actions"
@@ -1121,6 +1121,14 @@ de `main`.
 | Pacote | 2/2 jobs `success` em Ubuntu/Windows e Python 3.12, incluindo build e smoke da wheel |
 | Aggregate | `CI required` concluiu `success`; run completo `completed/success`, 11/11 jobs verdes |
 
+| Proteção e prova remota | Resultado |
+|---|---|
+| PR principal | [`#1`](https://github.com/Wf-ops1/Harnessinfra/pull/1), aberto e não mesclado; baseline R2 `f66d47ab66886d560198d4db42faab6b8e68ba3d` comprovado com `mergeable_state=clean`; fechamento ancorado por `checkpoint/f0.6-complete` |
+| CI do PR principal | Runs [`30879923860`](https://github.com/Wf-ops1/Harnessinfra/actions/runs/30879923860) (push) e [`30879926143`](https://github.com/Wf-ops1/Harnessinfra/actions/runs/30879926143) (pull request), ambos `completed/success` |
+| Proteção de `main` | `CI required` obrigatório; `strict=true`; `enforce_admins=true`; reviews adicionais desabilitados; force-push e exclusão desabilitados |
+| PR de prova vermelho | [`#2`](https://github.com/Wf-ops1/Harnessinfra/pull/2), commit `d9640ff57d2e29c37f257e6a13c08025e68a69bd`; run [`30879998396`](https://github.com/Wf-ops1/Harnessinfra/actions/runs/30879998396) falhou em 4 jobs de testes e em `CI required`; `mergeable_state=blocked` |
+| Restauração da prova | Revert `79af2e353ed0743082355364bb8c3a24d98c90bd`; run [`30880164178`](https://github.com/Wf-ops1/Harnessinfra/actions/runs/30880164178) com 11/11 jobs verdes e `mergeable_state=clean`; PR #2 fechado sem merge |
+
 | Pergunta obrigatória | Resposta local F0.6 |
 |---|---|
 | **Qual comportamento anterior foi substituído?** | O repositório não possuía pipeline; todos os gates dependiam de execução manual. |
@@ -1128,23 +1136,23 @@ de `main`.
 | **Quais erros tipados podem ocorrer?** | Scripts retornam exit não zero para YAML/contrato inválido, teste/gate falho, número inesperado de wheels, bytecode no artefato, instalação/import/CLI divergente ou job dependente não sucedido. |
 | **Quais side effects são produzidos?** | Somente arquivos do workflow/testes e artefatos ignorados `build/`, `dist/`, egg-info e ambientes uv isolados. |
 | **Onde o estado é persistido?** | Workflow em `.github/workflows/ci.yml`, contratos em testes, evidência/checkpoints neste painel e Git local. |
-| **Como a operação é retomada após crash?** | Retomar de `checkpoint/f0.6-local-validated`; confirmar status limpo e repetir o teste do workflow antes de qualquer push. |
+| **Como a operação é retomada após crash?** | Retomar de `checkpoint/f0.6-complete`; confirmar PR #1 aberto/verde e proteção de `main` antes de qualquer promoção. |
 | **Qual política autoriza a ação?** | DEC-001/002, dossiê F0.6 `READY` e `checkpoint/f0.6-ready`. |
 | **Como secrets são protegidos?** | Workflow usa apenas `contents: read`, checkout sem credenciais persistidas e nenhuma secret. |
-| **Quais eventos são emitidos?** | Localmente apenas saída de ferramentas; no GitHub serão check runs de quality, tests, package e `CI required`. |
-| **Quais testes provam sucesso?** | Quatro regressões do workflow, suíte 73+6, gates estáticos, build e smoke uv isolado. |
-| **Quais testes provam falha segura?** | O contrato rejeita action móvel, matriz/trigger/job ausente e aggregate não fail-closed; smoke rejeita bytecode, wheel ambígua, import do checkout e versões divergentes. |
+| **Quais eventos são emitidos?** | GitHub registrou check runs de quality, tests, package e `CI required` em push e pull request, com URLs preservadas acima. |
+| **Quais testes provam sucesso?** | Quatro regressões do workflow, suíte 73+6, gates estáticos, build/smoke uv isolado e múltiplos runs remotos 11/11 verdes. |
+| **Quais testes provam falha segura?** | Além dos contratos locais, o PR #2 comprovou `CI required=failure` e merge bloqueado; o revert comprovou restauração integral para 11/11 verdes. |
 | **A wheel instalada externamente foi testada?** | Sim; uv `--isolated --no-project --with <wheel>`, com origem no cache isolado e CLI aprovada. |
-| **A documentação foi atualizada?** | Sim; README informa workflow local e mantém execução remota/branch protection como pendência. |
+| **A documentação foi atualizada?** | Sim; README, plano, auditoria, guia e este painel registram CI remota obrigatória e preservam as limitações de produto ainda reais. |
 
-**Aceite remoto ainda pendente — F0.6 não está concluída:**
+**Aceite remoto concluído:**
 
 1. [x] publicar somente a branch `phase/f0-baseline` no `origin`;
 2. [x] observar o primeiro conjunto de 4 quality, 4 tests, 2 package e o aggregate `CI required`;
 3. [x] publicar a correção F0.6-R1 e comprovar novo run integralmente verde, sem reduzir matriz ou gates;
-4. [ ] com nova autorização, abrir PR para `main` e configurar `CI required` como status check obrigatório;
-5. [ ] comprovar com PR controlado que uma falha obrigatória impede merge;
-6. [ ] somente então marcar F0.6 e Fase 0 como `completed` e criar `checkpoint/f0.6-complete`.
+4. [x] abrir PR para `main` e configurar `CI required` como status check obrigatório;
+5. [x] comprovar com PR controlado que uma falha obrigatória impede merge e que o revert restaura o verde;
+6. [x] marcar F0.6 e Fase 0 como `completed` e ancorar o commit final em `checkpoint/f0.6-complete`.
 
 ---
 
@@ -1186,6 +1194,7 @@ de `main`.
 | 2026-08-04 | DEC-002 | Adotar `uv`, `uv.lock` e Python `>=3.11,<3.15` como contrato do ambiente | Eliminar bootstrap ad hoc e tornar sync/test/lint/typecheck/build reproduzíveis | F0.3 cria ambiente local `.venv`; F0.6 deverá validar a faixa Python na CI |
 | 2026-08-04 | DEC-003 | Versionar pacote, schemas e definições em namespaces separados | Evitar que 0.1.0, 1.0/1.0.0 e 3.2.0 sejam comparados ou atualizados como se representassem o mesmo contrato | Metadata instalada governa package version; schemas começam em 1.0; 3.2.0 permanece definition version até migrações futuras |
 | 2026-08-04 | DEC-004 | Classificar claims públicos como implementados, experimentais/simulados ou planejados | Impedir que presença de classe/teste interno seja confundida com efeito operacional real | README/docs e regressão automatizada devem expor limitações e bloquear rótulos positivos sem evidência |
+| 2026-08-04 | DEC-005 | Exigir `CI required` em `main`, com branch atualizada e regra aplicada a administradores | Fazer o aggregate fail-closed governar merges reais, sem bypass administrativo implícito | PR #2 comprovou estado bloqueado no vermelho e restauração para limpo após revert; PR #1 permanece aberto e verde |
 
 > Registre aqui toda decisão arquitetural que diverge do plano. Formato: data ISO, ID (ADR-XXX), descrição, motivo, arquivos impactados.
 
@@ -1211,13 +1220,13 @@ de `main`.
 ```
 Data:              2026-08-04
 Fase:              F0
-Tarefa:            F0.6 — CI mínima, aceite remoto da branch concluído
-Estado:            in_progress — local/remote validated; proteção de main e prova de bloqueio pendentes
-Arquivos alterados: metadata Git de compiler/compile.py (100644 → 100755); TASK.md
-Validações:         run 30879368468 no commit 3d465680a085ba6c51aee18e38def3858a14d4c1 — completed/success; 11/11 jobs verdes
-Checkpoint:         3d465680a085ba6c51aee18e38def3858a14d4c1 em origin/phase/f0-baseline; rollback em checkpoint/f0.6-local-validated, checkpoint/f0.6-ready e checkpoint/f0.5-complete
-Observação:         branch publicada; main/tags/PR/branch protection intactos; nenhuma matriz, regra ou gate foi reduzido
-Resultado:          quality 4/4, tests 4/4, package 2/2 e CI required verdes em Windows/Linux
+Tarefa:            F0.6 — CI mínima e gate remoto concluídos
+Estado:            completed — Fase 0 concluída na branch; promoção para main ainda não autorizada
+Arquivos alterados: .github/workflows/ci.yml; testes/README/docs/TASK; metadata Git executável de compiler/compile.py
+Validações:         PR #1 verde; main protegida; PR #2 blocked no vermelho e clean após revert; prova fechada sem merge
+Checkpoint:         checkpoint/f0.6-complete no commit documental final; rollback em checkpoint/f0.6-local-validated, checkpoint/f0.6-ready e checkpoint/f0.5-complete
+Observação:         main mantém o mesmo conteúdo; PR #1 está aberto; tags remotas não foram alteradas; nenhuma matriz, regra ou gate foi reduzido
+Resultado:          F0.0–F0.6 concluídas; quality 4/4, tests 4/4, package 2/2 e CI required governam merges em Windows/Linux
 ```
 
 ---
@@ -1225,13 +1234,12 @@ Resultado:          quality 4/4, tests 4/4, package 2/2 e CI required verdes em 
 ## 11. Próxima Ação Exata
 
 ```text
-FINALIZAR O GATE REMOTO F0.6 — EXIGE NOVA AUTORIZAÇÃO EXPLÍCITA:
-1. Confirmar worktree limpa, origin/phase/f0-baseline sincronizada e run 30879368468 completed/success.
-2. Com nova autorização, abrir PR de phase/f0-baseline para main; não realizar merge neste passo.
-3. Configurar main para exigir o status check estável CI required e branch atualizada antes do merge.
-4. Criar uma falha controlada e reversível em branch/commit de prova; confirmar que o GitHub impede o merge.
-5. Restaurar a prova, repetir a CI até verde e registrar URLs/evidências sem alterar main diretamente.
-6. Somente após todos os critérios remotos marcar F0.6/Fase 0 completed e criar checkpoint/f0.6-complete.
+PROMOVER A FASE 0 PARA MAIN — EXIGE NOVA AUTORIZAÇÃO EXPLÍCITA:
+1. Confirmar checkpoint/f0.6-complete, worktree limpa, PR #1 aberto/clean e CI required verde no HEAD.
+2. Com autorização, mesclar o PR #1 por merge commit; não usar bypass, squash ou rebase.
+3. Confirmar que main avançou pelo merge, permanece protegida e executa CI required com sucesso.
+4. Sincronizar a main local sem descartar branches/checkpoints e registrar o merge neste painel.
+5. Somente depois preparar o gate de defensabilidade da F1.1; nenhum arquivo de F1 entra em in_progress antes disso.
 ```
 
 ---
