@@ -143,13 +143,12 @@ para preparar o próprio dossiê é permitida; alteração de código da tarefa 
 
 ## 5. Fase Atual
 
-**→ FASE 0 — Baseline honesta, executável e reproduzível**
+**→ FASE 1 — Contrato de grafo e compilador único**
 
-**Objetivo:** garantir que o pacote compile, instale, rode testes reproduzivelmente
-e não anuncie capacidades inexistentes.
+**Objetivo:** transformar YAMLs declarativos em artefatos executáveis, validados e determinísticos.
 
-**Status da fase:** `completed` — F0.0 a F0.6 promovidas para `main` pelo PR #1; CI pós-merge verde,
-`main` protegida por `CI required` e bloqueio de merge comprovado. F1 ainda não foi iniciada.
+**Status da fase:** `preparing` — auditoria e gate de defensabilidade da F1.1 concluídos; F1.1 permanece
+`pending`, sem implementação, até uma próxima execução confirmar o checkpoint local `checkpoint/f1.1-ready`.
 
 ### Coordenação e ambiente observado
 
@@ -158,15 +157,220 @@ e não anuncie capacidades inexistentes.
 | **Executor ativo** | `Codex` — responsável por implementar, validar, manter checkpoints e criar commits locais |
 | **Auditor/revisor** | `Antigravity` — somente-leitura por padrão; só edita quando o usuário solicitar explicitamente ou transferir a execução |
 | **Workspace** | `C:\Users\walla\OneDrive\Desktop\ai-engineering-harness` |
-| **Git** | `available` — PR #1 mesclado por merge commit `3f29c4c894808eb47464c96a01c9048198d971c9`; `main` local/remota sincronizadas; `checkpoint/f0.6-complete` aponta para o HEAD aprovado `fd4de2c119daf9a401f450a907f1d07bf3f580e9`; tags remotas não foram alteradas |
+| **Git** | `available` — branch local `phase/f1-graph-contract` criada em `4e3a3531cea44aadcebb9ff3b3e763b4e53adba6`, mesmo commit observado em `origin/main`; `checkpoint/pre-f1.1-defensibility` aponta para esse baseline; nenhuma branch/tag da F1 foi publicada |
 | **python_command** | `& 'C:\Users\walla\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe'` — Python `3.12.13` |
 | **uv_command** | `& '.\build\f0.6-tools\uv\bin\uv.exe'` — uv `0.11.32` restaurado de forma isolada/ignorada, sem PATH ou instalação global; `lock --check` e `sync --all-extras --locked` verdes |
-| **Dependências do projeto** | `.venv` sincronizada pelo uv com Python 3.12.13 e `uv.lock`; 73 testes + 6 subtests, mypy em 86 arquivos, ruff, compileall, build e smoke isolado da wheel verdes |
+| **Dependências do projeto** | `.venv` ressincronizada pelo uv 0.11.32 com Python 3.12.13 e `uv.lock`; 73 testes + 6 subtests, mypy em 86 arquivos, Ruff, compileall, build e smoke isolado da wheel revalidados nesta retomada |
 | **Regra de escrita** | apenas um agente escreve por vez |
 
 ---
 
-## 6. Tarefas da Fase Atual
+## 6. Tarefa Atual — F1.1
+
+### F1.1 — Definir schema tipado do grafo
+
+| Campo | Detalhe |
+|-------|---------|
+| **Status** | `pending` — gate `READY`; nenhum arquivo de implementação foi alterado |
+| **Objetivo** | Criar os dez modelos Pydantic exigidos pelo plano e validar a topologia do grafo em memória, sem integrar ainda compilador, runtime, policies ou defaults |
+| **Arquivos potencialmente alteráveis** | `src/ai_engineering_harness/contracts/graph.py` (novo), `src/ai_engineering_harness/contracts/__init__.py`, `tests/unit/test_graph_contracts.py` (novo), `TASK.md` |
+| **Dependências** | Fase 0 concluída; Pydantic v2 e namespaces de versão já disponíveis |
+
+#### Auditoria concreta da F1.1
+
+| Superfície | Comportamento observado | Lacuna frente ao plano | Risco/compatibilidade |
+|---|---|---|---|
+| `src/ai_engineering_harness/contracts/` | Possui modelos de payloads de nós, eventos e transações; o `__init__.py` raiz não exporta modelos de grafo | Os dez modelos F1.1 estão ausentes | Adição pode ser isolada e sem quebrar imports atuais |
+| `src/ai_engineering_harness/compiler/compiler.py` | `GraphCompiler` carrega YAML como `dict`, valida somente se um bloco `loop` contém duas chaves e serializa o grafo bruto | Não valida IDs, entrypoint, arestas, terminais, alcançabilidade, tipos ou valor positivo/condição real de retry | Integrá-lo agora ampliaria a F1.1 para F1.4; explicitamente excluído |
+| `compiler/` legado | Implementação separada, import dinâmico de contratos por path, `PolicyValidator` valida somente `graph.name` e emite outro formato de artefato | Duplica compilação e não aplica o contrato F1.1 | Registry seguro pertence à F1.2, policies à F1.3 e unificação à F1.4 |
+| `defaults/graphs/*.yaml` | Cinco grafos usam `graph_schema_version=1.0`, mas nenhum declara entrypoint, terminais ou tipo explícito; todas as arestas de término/retry incluem alvos não declarados | Todos falhariam no schema estrito alvo | Não migrar silenciosamente na F1.1; correção fica para a integração/unificação da Fase 1 |
+| `versioning.py` | Já separa `GRAPH_SCHEMA_VERSION=1.0` e `ARTIFACT_SCHEMA_VERSION=1.0` | Nenhuma lacuna de versão necessária à F1.1 | Reutilizar constantes sem editar o arquivo |
+| CLI/runtime/consumidores | CLI usa somente o compilador oficial; `MAFAdapter` valida apenas `header.runtime_provider`; testes atuais compilam specs mínimos inválidos | Nenhum consumidor usa um `GraphSpec`/`CompiledGraphArtifact` tipado | F1.1 será aditiva; adoção fica para F1.4/F1.5 |
+
+#### Gate de defensabilidade da F1.1
+
+| Campo | Estado atual |
+|---|---|
+| **Gate** | `READY` — problema, baseline, escopo, decisões, aceite, compatibilidade e rollback congelados |
+| **Checkpoint de rollback** | `checkpoint/pre-f1.1-defensibility` → `4e3a3531cea44aadcebb9ff3b3e763b4e53adba6` |
+| **Checkpoint de liberação** | `checkpoint/f1.1-ready` — tag local no commit documental que contém este dossiê; não publicada |
+| **Próximo passo permitido** | Em nova execução, implementar somente os arquivos/símbolos congelados; descoberta fora do escopo reabre o gate |
+
+```yaml
+defensibility:
+  task_id: "F1.1"
+  gate: "READY"
+  executor: "Codex"
+  authorized_at: "2026-08-04T12:07:01-03:00"
+  problem_statement: >-
+    O pacote não possui nenhum dos dez modelos tipados exigidos pela F1.1 e o GraphCompiler atual
+    aceita e serializa um grafo com ID duplicado, arestas quebradas, sem metadata, entrypoint ou
+    terminais, impedindo que o contrato de topologia seja aplicado de forma fail-closed.
+  evidence:
+    - command: >-
+        para cada símbolo F1.1, rg -n -w --glob '*.py' <símbolo>
+        src/ai_engineering_harness
+      observed: >-
+        exit 1 para GraphSpec, GraphMetadata, NodeSpec, AgentNodeSpec,
+        DeterministicNodeSpec, HumanApprovalNodeSpec, TerminalStateSpec,
+        RetryPolicySpec, ToolPermissionSpec e CompiledGraphArtifact
+      location: "src/ai_engineering_harness/contracts/"
+    - command: >-
+        .venv/Scripts/python.exe -c <probe temporário que chama
+        GraphCompiler.compile_graph com dois IDs 'duplicate', arestas para alvos ausentes e sem graph/terminais>
+      observed: >-
+        exit 0; INVALID_GRAPH_COMPILED=True; artefato gravado no TemporaryDirectory e removido ao final
+      location: "src/ai_engineering_harness/compiler/compiler.py:19-65"
+    - command: >-
+        .venv/Scripts/python.exe -c <auditoria read-only dos cinco defaults, entrypoint,
+        terminal_states, type e destinos de on_success/on_failure>
+      observed: >-
+        exit 0; todos os cinco têm entrypoint=None, zero terminais e type ausente em todos os nós;
+        todos possuem alvos não declarados, incluindo END e rotas de retry/escalation/revert
+      location: "src/ai_engineering_harness/defaults/graphs/*.yaml"
+    - command: >-
+        inspeção de src/ai_engineering_harness/compiler/compiler.py, compiler/compile.py,
+        compiler/validators/*.py, runtime/maf_adapter.py e consumidores via rg
+      observed: >-
+        dois formatos/caminhos de compilação; validator oficial apenas de chaves de loop;
+        validator legado importa Python por path; runtime confere apenas runtime_provider
+      location: "src/ai_engineering_harness/compiler/; compiler/; src/ai_engineering_harness/runtime/maf_adapter.py"
+  baseline:
+    source_branch: "main"
+    branch: "phase/f1-graph-contract"
+    head: "4e3a3531cea44aadcebb9ff3b3e763b4e53adba6"
+    origin_main: "4e3a3531cea44aadcebb9ff3b3e763b4e53adba6"
+    status: "clean antes do dossiê; somente build/dist/caches ignorados produzidos pela revalidação"
+    checkpoint: "checkpoint/pre-f1.1-defensibility"
+    f0_checkpoint: "checkpoint/f0.6-complete^{} = fd4de2c119daf9a401f450a907f1d07bf3f580e9; ancestral"
+    remote_tags: "nenhuma"
+    current_ci: >-
+      run 30920640518 no HEAD observado, completed/success, 11/11 jobs e CI required=success;
+      marco 30917657879 também completed/success, 11/11
+    branch_protection: >-
+      API pública confirma main protected=true; detalhes strict/enforce_admins/force-push/delete
+      permanecem na última evidência autenticada da F0 porque a reconsulta granular retornou 401
+      e não havia sessão/credencial autenticada disponível; nenhuma divergência observada
+  frozen_decisions:
+    model_policy: "Pydantic v2; strict=True, frozen=True e extra='forbid' em todos os modelos"
+    public_api: >-
+      os dez símbolos exigidos serão definidos em contracts/graph.py e reexportados por contracts/__init__.py
+    graph_metadata: >-
+      name, graph_schema_version, definition_version, entrypoint, status e description opcional;
+      schema_version será aceito somente como alias de entrada do graph_schema_version e a saída
+      canônica usará graph_schema_version, preservando DEC-003
+    graph_shape: >-
+      GraphSpec conterá graph, nodes, terminal_states, policies e contracts; IDs de nós e terminais
+      compartilharão namespace único
+    node_union: >-
+      NodeSpec será união discriminada por type=agent|deterministic|human_approval;
+      on_success e on_failure serão obrigatórios para impedir aresta implícita
+    agent_node: >-
+      exige role, input_contract e output_contract; pode declarar tool_permissions;
+      campos de executor determinístico/humano serão proibidos pelo modelo estrito
+    deterministic_node: >-
+      exige executor determinístico explícito e o campo compatível com a variante
+      (policy_ref, gate_name ou command); campos de agente/human approval são inválidos
+    human_node: >-
+      exige estratégia de aprovação explícita; campos de agente ou executor determinístico são inválidos
+    terminal_state: "outcome restrito a success|failure; ao menos um de cada obrigatório"
+    retry_policy: >-
+      max_iterations será inteiro estritamente positivo e exit_condition string não vazia;
+      cada nó participante de ciclo deverá declarar retry_policy
+    tool_permission: >-
+      referência de tool não vazia e effect restrito a allow|deny; enforcement permanece na F1.3/F5
+    topology: >-
+      entrypoint deve ser nó existente; toda aresta deve resolver para nó ou terminal;
+      todos os nós devem ser alcançáveis a partir do entrypoint
+    artifact: >-
+      CompiledGraphArtifact tipará apenas metadata de versão e GraphSpec resolvido necessários à F1.1;
+      digests, fontes, normalização, atomicidade e integração runtime permanecem F1.5
+  frozen_scope:
+    allowed:
+      - "src/ai_engineering_harness/contracts/graph.py — criar exclusivamente os dez modelos e validações F1.1"
+      - "src/ai_engineering_harness/contracts/__init__.py — reexportar exclusivamente a API pública F1.1"
+      - "tests/unit/test_graph_contracts.py — testes positivos, negativos, serialização e API pública"
+      - "TASK.md — transições, evidências, resultado e checkpoints da F1.1"
+      - "build/f1.1-*; build/; dist/; C:/tmp — temporários ignorados/confinados de verificação"
+    excluded:
+      - "src/ai_engineering_harness/compiler/**, compiler/** e CLI — integração/unificação F1.4"
+      - "src/ai_engineering_harness/defaults/graphs/*.yaml — migração dos defaults após adoção do compilador único"
+      - "runtime/maf_adapter.py e runtime/engine.py — consumo do artefato tipado F1.4/F1.5/F2"
+      - "registry/import de contratos F1.2; policies/roles/tools F1.3; enforcement de permissions F5"
+      - "digests, timestamps, escrita atômica e determinismo de compilação F1.5"
+      - "pyproject.toml, uv.lock, versioning.py, dependências e ambiente global"
+      - "push, PR, merge, tag remota ou alteração de branch protection"
+  compatibility_strategy:
+    current_consumers: >-
+      nenhuma chamada existente será redirecionada na F1.1; os modelos serão API aditiva e só
+      dados validados explicitamente por GraphSpec receberão o novo contrato
+    defaults: >-
+      os cinco YAMLs atuais permanecem inalterados e reconhecidamente incompatíveis; migração será
+      feita quando o compilador oficial passar a consumir GraphSpec, sem fallback permissivo
+    legacy_compiler: >-
+      compiler/ permanece somente como evidência de dívida até F1.2-F1.4; F1.1 não o legitima nem altera
+    versions: >-
+      graph_schema_version e artifact_schema_version permanecem 1.0; evolução incompatível exige
+      tarefa de migração e novo gate, não mudança silenciosa
+  frozen_acceptance:
+    - command: >-
+        <uv_command> run python -m pytest tests/unit/test_graph_contracts.py
+        tests/unit/test_public_module_imports.py tests/unit/test_versioning.py -q
+      expected: >-
+        exit 0; grafo válido e round-trip do artefato passam; os dez símbolos são públicos;
+        zero skips
+    - command: >-
+        casos negativos em test_graph_contracts.py para ID duplicado, entrypoint ausente/desconhecido,
+        terminal success/failure ausente, aresta quebrada, nó inalcançável, aresta implícita,
+        ciclo sem retry, max_iterations zero, exit_condition vazia, tipo/campos incompatíveis e extra desconhecido
+      expected: "cada caso levanta pydantic.ValidationError; nenhum inválido é aceito ou normalizado silenciosamente"
+    - command: "<uv_command> run python -m pytest -q"
+      expected: "exit 0; 73+ testes, 6 subtests e os novos testes F1.1 passam"
+    - command: >-
+        <uv_command> run python -m mypy src; <uv_command> run python -m ruff check .;
+        <uv_command> run python -m compileall -q src compiler tests; git diff --check
+      expected: "todos exit 0; sem redução de regras, ignores ou skips"
+    - command: >-
+        <uv_command> run python -m build; com uv isolado no PATH do subprocesso,
+        <uv_command> run python tests/ci/smoke_wheel.py
+      expected: >-
+        exit 0; wheel contém contracts/graph.py; import público funciona da instalação externa;
+        metadata, __version__ e CLI permanecem 0.1.0
+  rollback:
+    triggers:
+      - "necessidade de alterar compilador, runtime, YAML default, dependency ou arquivo fora do escopo"
+      - "modelo precisar executar/importar código fornecido por projeto não confiável"
+      - "critério negativo aceitar coerção, extra ou topologia inválida"
+      - "qualquer teste F0, build, smoke ou API pública existente regredir"
+      - "critério congelado precisar ser removido, ignorado ou enfraquecido"
+    procedure: >-
+      interromper e preservar logs; antes de commit inverter somente os hunks F1.1 por apply_patch;
+      depois de commit usar git revert nos commits exclusivos da F1.1; nunca resetar ou descartar
+      trabalho preexistente; preservar checkpoint/pre-f1.1-defensibility
+    verify: >-
+      git status --short; git diff checkpoint/pre-f1.1-defensibility --
+      src/ai_engineering_harness/contracts tests/unit/test_graph_contracts.py TASK.md;
+      repetir pytest integral, mypy, Ruff, compileall, build e smoke da wheel
+  external_boundary: >-
+    nenhum push, PR, merge, tag remota ou mudança de proteção está autorizado nesta tarefa sem
+    pedido explícito adicional do usuário
+```
+
+#### Checklist de liberação da F1.1
+
+```text
+[x] Problema comprovado com evidência reproduzível
+[x] Baseline Git e mudanças preexistentes registrados
+[x] Escopo permitido e fora de escopo congelados
+[x] Decisões de contrato e estratégia de compatibilidade congeladas
+[x] Critérios positivos, negativos e regressão integral congelados
+[x] Checkpoint Git local e rollback não destrutivo definidos
+[x] Executor único e horário de autorização registrados
+```
+
+---
+
+## 6.1. Histórico detalhado da Fase 0
 
 ---
 
@@ -1220,14 +1424,14 @@ de `main`.
 
 ```
 Data:              2026-08-04
-Fase:              F0
-Tarefa:            F0.6 — CI mínima, gate remoto e promoção concluídos
-Estado:            completed — Fase 0 integrada em main; F1 ainda não iniciada
-Arquivos alterados: .github/workflows/ci.yml; testes/README/docs/TASK; metadata Git executável de compiler/compile.py
-Validações:         PR #1 verde e mesclado; PR #2 blocked no vermelho e clean após revert; run de fechamento 30917657879 com 11/11 success; CI corrente deve ser consultada pelo HEAD
-Checkpoint:         checkpoint/f0.6-complete em fd4de2c119daf9a401f450a907f1d07bf3f580e9; promoção PR #1 em 3f29c4c894808eb47464c96a01c9048198d971c9
-Observação:         main local/remota sincronizadas; PRs #1/#3/#4 mesclados; PR #2 fechado sem merge; tags remotas não foram alteradas; handoff em docs/handoff_fase_1.md
-Resultado:          F0.0–F0.6 integradas em main; quality 4/4, tests 4/4, package 2/2 e CI required governam merges em Windows/Linux
+Fase:              F1
+Tarefa:            F1.1 — auditoria e gate de defensabilidade preparados
+Estado:            pending — gate READY; nenhuma implementação F1.1 iniciada
+Arquivos alterados: TASK.md somente; nenhum Python, YAML de produção ou schema alterado
+Validações:         snapshot Git/CI auditado; lacuna reproduzida; 73 testes + 6 subtests, mypy 86 arquivos, Ruff, compileall, build e smoke da wheel verdes
+Checkpoint:         checkpoint/pre-f1.1-defensibility no baseline 4e3a3531cea44aadcebb9ff3b3e763b4e53adba6; checkpoint/f1.1-ready no commit documental deste dossiê
+Observação:         branch local phase/f1-graph-contract; nenhuma branch/tag F1 publicada; proteção granular não reconsultável sem autenticação, mas protected=true e CI required atual verde
+Resultado:          escopo, contrato, aceite, compatibilidade e rollback da F1.1 congelados; implementação deve ocorrer somente em execução posterior
 ```
 
 ---
@@ -1235,12 +1439,13 @@ Resultado:          F0.0–F0.6 integradas em main; quality 4/4, tests 4/4, pack
 ## 11. Próxima Ação Exata
 
 ```text
-PREPARAR F1.1 — DEFINIR SCHEMA TIPADO DO GRAFO, PREFERENCIALMENTE EM NOVA CONVERSA:
-1. Confirmar main local/remota sincronizadas, worktree limpa, checkpoint/f0.6-complete ancestral e CI required verde no HEAD observado; run 30917657879 é o marco de fechamento da Fase 0.
-2. Ler integralmente .agents/AGENTS.md, este painel, docs/handoff_fase_1.md e a seção Fase 1/F1.1 do plano operacional.
-3. Auditar os schemas, modelos e dois caminhos de compilação existentes; comprovar problemas com arquivos/comandos concretos.
-4. Criar o dossiê de defensabilidade da F1.1: baseline, escopo permitido/proibido, aceite, checkpoint e rollback.
-5. Manter F1.1 pending até o gate ser marcado READY; nenhuma alteração de código da F1 é autorizada antes disso.
+IMPLEMENTAR F1.1 — SOMENTE EM NOVA EXECUÇÃO E DENTRO DO GATE CONGELADO:
+1. Confirmar branch phase/f1-graph-contract, worktree sem mudanças alheias e checkpoint/f1.1-ready resolvendo para o commit documental do dossiê.
+2. Reler a F1.1, o dossiê e os triggers de recongelamento; manter um único executor.
+3. Alterar somente contracts/graph.py, contracts/__init__.py, test_graph_contracts.py e TASK.md.
+4. Executar primeiro os casos positivos/negativos focados; depois suíte integral, mypy, Ruff, compileall, build e smoke da wheel.
+5. Se qualquer descoberta exigir compiler, runtime, defaults, dependency ou critério novo, interromper e recongelar antes de editar fora do escopo.
+6. Não fazer push, PR, merge, tag remota ou alteração de proteção sem autorização explícita.
 ```
 
 ---
