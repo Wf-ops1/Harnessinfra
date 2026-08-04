@@ -189,7 +189,7 @@ permanece `pending` até seu gate pré-execução ser comprovado e marcado como 
 
 | Campo | Detalhe |
 |-------|---------|
-| **Status** | `pending` |
+| **Status** | `in_progress` — gate de defensabilidade `READY`; implementação autorizada em 2026-08-03T23:51:25-03:00 |
 | **Objetivo** | Eliminar erros de sintaxe, imports quebrados e assinaturas inválidas que impedem importação do pacote |
 | **Arquivos envolvidos** | `src/ai_engineering_harness/migrations/runner.py`, todos os módulos públicos do pacote |
 | **Implementação esperada** | (1) Corrigir assinatura inválida em `migrations/runner.py`; (2) executar `compileall` em `src/`, `compiler/`, `tests/`; (3) corrigir imports quebrados; (4) adicionar teste que importe todos os módulos públicos |
@@ -201,9 +201,83 @@ permanece `pending` até seu gate pré-execução ser comprovado e marcado como 
 
 | Campo | Estado atual |
 |---|---|
-| **Gate** | `BLOCKED` — dossiê ainda não preenchido; nenhuma alteração Python autorizada |
-| **Checkpoint candidato** | `checkpoint/pre-f0.1-defensibility` — deve existir antes da coleta e congelamento final das evidências |
-| **Próximo passo permitido** | Somente inspeções read-only, reprodução dos erros e preenchimento do dossiê conforme seção 4.1 |
+| **Gate** | `READY` — problema reproduzido, baseline conhecido, escopo/aceite congelados e rollback definido |
+| **Checkpoint de rollback** | `checkpoint/pre-f0.1-defensibility` → `758b1a59627e363534df32b2e134d309fcf50097` |
+| **Checkpoint de liberação** | `checkpoint/f0.1-ready` — tag criada no commit documental que contém este dossiê |
+| **Próximo passo permitido** | Implementar somente o escopo congelado abaixo; qualquer ampliação reabre o gate |
+
+```yaml
+defensibility:
+  task_id: "F0.1"
+  gate: "READY"
+  executor: "Codex"
+  authorized_at: "2026-08-03T23:51:25-03:00"
+  problem_statement: >-
+    O pacote não compila e ai_engineering_harness.migrations não pode ser importado porque
+    check_and_migrate_manifest possui uma assinatura Python sintaticamente inválida.
+  evidence:
+    - command: >-
+        & '<python_command>' -m compileall -q src compiler tests
+      observed: >-
+        exit 1; SyntaxError: Function parameters cannot be parenthesized em runner.py:15
+      location: "src/ai_engineering_harness/migrations/runner.py:15"
+    - command: >-
+        & '<python_command>' -c "import sys; sys.path.insert(0, 'src'); import ai_engineering_harness.migrations"
+      observed: >-
+        exit 1; import chega a migrations.runner e falha com o mesmo SyntaxError em runner.py:15
+      location: "src/ai_engineering_harness/migrations/runner.py:15"
+    - command: >-
+        & '<python_command>' -c "import ai_engineering_harness.migrations"
+      observed: >-
+        exit 1; ModuleNotFoundError porque o pacote usa layout src e ainda não está instalado;
+        a aceitação congelada adiciona src ao sys.path sem ocultar falhas internas
+      location: "pyproject.toml:[tool.setuptools.packages.find]"
+  baseline:
+    branch: "phase/f0-baseline"
+    head: "758b1a59627e363534df32b2e134d309fcf50097"
+    status: "clean; compileall gerou apenas caches ignorados"
+    checkpoint: "checkpoint/pre-f0.1-defensibility"
+  frozen_scope:
+    allowed:
+      - "TASK.md — transições, evidências e checkpoint"
+      - "src/ai_engineering_harness/migrations/runner.py — correção sintática mínima"
+      - "tests/unit/test_public_module_imports.py — novo teste de importação"
+      - "src/ai_engineering_harness/**/*.py — somente correções mínimas de imports que o novo teste comprovar quebrados"
+      - "C:/tmp/ai-engineering-harness-f0.1-deps — dependências declaradas usadas apenas na verificação isolada"
+    excluded:
+      - "mudanças de comportamento, refactors e capacidades novas"
+      - "alterações em pyproject.toml, lockfile ou ambiente Python global"
+      - "encoding, versionamento, documentação de produto e compilador legado"
+      - "correção de integrações simuladas ou dívidas das fases 1 a 8"
+  verification_environment:
+    setup: >-
+      & '<python_command>' -m pip install --target C:/tmp/ai-engineering-harness-f0.1-deps
+      pyyaml>=6.0.1 click>=8.1.0 rich>=13.0.0 httpx>=0.27.0
+    constraint: "diretório temporário fora do repositório; nenhuma instalação global"
+  frozen_acceptance:
+    - command: >-
+        & '<python_command>' -m compileall -q src compiler tests
+      expected: "exit 0 e nenhuma mensagem de erro"
+    - command: >-
+        & '<python_command>' -c "import sys; sys.path.insert(0, 'src'); import ai_engineering_harness.migrations"
+      expected: "exit 0"
+    - command: >-
+        com PYTHONPATH incluindo C:/tmp/ai-engineering-harness-f0.1-deps,
+        & '<python_command>' -m unittest discover -s tests/unit -p test_public_module_imports.py -v
+      expected: "exit 0; todos os módulos públicos descobertos e importados; zero skips"
+  rollback:
+    triggers:
+      - "necessidade de alterar arquivo/efeito fora do escopo congelado"
+      - "sobreposição com mudança preexistente ou de outro executor"
+      - "critério congelado exige ser removido ou enfraquecido"
+      - "risco de perda de dados ou alteração do checkout original"
+    procedure: >-
+      interromper; não usar reset; antes do commit, inverter somente os hunks da F0.1 com apply_patch;
+      depois do commit, usar git revert no commit exclusivo da F0.1
+    verify: >-
+      git status --short, git diff checkpoint/pre-f0.1-defensibility --
+      src/ai_engineering_harness tests/unit e os dois comandos baseline registrados
+```
 
 ---
 
@@ -336,13 +410,13 @@ permanece `pending` até seu gate pré-execução ser comprovado e marcado como 
 ```
 Data:              2026-08-03
 Fase:              F0
-Tarefa:            GOV-001 — protocolo de defensabilidade pré-execução
-Estado:            completed
+Tarefa:            F0.1 — gate de defensabilidade pré-execução
+Estado:            in_progress — gate READY; implementação Python ainda não iniciada
 Arquivos alterados: TASK.md
-Validações:         Markdown/UTF-8 e consistência interna; git diff --check; checkpoint Git nomeado após o commit
-Checkpoint:         checkpoint/pre-f0.1-defensibility na branch phase/f0-baseline
-Observação:         nenhuma alteração Python realizada; F0.1 continua pending e seu gate está BLOCKED
-Resultado:          nenhuma tarefa pode entrar em in_progress sem problema comprovado, critérios congelados e rollback
+Validações:         compileall exit 1 e import via src exit 1 reproduzem SyntaxError em runner.py:15; baseline Git limpo
+Checkpoint:         checkpoint/f0.1-ready na branch phase/f0-baseline; rollback em checkpoint/pre-f0.1-defensibility
+Observação:         dossiê completo; escopo, aceite e rollback congelados; nenhuma alteração Python neste checkpoint
+Resultado:          implementação F0.1 autorizada somente dentro do escopo congelado
 ```
 
 ---
@@ -350,14 +424,13 @@ Resultado:          nenhuma tarefa pode entrar em in_progress sem problema compr
 ## 11. Próxima Ação Exata
 
 ```text
-PREPARAR O GATE DE DEFENSABILIDADE DA F0.1 — AINDA NÃO ALTERAR PYTHON:
-1. Confirmar `checkpoint/pre-f0.1-defensibility`, branch, HEAD e working tree.
-2. Fazer inspeção read-only de `src/ai_engineering_harness/migrations/runner.py`.
-3. Executar a reprodução baseline (`compileall` e import) e registrar comandos, exit codes e erros.
-4. Preencher o dossiê da F0.1: problema, evidências, baseline, escopo permitido/excluído,
-   critérios de aceite exatos e rollback.
-5. Validar todos os itens da seção 4.1.4; manter `BLOCKED` se qualquer item faltar.
-6. Somente depois do gate `READY`, mudar F0.1 para `in_progress` e iniciar a correção Python.
+EXECUTAR F0.1 DENTRO DO ESCOPO CONGELADO:
+1. Criar o commit documental e a tag `checkpoint/f0.1-ready` deste gate.
+2. Corrigir somente a assinatura inválida em `migrations/runner.py`.
+3. Adicionar `tests/unit/test_public_module_imports.py` para descobrir e importar todos os módulos públicos.
+4. Prover dependências declaradas somente no diretório temporário congelado e executar o teste.
+5. Corrigir somente imports internos que o teste comprovar quebrados; qualquer outro problema reabre o gate.
+6. Executar os três critérios congelados, atualizar este TASK.md e criar commit exclusivo da F0.1.
 ```
 
 ---
