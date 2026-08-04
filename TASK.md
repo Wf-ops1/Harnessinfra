@@ -148,8 +148,8 @@ para preparar o próprio dossiê é permitida; alteração de código da tarefa 
 **Objetivo:** garantir que o pacote compile, instale, rode testes reproduzivelmente
 e não anuncie capacidades inexistentes.
 
-**Status da fase:** `completed` — F0.0 a F0.6 concluídas na branch de fase; PR principal aberto e
-verde, `main` protegida por `CI required` e bloqueio de merge comprovado. O merge permanece separado.
+**Status da fase:** `completed` — F0.0 a F0.6 promovidas para `main` pelo PR #1; CI pós-merge verde,
+`main` protegida por `CI required` e bloqueio de merge comprovado. F1 ainda não foi iniciada.
 
 ### Coordenação e ambiente observado
 
@@ -158,7 +158,7 @@ verde, `main` protegida por `CI required` e bloqueio de merge comprovado. O merg
 | **Executor ativo** | `Codex` — responsável por implementar, validar, manter checkpoints e criar commits locais |
 | **Auditor/revisor** | `Antigravity` — somente-leitura por padrão; só edita quando o usuário solicitar explicitamente ou transferir a execução |
 | **Workspace** | `C:\Users\walla\OneDrive\Desktop\ai-engineering-harness` |
-| **Git** | `available` — `phase/f0-baseline` publicada e acompanhando `origin/phase/f0-baseline`; primeiro commit remoto validado `56b104fd1158bd3af35de28f686140b65b61c5ac`; `main` e tags não foram alteradas |
+| **Git** | `available` — PR #1 mesclado por merge commit `3f29c4c894808eb47464c96a01c9048198d971c9`; `main` local/remota sincronizadas; `checkpoint/f0.6-complete` aponta para o HEAD aprovado `fd4de2c119daf9a401f450a907f1d07bf3f580e9`; tags remotas não foram alteradas |
 | **python_command** | `& 'C:\Users\walla\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe'` — Python `3.12.13` |
 | **uv_command** | `& '.\build\f0.6-tools\uv\bin\uv.exe'` — uv `0.11.32` restaurado de forma isolada/ignorada, sem PATH ou instalação global; `lock --check` e `sync --all-extras --locked` verdes |
 | **Dependências do projeto** | `.venv` sincronizada pelo uv com Python 3.12.13 e `uv.lock`; 73 testes + 6 subtests, mypy em 86 arquivos, ruff, compileall, build e smoke isolado da wheel verdes |
@@ -916,7 +916,7 @@ defensibility:
 
 | Campo | Detalhe |
 |-------|---------|
-| **Status** | `completed` — CI Windows/Linux verde, PR principal aberto, `main` protegida e bloqueio/restauração comprovados em PR separado |
+| **Status** | `completed` — CI Windows/Linux verde antes e depois do merge; `main` protegida; bloqueio/restauração comprovados em PR separado |
 | **Objetivo** | Pipeline automatizado impede merge com falhas em encoding, lint, tipos, testes ou build |
 | **Arquivos envolvidos** | `.github/workflows/*.yml` (ou equivalente CI) |
 | **Implementação esperada** | Pipeline Windows + Linux com jobs: encoding/compileall; ruff; mypy; testes unitários; E2E locais; build da wheel; instalação e smoke test. Merge bloqueado quando job obrigatório falha |
@@ -931,7 +931,7 @@ defensibility:
 | **Gate** | `CORRECTION_REMOTE_VALIDATED → COMPLETED` — 11/11 jobs verdes; `CI required` obrigatório; falha controlada bloqueou merge e o revert restaurou estado verde |
 | **Checkpoint de rollback** | `checkpoint/f0.5-complete` → `7cd6d81137b64914b8f53f6067f76f42cfde2711` |
 | **Checkpoint de liberação** | `checkpoint/f0.6-ready` — tag criada no commit deste dossiê antes do primeiro workflow |
-| **Fronteira externa** | PR principal `#1` aberto sem merge; `main` exige `CI required` em modo estrito inclusive para administradores; PR de prova `#2` fechado sem merge; conteúdo de `main` e tags remotas não foram alterados |
+| **Fronteira externa** | PR principal `#1` mesclado sem bypass; `main` exige `CI required` em modo estrito inclusive para administradores; PR de prova `#2` fechado sem merge; tags remotas não foram alteradas |
 
 ```yaml
 defensibility:
@@ -1123,8 +1123,9 @@ de `main`.
 
 | Proteção e prova remota | Resultado |
 |---|---|
-| PR principal | [`#1`](https://github.com/Wf-ops1/Harnessinfra/pull/1), aberto e não mesclado; baseline R2 `f66d47ab66886d560198d4db42faab6b8e68ba3d` comprovado com `mergeable_state=clean`; fechamento ancorado por `checkpoint/f0.6-complete` |
+| PR principal | [`#1`](https://github.com/Wf-ops1/Harnessinfra/pull/1), mesclado sem bypass por merge commit `3f29c4c894808eb47464c96a01c9048198d971c9`; fechamento ancorado por `checkpoint/f0.6-complete` |
 | CI do PR principal | Runs [`30879923860`](https://github.com/Wf-ops1/Harnessinfra/actions/runs/30879923860) (push) e [`30879926143`](https://github.com/Wf-ops1/Harnessinfra/actions/runs/30879926143) (pull request), ambos `completed/success` |
+| CI pós-merge em `main` | Run [`30917066077`](https://github.com/Wf-ops1/Harnessinfra/actions/runs/30917066077), commit `3f29c4c894808eb47464c96a01c9048198d971c9`, 11/11 jobs `success`, incluindo `CI required` |
 | Proteção de `main` | `CI required` obrigatório; `strict=true`; `enforce_admins=true`; reviews adicionais desabilitados; force-push e exclusão desabilitados |
 | PR de prova vermelho | [`#2`](https://github.com/Wf-ops1/Harnessinfra/pull/2), commit `d9640ff57d2e29c37f257e6a13c08025e68a69bd`; run [`30879998396`](https://github.com/Wf-ops1/Harnessinfra/actions/runs/30879998396) falhou em 4 jobs de testes e em `CI required`; `mergeable_state=blocked` |
 | Restauração da prova | Revert `79af2e353ed0743082355364bb8c3a24d98c90bd`; run [`30880164178`](https://github.com/Wf-ops1/Harnessinfra/actions/runs/30880164178) com 11/11 jobs verdes e `mergeable_state=clean`; PR #2 fechado sem merge |
@@ -1220,13 +1221,13 @@ de `main`.
 ```
 Data:              2026-08-04
 Fase:              F0
-Tarefa:            F0.6 — CI mínima e gate remoto concluídos
-Estado:            completed — Fase 0 concluída na branch; promoção para main ainda não autorizada
+Tarefa:            F0.6 — CI mínima, gate remoto e promoção concluídos
+Estado:            completed — Fase 0 integrada em main; F1 ainda não iniciada
 Arquivos alterados: .github/workflows/ci.yml; testes/README/docs/TASK; metadata Git executável de compiler/compile.py
-Validações:         PR #1 verde; main protegida; PR #2 blocked no vermelho e clean após revert; prova fechada sem merge
-Checkpoint:         checkpoint/f0.6-complete no commit documental final; rollback em checkpoint/f0.6-local-validated, checkpoint/f0.6-ready e checkpoint/f0.5-complete
-Observação:         main mantém o mesmo conteúdo; PR #1 está aberto; tags remotas não foram alteradas; nenhuma matriz, regra ou gate foi reduzido
-Resultado:          F0.0–F0.6 concluídas; quality 4/4, tests 4/4, package 2/2 e CI required governam merges em Windows/Linux
+Validações:         PR #1 verde e mesclado; run main 30917066077 com 11/11 success; PR #2 blocked no vermelho e clean após revert
+Checkpoint:         checkpoint/f0.6-complete em fd4de2c119daf9a401f450a907f1d07bf3f580e9; merge em main 3f29c4c894808eb47464c96a01c9048198d971c9
+Observação:         main local/remota sincronizadas; PR #1 mesclado; PR #2 fechado sem merge; tags remotas não foram alteradas
+Resultado:          F0.0–F0.6 integradas em main; quality 4/4, tests 4/4, package 2/2 e CI required governam merges em Windows/Linux
 ```
 
 ---
@@ -1234,12 +1235,12 @@ Resultado:          F0.0–F0.6 concluídas; quality 4/4, tests 4/4, package 2/2
 ## 11. Próxima Ação Exata
 
 ```text
-PROMOVER A FASE 0 PARA MAIN — EXIGE NOVA AUTORIZAÇÃO EXPLÍCITA:
-1. Confirmar checkpoint/f0.6-complete, worktree limpa, PR #1 aberto/clean e CI required verde no HEAD.
-2. Com autorização, mesclar o PR #1 por merge commit; não usar bypass, squash ou rebase.
-3. Confirmar que main avançou pelo merge, permanece protegida e executa CI required com sucesso.
-4. Sincronizar a main local sem descartar branches/checkpoints e registrar o merge neste painel.
-5. Somente depois preparar o gate de defensabilidade da F1.1; nenhum arquivo de F1 entra em in_progress antes disso.
+PREPARAR F1.1 — DEFINIR SCHEMA TIPADO DO GRAFO, PREFERENCIALMENTE EM NOVA CONVERSA:
+1. Confirmar main local/remota sincronizadas, worktree limpa, checkpoint/f0.6-complete ancestral e run 30917066077 verde.
+2. Ler integralmente .agents/AGENTS.md, este painel e a seção Fase 1/F1.1 do plano operacional.
+3. Auditar os schemas, modelos e dois caminhos de compilação existentes; comprovar problemas com arquivos/comandos concretos.
+4. Criar o dossiê de defensabilidade da F1.1: baseline, escopo permitido/proibido, aceite, checkpoint e rollback.
+5. Manter F1.1 pending até o gate ser marcado READY; nenhuma alteração de código da F1 é autorizada antes disso.
 ```
 
 ---
