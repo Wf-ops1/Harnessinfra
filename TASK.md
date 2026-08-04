@@ -160,7 +160,7 @@ e não anuncie capacidades inexistentes.
 | **Workspace** | `C:\Users\walla\OneDrive\Desktop\ai-engineering-harness` |
 | **Git** | `available` — branch de execução `phase/f0-baseline`, criada a partir de `main`/`origin/main` no baseline `6eef8e0`; remote `https://github.com/Wf-ops1/Harnessinfra.git` |
 | **python_command** | `& 'C:\Users\walla\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe'` — Python `3.12.13` |
-| **uv_command** | `& 'C:\tmp\ai-engineering-harness-uv-0.11.32-resume\bin\uv.exe'` — uv `0.11.32`; instalação temporária isolada, sem PATH/global |
+| **uv_command** | `missing` nesta retomada — o binário temporário `C:\tmp\ai-engineering-harness-uv-0.11.32-resume\bin\uv.exe` foi limpo; `.venv` e `uv.lock` permanecem válidos. F0.5 usa `.venv\Scripts\python.exe`; restaurar uv isolado antes do gate F0.6 |
 | **Dependências do projeto** | `.venv` sincronizada pelo uv com Python 3.12.13 e `uv.lock`; 65 testes, mypy em 86 arquivos, ruff, compileall e build verdes |
 | **Regra de escrita** | apenas um agente escreve por vez |
 
@@ -751,13 +751,135 @@ defensibility:
 
 | Campo | Detalhe |
 |-------|---------|
-| **Status** | `pending` |
+| **Status** | `in_progress` — gate defensável `READY`; somente documentação e regressões documentais autorizadas |
 | **Objetivo** | Documentação não deve declarar capacidades inexistentes nem conter links quebrados |
 | **Arquivos envolvidos** | `README.md`, `docs/*.md` |
 | **Implementação esperada** | (1) Substituir "Em Produção" por "Protótipo / Em desenvolvimento"; (2) remover referências a arquivos inexistentes; (3) corrigir links `file:///` absolutos; (4) criar matriz Capacidade/Implementada/Experimental/Planejada; (5) marcar adapters fake como dívida técnica |
 | **Critérios de aceite** | Nenhum documento declara produção; nenhum link aponta para arquivo inexistente |
 | **Comandos de verificação** | `rg "Em Produção" docs README.md` → sem resultados |
 | **Dependências** | F0.1 |
+
+#### Gate de defensabilidade da F0.5
+
+| Campo | Estado atual |
+|---|---|
+| **Gate** | `READY` — claims falsos, links não portáveis, referências ausentes e adapters simulados foram comprovados |
+| **Checkpoint de rollback** | `checkpoint/f0.4-complete` → `aaee725f226f363b6c3636a5d8b746379d41b594` |
+| **Checkpoint de liberação** | `checkpoint/f0.5-ready` — tag criada no commit documental deste dossiê antes da correção dos documentos |
+
+```yaml
+defensibility:
+  task_id: "F0.5"
+  gate: "READY"
+  executor: "Codex"
+  authorized_at: "2026-08-04T01:16:15-03:00"
+  problem_statement: >-
+    README e documentos descrevem o projeto como autônomo, pronto e totalmente funcional, mas o
+    runtime ainda usa providers que fabricam respostas, doctor que sempre retorna saudável,
+    Codebase-Memory simulado, promoção com SHA sintético e terminal com shell implícito. Existem
+    também nove links locais absolutos e referências a paths ausentes do repositório.
+  evidence:
+    - command: >-
+        rg -n "Em Produção|100% OPERACIONAL|100% Funcional|100% funcional|totalmente revisado|altamente robusto"
+        README.md docs --glob '*.md'
+      observed: >-
+        exit 0; claims positivos em harness_architecture_spec.md, walkthrough.md,
+        walkthrough_audit.md, agentic_lifecycle_audit.md e audit_report.md; o plano ainda contém o
+        próprio literal proibido no critério F0.5
+      location: "README.md e docs/*.md"
+    - command: "rg -n 'file:///' README.md docs --glob '*.md'"
+      observed: >-
+        exit 0; nove URLs absolutas: quatro no README, duas em audit_report.md e três em walkthrough.md;
+        o plano contém ainda o próprio padrão do critério
+      location: "README.md; docs/{audit_report.md,walkthrough.md,plano_implementacao_harness_operacional.md}"
+    - command: >-
+        Test-Path contracts, policies, graphs/specs e
+        src/ai_engineering_harness/observability/log_integrity.py
+      observed: "todos False; documentos apresentam esses paths como estrutura atual"
+      location: "docs/{audit_report.md,walkthrough.md,walkthrough_audit.md}"
+    - command: >-
+        rg -n "mock_ast|is_healthy=True|synthetic_sha|shell=True|dry_run=True|Response to:" src --glob '*.py'
+      observed: >-
+        exit 0; providers retornam texto fabricado, doctor retorna healthy incondicionalmente,
+        indexador persiste mock_ast, runtime força dry_run e promoção devolve synthetic_sha;
+        TerminalAdapter executa string com shell=True
+      location: >-
+        src/ai_engineering_harness/{models/adapters,doctor/probes.py,indexer/codebase_memory_adapter.py,
+        runtime/{engine.py,promotion_manager.py},tools/adapters/terminal.py}
+    - command: >-
+        com temporários confinados em build/f0.5-baseline,
+        .venv/Scripts/python.exe -m pytest -q -p no:cacheprovider --basetemp build/f0.5-baseline/pytest
+      observed: >-
+        exit 0; 65 testes e 6 subtests passaram. A primeira execução fora do confinamento falhou por
+        PermissionError do sandbox; um diretório gerado graphs/compiled, vazio e ignorado, foi removido
+        após inspeção para restaurar o baseline estrutural
+      location: "ambiente de verificação; nenhum arquivo rastreado alterado"
+  baseline:
+    branch: "phase/f0-baseline"
+    head: "aaee725f226f363b6c3636a5d8b746379d41b594"
+    status: "clean; somente artefatos ignorados de teste/build; graphs/compiled vazio foi removido"
+    checkpoint: "checkpoint/f0.4-complete"
+  frozen_decisions:
+    capability_matrix:
+      implemented:
+        - "empacotamento, bootstrap de desenvolvimento e comandos de qualidade reproduzíveis"
+        - "versionamento único do pacote e namespaces separados de schema"
+      experimental:
+        - "CLI, compiladores, FSM, contexto, plano, verificação, auditoria e aprovações locais"
+        - "interfaces de providers, Serena, Codebase-Memory, doctor, promoção, worktree e rollback"
+      planned:
+        - "providers e MCPs reais, isolamento Git, promoção/reversão reais, recovery e segurança fail-closed"
+        - "CI Windows/Linux e instalação externa segura para uso cotidiano em IDE/CLI"
+    wording: >-
+      arquitetura-alvo será descrita como projetada/planejada; comportamento existente só será
+      chamado implementado quando houver efeito real e teste correspondente; simulações serão
+      identificadas como dívida técnica sem eufemismo
+  frozen_scope:
+    allowed:
+      - "README.md — status honesto, matriz de capacidade, uso seguro e links relativos"
+      - "docs/*.md — corrigir claims, estado, paths e links; preservar requisitos futuros do plano"
+      - "tests/unit/test_documentation.py — regressões de claims, links locais e estrutura Markdown"
+      - "TASK.md — transições, evidências, handoff e checkpoints"
+      - "build/f0.5-* — temporários ignorados e confinados para verificação"
+    excluded:
+      - "qualquer alteração em src/, compiler/, pyproject.toml ou uv.lock"
+      - "implementar ou corrigir adapters, doctor, runtime, promoção, worktree, rollback ou gates"
+      - "reescrever requisitos futuros do plano como se já estivessem entregues"
+      - "alterar docs/walkthrough_dashboard.html ou adicionar dependência de Markdown"
+  frozen_acceptance:
+    - command: "rg -n 'Em Produção' docs README.md"
+      expected: "exit 1 e nenhuma ocorrência, inclusive autorreferência do plano"
+    - command: "rg -n 'file:///' docs README.md"
+      expected: "exit 1 e nenhuma ocorrência, inclusive autorreferência do plano"
+    - command: >-
+        .venv/Scripts/python.exe -m pytest tests/unit/test_documentation.py
+        tests/unit/test_encoding.py -q -p no:cacheprovider --basetemp build/f0.5-doc-pytest
+      expected: >-
+        exit 0; matriz presente; nenhum claim positivo proibido; links relativos resolvem;
+        nenhum link local absoluto; todos os Markdown UTF-8 terminam com newline e possuem fences balanceadas
+    - command: >-
+        com LOCALAPPDATA/TEMP/TMP confinados em build/f0.5-full,
+        .venv/Scripts/python.exe -m pytest -q -p no:cacheprovider --basetemp build/f0.5-full/pytest
+      expected: "exit 0; 65+ testes e todos os subtests passam"
+    - command: >-
+        .venv/Scripts/python.exe -m ruff check .;
+        .venv/Scripts/python.exe -m compileall -q src compiler tests;
+        git diff --check
+      expected: "todos exit 0; nenhuma regra reduzida e nenhum erro de whitespace/compilação"
+  rollback:
+    triggers:
+      - "documento precisar declarar uma simulação como capacidade operacional"
+      - "correção exigir alteração de runtime ou arquivo fora do escopo congelado"
+      - "link local não puder ser resolvido de forma portátil"
+      - "qualquer gate F0.4 ou critério documental congelado regredir"
+    procedure: >-
+      interromper e preservar evidências; antes do commit inverter somente hunks F0.5 por apply_patch;
+      depois do commit usar git revert no commit exclusivo F0.5; nunca reset; preservar
+      checkpoint/f0.4-complete
+    verify: >-
+      git status --short; git diff checkpoint/f0.4-complete; repetir os testes documentais,
+      a suíte completa confinada, ruff, compileall e as duas buscas sem resultado
+```
 
 ---
 
@@ -836,13 +958,13 @@ defensibility:
 ```
 Data:              2026-08-04
 Fase:              F0
-Tarefa:            F0.4 — versionamento único e schemas separados
-Estado:            completed — critérios e handoff aprovados
-Arquivos alterados: versioning.py; __init__.py; cli/main.py; compiladores oficial/legado; defaults graphs/policies; test_packaging.py; test_phase5.py; test_versioning.py; README.md; TASK.md
-Validações:         lock/sync exit 0; 65 testes; mypy 86 arquivos; ruff/compileall/build exit 0; artefatos sem bytecode; wheel externa e compilador legado aprovados
-Checkpoint:         checkpoint/f0.4-complete na branch phase/f0-baseline; rollback em checkpoint/f0.4-ready e checkpoint/f0.3-complete
-Observação:         package=0.1.0 por metadata; graph/artifact/policy schemas=1.0; definition=3.2.0; nenhuma dependência alterada
-Resultado:          versões deixam de competir entre conceitos e as superfícies públicas não podem divergir por literal duplicado
+Tarefa:            F0.5 — gate de correção do estado documental
+Estado:            in_progress — defensability READY; alterações documentais autorizadas
+Arquivos alterados: TASK.md; nenhuma claim ou link alterado no checkpoint de liberação
+Validações:         baseline aaee725 limpo; 65 testes + 6 subtests com temporários confinados; 9 URLs absolutas, claims falsos, 4 paths ausentes e adapters simulados comprovados
+Checkpoint:         checkpoint/f0.5-ready na branch phase/f0-baseline; rollback em checkpoint/f0.4-complete
+Observação:         uv temporário foi limpo; .venv/uv.lock preservados; restaurar uv isolado antes de F0.6
+Resultado:          escopo, matriz de capacidade, aceite e rollback F0.5 congelados antes de editar README/docs
 ```
 
 ---
@@ -850,13 +972,13 @@ Resultado:          versões deixam de competir entre conceitos e as superfície
 ## 11. Próxima Ação Exata
 
 ```text
-PREPARAR F0.5 — NÃO ALTERAR CLAIMS/LINKS AINDA:
-1. Criar/confirmar `checkpoint/f0.4-complete` e registrar branch, HEAD e status limpo.
-2. Comprovar claims de produção/capacidades e links quebrados em README.md/docs/*.md por buscas e resolução de paths.
-3. Congelar a matriz Capacidade/Implementada/Experimental/Planejada e os arquivos documentais permitidos.
-4. Congelar comandos para ausência de claims de produção, links absolutos/quebrados, encoding e consistência Markdown.
-5. Registrar rollback a partir de `checkpoint/f0.4-complete`, marcar F0.5 `READY` e criar `checkpoint/f0.5-ready`.
-6. Somente depois mudar F0.5 para `in_progress` e editar documentação.
+EXECUTAR F0.5 — SOMENTE ESCOPO CONGELADO:
+1. Criar e confirmar a tag checkpoint/f0.5-ready no commit deste dossiê.
+2. Reescrever README e documentos de estado para distinguir implementado, experimental/simulado e planejado.
+3. Corrigir nove links absolutos e todas as referências a paths ausentes por links relativos/paths reais.
+4. Adicionar tests/unit/test_documentation.py com regressões de claims, links e estrutura Markdown.
+5. Executar buscas congeladas, testes documentais, suíte completa confinada, ruff, compileall e git diff --check.
+6. Atualizar handoff, marcar F0.5 completed, criar checkpoint/f0.5-complete e preparar o gate F0.6.
 ```
 
 ---
