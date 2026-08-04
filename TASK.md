@@ -147,8 +147,8 @@ para preparar o próprio dossiê é permitida; alteração de código da tarefa 
 
 **Objetivo:** transformar YAMLs declarativos em artefatos executáveis, validados e determinísticos.
 
-**Status da fase:** `in_progress` — F1.1, F1.2 e F1.3 concluídas dentro dos gates congelados; a próxima
-retomada deve preparar somente a auditoria e o gate de defensabilidade da F1.4.
+**Status da fase:** `in_progress` — F1.1–F1.3 concluídas; a auditoria da F1.4 está congelada em gate
+`READY`, mas sua implementação só pode começar em uma retomada posterior que confirme o checkpoint.
 
 ### Coordenação e ambiente observado
 
@@ -157,7 +157,7 @@ retomada deve preparar somente a auditoria e o gate de defensabilidade da F1.4.
 | **Executor ativo** | `Codex` — responsável por implementar, validar, manter checkpoints e criar commits locais |
 | **Auditor/revisor** | `Antigravity` — somente-leitura por padrão; só edita quando o usuário solicitar explicitamente ou transferir a execução |
 | **Workspace** | `C:\Users\walla\OneDrive\Desktop\ai-engineering-harness` |
-| **Git** | `available` — branch local `phase/f1-policy-validation` criada em `c0aaadd117e9dfe90b3e7fd3c00392ff3ee01c6e`; `checkpoint/pre-f1.3-defensibility` aponta para esse baseline F1.2 concluído; nenhuma branch/tag da F1 foi publicada |
+| **Git** | `available` — branch local `phase/f1-compiler-unification` criada em `07c8fc362a4bb791d727b0cb43129e8cabb6a26d`; `checkpoint/pre-f1.4-defensibility` aponta para esse baseline F1.3 concluído; nenhuma branch/tag da F1 foi publicada |
 | **python_command** | `& 'C:\Users\walla\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe'` — Python `3.12.13` |
 | **uv_command** | `& '.\build\f0.6-tools\uv\bin\uv.exe'` — uv `0.11.32` restaurado de forma isolada/ignorada, sem PATH ou instalação global; `lock --check` e `sync --all-extras --locked` verdes |
 | **Dependências do projeto** | `.venv` gerida pelo uv 0.11.32 com Python 3.12.13 e `uv.lock`; 176 testes, mypy em 90 arquivos, Ruff, compileall, lock/sync, build e dois smokes da wheel verdes após F1.3 |
@@ -978,6 +978,288 @@ defensibility:
 | **Quais testes provam falha segura?** | Ref insegura/ausente/duplicada, extra key nas oito policies e autorização aninhada, role/tool ausentes, catálogo inconsistente, ampliação e conflito allow/deny. |
 | **A wheel instalada externamente foi testada?** | Sim; smoke `-I` importou 9 símbolos e instanciou os catálogos a partir de `site-packages`, fora de `src`. |
 | **A documentação foi atualizada?** | Sim; este painel registra implementação, provas e limites. O compilador oficial só preencherá `resolved_policies` na F1.4; enforcement continua F5. |
+
+---
+
+### F1.4 — Unificar os compiladores
+
+| Campo | Detalhe |
+|---|---|
+| **Status** | `pending` — gate `READY`; nenhuma implementação F1.4 foi iniciada |
+| **Objetivo** | Fazer o package compiler ser o único caminho de YAML para `CompiledGraphArtifact`, conectar CLI/wrapper aos validators F1.1–F1.3 e eliminar fallback/formatos/destinos duplicados |
+| **Arquivos potencialmente alteráveis** | Compiler oficial e exports, CLI compile/run, wrapper/README legado, adapter/visualizer do artefato, cinco grafos default, consumidores de teste e `TASK.md` |
+| **Dependências** | F1.1–F1.3 concluídas; Pydantic, PyYAML e registries disponíveis; nenhuma dependência nova prevista |
+
+#### Auditoria concreta da F1.4
+
+| Superfície | Comportamento observado | Lacuna frente ao plano | Fronteira congelada |
+|---|---|---|---|
+| Package `GraphCompiler` | Lê YAML como `dict`, verifica apenas duas chaves de `loop`, adiciona header com timestamp e grava `header + graph` | Bypassa GraphSpec, ContractRegistry e PolicyRegistry | Torna-se a única implementação e produz `CompiledGraphArtifact`; digest/atomicidade ficam F1.5 |
+| `compiler/compile.py` | Reimplementa leitura, três buscas de policy, adapters legados, GateInjector, schema próprio e saída `graphs/compiled/*.maf.json` | Segundo compilador com semântica, path e artefato diferentes | Virará wrapper fino; adapters F1.2/F1.3 permanecem compatíveis, mas não no caminho oficial |
+| Prova `build/f1.4-audit/probe_f1_4.py` | Mesma fonte produziu top-level `header,graph` no package e seis chaves diferentes no legado, em dois destinos; igualdade semântica `false` | Critério de compilador único objetivamente falha | Prova confinada/ignorada por Git |
+| `harness compile` | Compilou role/tool/policy, aresta e metadata inválidas com exit 0 e mensagem de sucesso | CLI não usa validators F1.1–F1.3 | Deve delegar ao package compiler e converter erros tipados em exit não zero |
+| `harness init` versus `run` | `init` cria `.harness/graphs/specs`; `run` procura `graphs/specs` | Spec inicializada é ignorada | `run` deve usar exclusivamente `.harness/graphs/specs/<workflow>.yaml` |
+| Fallback de `run` | Workflow ausente cria YAML mínimo em `state/compiled`, compila e conclui com exit 0 | Fabrica sucesso e artefato sem contrato | Remover integralmente; ausência falha antes de execution ID/estado/audit |
+| Cinco grafos packaged | Todos sem entrypoint/status/types/terminals; 19 nós sem `type`, refs de contrato apenas por módulo e arestas externas; incident possui role sem contracts | Nenhum passa `GraphSpec` F1.1 | Migrar somente o necessário para o schema congelado, preservando IDs, policies, contratos e intenção |
+| Retries packaged | `retry_bug_fix` e `retry_code_generation` são alvos inexistentes | Resolver como ciclos exige retry explícita em todos os nós participantes | Congelar redirects e `RetryPolicySpec` exatos nos dois grafos |
+| `GraphVisualizer` | Usa schema `name/agent/action/next` e inventa aresta sequencial quando `next` falta | Incompatível com GraphSpec e viola aresta explícita | Renderizar apenas IDs, on_success/on_failure e terminais já validados |
+| `MAFAdapter` | Exige `header.runtime_provider=maf`; não conhece `CompiledGraphArtifact` | Rejeitará o artefato canônico | Migrar somente o loader/validator; execução de nós continua F2 |
+| Testes consumidores | Cinco arquivos compilam YAMLs mínimos inválidos; teste CLI prova hoje o fallback como sucesso | Baseline reforça o protótipo permissivo | Migrar fixtures para GraphSpec e inverter o caso workflow ausente |
+
+#### Gate de defensabilidade da F1.4
+
+| Campo | Estado atual |
+|---|---|
+| **Gate** | `READY` — problema, contrato único, migração default, escopo, aceite e rollback congelados; código ainda não autorizado nesta retomada |
+| **Checkpoint anterior** | `checkpoint/pre-f1.4-defensibility` → `07c8fc362a4bb791d727b0cb43129e8cabb6a26d` |
+| **Checkpoint de liberação** | `checkpoint/f1.4-ready` será criado no commit exclusivamente documental deste dossiê |
+| **Próximo passo permitido** | Em nova retomada, confirmar checkpoint/limpeza e implementar somente o allowlist; descoberta material reabre o gate |
+
+```yaml
+defensibility:
+  task_id: "F1.4"
+  gate: "READY"
+  executor: "Codex"
+  authorized_at: "2026-08-04T18:43:07-03:00"
+  problem_statement: >-
+    O package compiler, o wrapper e a CLI não formam um compilador único: aceitam grafos inválidos,
+    geram artefatos incompatíveis em destinos distintos, ignoram os registries F1.2/F1.3 e permitem
+    que harness run fabrique e execute um workflow ausente.
+  evidence:
+    - command: "<uv_command> run python build/f1.4-audit/probe_f1_4.py"
+      observed: >-
+        exit 0 do probe; official_invalid_compiled=true, CLI inválida exit 0/sucesso, run ausente exit 0
+        com fallback, e same_source_produced_same_semantics=false
+      location: >-
+        src/ai_engineering_harness/compiler/compiler.py; compiler/compile.py;
+        src/ai_engineering_harness/cli/main.py; build/f1.4-audit/ ignorado
+    - command: >-
+        comparar chaves e paths dos dois artefatos produzidos pela mesma fonte
+      observed: >-
+        package: .harness/state/compiled/semantic-divergence.json com header+graph; legado:
+        graphs/compiled/semantic-divergence.maf.json com seis chaves top-level diferentes
+      location: "build/f1.4-audit/official-shared-project e legacy-shared-project"
+    - command: "<uv_command> run python build/f1.4-audit/audit_default_graphs.py"
+      observed: >-
+        cinco grafos sem entrypoint/status/terminal_states; 19 nós sem type; 15 refs module-only;
+        incident.evaluate_rollback sem contracts e nove classes de targets externos
+      location: "src/ai_engineering_harness/defaults/graphs/*.yaml"
+    - command: >-
+        rg -n 'compile_graph|temp_|graphs/specs|state/compiled|maf.json' src compiler tests
+      observed: >-
+        duas implementações, dois destinos, fallback temporário e cinco arquivos de testes consumidores
+        com fixtures mínimas permissivas
+      location: "src/ai_engineering_harness, compiler e tests"
+  git_baseline:
+    branch: "phase/f1-compiler-unification"
+    head: "07c8fc362a4bb791d727b0cb43129e8cabb6a26d"
+    base_checkpoint: "checkpoint/f1.3-complete"
+    rollback_checkpoint: "checkpoint/pre-f1.4-defensibility"
+    worktree: "limpa antes do dossiê; somente build/f1.4-audit e bytecode ignorados nas provas"
+    remote_boundary: "nenhuma branch ou tag F1 publicada"
+  baseline_verification:
+    - command: "<uv_command> lock --check"
+      observed: "exit 0; 41 pacotes resolvidos"
+    - command: "<uv_command> run python -m pytest"
+      observed: "exit 0; 176 testes passaram"
+    - command: "<uv_command> run python -m mypy src"
+      observed: "exit 0; sem issues em 90 arquivos"
+    - command: >-
+        <uv_command> run python -m ruff check .; <uv_command> run python -m compileall -q src compiler tests
+      observed: "ambos exit 0"
+  frozen_contract:
+    official_owner: >-
+      ai_engineering_harness.compiler.GraphCompiler é a única classe com compile_graph e o único
+      código que lê YAML, executa validators e serializa artefato. Nenhum segundo pipeline é permitido.
+    source_boundary: >-
+      compile_graph recebe Path dentro do project_root real, exige arquivo .yaml regular e bloqueia
+      absoluto externo, traversal e symlink escape antes da leitura. YAML vazio, não mapping ou inválido falha.
+    workflow_identity: >-
+      O nome canônico vem de GraphSpec.graph.name e deve casar com slug [A-Za-z0-9][A-Za-z0-9._-]*.
+      workflow_name opcional é preservado apenas por compatibilidade e, quando fornecido, deve ser idêntico.
+    validation_order:
+      - "1. ler YAML seguro e validar GraphSpec F1.1 integralmente"
+      - "2. coletar graph.contracts e input/output de agent nodes; ContractRegistry.resolve_many F1.2"
+      - "3. carregar overrides declarativos exatos e PolicyRegistry.resolve_graph F1.3"
+      - "4. construir CompiledGraphArtifact e só então criar diretório/gravar saída"
+    contract_resolution: >-
+      ContractRegistry usa .harness/contracts como schema_root, catálogo/aliases internos F1.2 e
+      repository_trusted=false sem approvals. Compatibilidade entre arestas não é inferida porque o
+      GraphSpec não declara transformação/mapping; adicionar esse contrato exige recongelamento futuro.
+    policy_resolution: >-
+      Os catálogos packaged F1.3 são base registrada. Overrides são lidos somente dos paths exatos
+      .harness/policies/<nome>, .harness/agents/*/agent.yaml e .harness/tools/tool_registry.yaml;
+      nenhum lookup em raiz, import Python ou path alternativo é aceito.
+    artifact: >-
+      A única saída serializa CompiledGraphArtifact com artifact_schema_version, package_version,
+      GraphSpec, resolved_contracts e resolved_policies; não contém header legado, graph_metadata,
+      compiled_nodes, policies_applied, runtime_provider ou timestamp de compilação.
+    output: >-
+      Caminho único .harness/state/compiled/<graph.name>.json sob project_root. O diretório só é criado
+      depois de todas as validações. Serialização direta permanece nesta tarefa; escrita atômica é F1.5.
+    legacy_wrapper: >-
+      compiler/compile.py preserva --graph, resolve relativo ao cwd/project_root, chama exclusivamente
+      GraphCompiler.compile_graph e reporta o mesmo output. Não carrega YAML/policies, não injeta gates
+      e não constrói JSON. GateInjector é removido por ser mutação implícita/orfã.
+    cli_compile: >-
+      harness compile delega ao mesmo GraphCompiler; --workflow default deixa de fabricar new-feature,
+      usa o nome do grafo e só aceita override idêntico. GraphCompilerError vira ClickException/exit não zero.
+    cli_run: >-
+      Usa artefato existente ou a spec exata .harness/graphs/specs/<workflow>.yaml. Se ambos faltarem,
+      falha não zero antes de execution_id, estado, audit ou arquivo temporário. Nunca consulta graphs/specs.
+    visualizer: >-
+      GraphVisualizer valida GraphSpec e desenha somente on_success/on_failure e terminal_states;
+      não usa agent/action/next nem cria sequência implícita.
+    artifact_consumer: >-
+      MAFAdapter.load_and_validate passa a retornar CompiledGraphArtifact após model_validate_json;
+      remove dependência de header.runtime_provider. RuntimeEngine fora desse loader permanece intocado.
+    packaged_graph_migration:
+      common: >-
+        preservar graph.name, versions, description, policies, node IDs e contratos de node; adicionar
+        entrypoint igual ao primeiro node, status=stable, types explícitos, contracts como refs completas
+        únicas e terminal_states para todos os destinos finais existentes.
+      bug_fix: >-
+        retry_bug_fix vira aresta para bug_code_fix; bug_code_fix e test_verification recebem
+        max_iterations=2/exit_condition=tests_passed; END é success e escalate_to_human failure.
+      new_feature: >-
+        retry_code_generation vira aresta para code_generation; code_generation, test_generation e
+        verification_gates recebem max_iterations=2/exit_condition=all_required_gates_passed; END é
+        success e escalate_to_human/revert_and_fail são failure.
+      incident: >-
+        evaluate_rollback vira deterministic_policy com production_health e sem role; END é success e
+        immediate_human_page/escalate_to_human são failure.
+      migration: >-
+        human_approval_gate vira type=human_approval/approval_strategy=explicit; END é success e
+        escalate_to_human/abort_migration/execute_database_rollback são failure.
+      refactoring: >-
+        tipos explícitos; END é success e escalate_to_human/revert_and_escalate são failure; sem ciclo novo.
+    errors:
+      - "GraphCompilerError — base tipada pública"
+      - "GraphSourceError — path, arquivo, encoding ou YAML inválido"
+      - "GraphValidationError — GraphSpec, contrato, policy, role, tool ou workflow incompatível"
+      - "GraphWriteError — falha ao criar/gravar o único output depois da validação"
+    f1_5_boundary: >-
+      Canonicalização semântica, graph/policy digests, source manifest, required capabilities,
+      timestamp fora do digest, escrita atômica e compatibilidade exata de versão permanecem F1.5.
+    runtime_boundary: >-
+      F1.4 entrega e valida o artefato único, mas não faz RuntimeEngine seguir arestas/nós (F2), não
+      implementa adapters (F3) e não aplica resolved_policies antes de side effects (F5).
+  frozen_scope:
+    allowed:
+      - "src/ai_engineering_harness/compiler/compiler.py — único pipeline e erros tipados"
+      - "src/ai_engineering_harness/compiler/__init__.py — exports públicos F1.4"
+      - "src/ai_engineering_harness/compiler/visualizer.py — GraphSpec/arestas explícitas"
+      - "src/ai_engineering_harness/cli/main.py — compile/run delegados e sem fallback"
+      - "src/ai_engineering_harness/runtime/maf_adapter.py — somente validação do artefato tipado"
+      - "compiler/compile.py e compiler/README.md — wrapper fino e documentação real"
+      - "compiler/validators/gate_injector.py — remover implementação implícita não usada"
+      - "src/ai_engineering_harness/defaults/graphs/*.yaml — migração estrita congelada dos cinco"
+      - "tests/unit/test_compiler_unification.py — provas focadas novas"
+      - "tests/unit/test_cli_runtime.py, test_phase5.py, test_agent_centric.py e test_phase6.py — migrar consumidores"
+      - "tests/e2e/test_full_lifecycle.py — migrar somente fixture/asserções do artefato"
+      - "tests/unit/test_structure.py — provar que todos os defaults compilam se necessário"
+      - "TASK.md — transições, evidências, resultado e checkpoints F1.4"
+      - "build/f1.4-*; build/; dist/; C:/tmp — temporários ignorados/confinados de verificação"
+    excluded:
+      - "contracts GraphSpec/registries/policies e seus schemas — F1.1–F1.3 permanecem congelados"
+      - "outros arquivos runtime além de maf_adapter.py; FSM/ordem real de nós — F2"
+      - "providers, tools/adapters, workspace, indexador e knowledge — F3/F4"
+      - "governance, permissions, trust, secrets, budget e approval — enforcement F5"
+      - "digest, source manifest, capabilities, normalização e escrita atômica — F1.5"
+      - "pyproject.toml, uv.lock ou nova dependência; qualquer necessidade reabre o gate"
+      - "push, PR, merge, tag remota ou alteração de branch protection"
+  compatibility_strategy:
+    package_api: >-
+      GraphCompiler(project_root) e compile_graph(path, workflow_name opcional) permanecem; sucesso
+      continua retornando Path, mas YAML inválido antes tolerado passa a erro tipado deliberado.
+    wrapper: >-
+      --graph permanece; destino e schema antigos são removidos. Compatibilidade significa delegação
+      e artefato idêntico, não preservar o segundo formato inseguro.
+    cli: >-
+      comandos e opções compile/run permanecem; --workflow explícito igual continua válido. Workflow
+      ausente e spec inválida mudam de falso sucesso para exit não zero.
+    defaults: >-
+      nomes/IDs/descrições/policies/ref contracts são preservados; apenas campos estruturais, terminais,
+      retries e dois nodes ambíguos são normalizados conforme migração congelada.
+    artifact_consumer: >-
+      MAFAdapter mantém nome/método, mas retorna modelo tipado. RuntimeEngine apenas descarta o retorno
+      hoje, portanto nenhuma sequência operacional é alterada nesta fase.
+  frozen_acceptance:
+    - command: >-
+        <uv_command> run python -m pytest tests/unit/test_compiler_unification.py
+        tests/unit/test_cli_runtime.py tests/unit/test_phase5.py tests/unit/test_agent_centric.py
+        tests/unit/test_phase6.py tests/e2e/test_full_lifecycle.py -q
+      expected: >-
+        exit 0; pipeline único, CLI/wrapper, defaults, paths, adapter e consumidores passam
+    - command: >-
+        compilar os cinco defaults copiados por harness init e validar cada JSON com CompiledGraphArtifact
+      expected: >-
+        cinco outputs somente em .harness/state/compiled, com contracts+policies resolvidos, sem warning/fallback
+    - command: >-
+        casos negativos F1.1–F1.3: metadata/type/edge/terminal/retry inválidos, contract/policy/role/tool ausentes
+      expected: >-
+        GraphValidationError/exit não zero antes de criar output; diretório compiled permanece ausente ou inalterado
+    - command: >-
+        harness run definitely-missing em projeto inicializado sem artefato/spec
+      expected: >-
+        exit não zero; nenhuma spec temp, artifact, execution state ou audit criado; mensagem identifica workflow
+    - command: >-
+        compilar a mesma spec pelo harness compile e compiler/compile.py --graph em projetos equivalentes
+      expected: >-
+        JSON semanticamente e byte-a-byte idêntico, mesmo path relativo e mesma API pública
+    - command: >-
+        casos de source absoluto externo, traversal, symlink escape, extensão não YAML, workflow path-like e nome divergente
+      expected: "GraphSourceError ou GraphValidationError; nenhum arquivo fora de project_root é lido/escrito"
+    - command: >-
+        rg -n 'class GraphCompiler|def compile_graph' src compiler; rg -n 'temp_|graphs/compiled|graphs/specs|GateInjector' src compiler
+      expected: >-
+        exatamente uma classe/implementação no package; zero fallback, destino legado, lookup errado ou GateInjector
+    - command: >-
+        testes de GraphVisualizer e MAFAdapter com GraphSpec/CompiledGraphArtifact válidos e adulterados
+      expected: "arestas explícitas renderizadas; artefato válido retorna modelo; schema adulterado falha"
+    - command: >-
+        <uv_command> lock --check; <uv_command> sync --all-extras --locked; <uv_command> run python -m pytest;
+        <uv_command> run python -m mypy src; <uv_command> run python -m ruff check .;
+        <uv_command> run python -m compileall -q src compiler tests; git diff --check
+      expected: "todos exit 0; 176+ testes, sem skips/ignores e dependências/lock inalterados"
+    - command: >-
+        <uv_command> run python -m build; <uv_command> run python tests/ci/smoke_wheel.py;
+        smoke isolado compila spec válida e importa GraphCompiler/errors/CompiledGraphArtifact
+      expected: >-
+        wheel/sdist limpas; package instalado fora do checkout; API única e defaults packaged funcionais
+  rollback:
+    triggers:
+      - "qualquer YAML inválido produzir output ou exit 0"
+      - "wrapper/CLI divergirem em bytes, schema, validators ou destino"
+      - "fallback, busca graphs/specs ou segunda implementação permanecer"
+      - "default packaged não compilar estritamente sem warning/fallback"
+      - "path escapar project_root ou output nascer antes da validação"
+      - "mudança exigir relaxar contratos F1.1–F1.3, tocar dependência ou antecipar F1.5/F2/F5"
+      - "critério congelado precisar ser removido, ignorado ou enfraquecido"
+    procedure: >-
+      interromper e preservar logs; antes de commit inverter somente hunks F1.4 por apply_patch;
+      depois de commit usar git revert nos commits exclusivos F1.4; nunca resetar nem descartar trabalho
+      preexistente; preservar checkpoint/pre-f1.4-defensibility.
+    verify: >-
+      git status --short; git diff checkpoint/pre-f1.4-defensibility -- nos caminhos do allowlist;
+      confirmar contratos/dependências/runtime excluído inalterados e repetir baseline integral.
+  external_boundary: >-
+    nenhum push, PR, merge, tag remota ou mudança de proteção está autorizado nesta tarefa sem
+    pedido explícito adicional do usuário
+```
+
+#### Checklist de liberação da F1.4
+
+```text
+[x] Bypass F1.1–F1.3, CLI falso sucesso e fallback reproduzidos
+[x] Divergência de schema/destino entre os dois compiladores comprovada
+[x] Cinco defaults, consumers, visualizer e artifact adapter auditados
+[x] Baseline Git limpo, branch e checkpoint de rollback registrados
+[x] Pipeline, paths, artefato, erros e migração default congelados
+[x] Fronteiras F1.5/F2/F3/F5 e compatibilidade deliberada congeladas
+[x] Critérios positivos, negativos, integral e wheel congelados
+[x] Nenhum código, YAML default ou teste F1.4 implementado nesta preparação
+```
 
 ---
 
@@ -2012,6 +2294,7 @@ de `main`.
 | 2026-08-04 | DEC-004 | Classificar claims públicos como implementados, experimentais/simulados ou planejados | Impedir que presença de classe/teste interno seja confundida com efeito operacional real | README/docs e regressão automatizada devem expor limitações e bloquear rótulos positivos sem evidência |
 | 2026-08-04 | DEC-005 | Exigir `CI required` em `main`, com branch atualizada e regra aplicada a administradores | Fazer o aggregate fail-closed governar merges reais, sem bypass administrativo implícito | PR #2 comprovou estado bloqueado no vermelho e restauração para limpo após revert; PR #1 permanece aberto e verde |
 | 2026-08-04 | DEC-006 | Separar capability declarada de adapter operacional e aplicar default-deny/deny-wins na resolução F1.3 | Evitar que um nome presente em YAML seja confundido com ferramenta executável ou que policy/role seja ampliada pelo node | F1.3 produz visão efetiva tipada; F1.4 integra o compilador, F3 implementa adapters e F5 impõe a decisão antes de side effects |
+| 2026-08-04 | DEC-007 | Adotar `ai_engineering_harness.compiler.GraphCompiler` como único pipeline e remover injeção implícita do wrapper | Dois artefatos e GateInjector contradizem validação única e arestas explícitas F1.1 | Wrapper e CLI apenas delegam; output é `CompiledGraphArtifact`; expansão/digest ficam F1.5 e execução das policies fica F2/F5 |
 
 > Registre aqui toda decisão arquitetural que diverge do plano. Formato: data ISO, ID (ADR-XXX), descrição, motivo, arquivos impactados.
 
@@ -2037,13 +2320,13 @@ de `main`.
 ```
 Data:              2026-08-04
 Fase:              F1
-Tarefa:            F1.3 — validação de policies, roles e tools
-Estado:            completed — gate READY → COMPLETED; todos os critérios congelados aprovados
-Arquivos alterados: models/registry F1.3, graph/__init__, adapter legado, três superfícies default, dois testes novos, duas regressões e TASK.md
-Validações:         71 testes focados; 176 integrais; mypy 90 arquivos; Ruff, compileall, lock/sync, build e dois smokes verdes
-Checkpoint:         checkpoint/pre-f1.3-defensibility em c0aaadd117e9dfe90b3e7fd3c00392ff3ee01c6e; checkpoint/f1.3-ready no dossiê; checkpoint/f1.3-complete no commit final
-Observação:         branch local phase/f1-policy-validation; nenhuma branch/tag F1 publicada; compilador oficial, CLI, grafos e runtime não foram integrados
-Resultado:          8 policies estritas, 7 roles, 18 capabilities, default-deny/deny-wins, erros tipados, adapter fail-closed e visão resolved_policies entregues
+Tarefa:            F1.4 — auditoria e gate de unificação dos compiladores
+Estado:            pending — gate READY; implementação deliberadamente não iniciada nesta retomada
+Arquivos alterados: somente TASK.md; probes e artefatos de auditoria sob build/f1.4-audit estão ignorados
+Validações:         bypass/fallback/divergência reproduzidos; 176 testes; mypy 90 arquivos; Ruff, compileall, lock e diff-check verdes
+Checkpoint:         checkpoint/pre-f1.4-defensibility em 07c8fc362a4bb791d727b0cb43129e8cabb6a26d; checkpoint/f1.4-ready no commit documental
+Observação:         branch local phase/f1-compiler-unification; nenhuma branch/tag F1 publicada; nenhum código/YAML/teste F1.4 alterado
+Resultado:          pipeline, paths, artefato, errors, migração dos cinco defaults, aceites e fronteiras F1.5/F2/F5 congelados
 ```
 
 ---
@@ -2051,14 +2334,14 @@ Resultado:          8 policies estritas, 7 roles, 18 capabilities, default-deny/
 ## 11. Próxima Ação Exata
 
 ```text
-PREPARAR F1.4 — SOMENTE AUDITORIA E GATE DE DEFENSABILIDADE, SEM IMPLEMENTAR:
-1. Confirmar branch phase/f1-policy-validation, worktree limpo e checkpoint/f1.3-complete no commit final da F1.3.
-2. Reler integralmente a F1.4 do plano e os handoffs F1.1–F1.3; manter um único executor.
-3. Auditar os dois compiladores, CLI compile/run, caminhos de specs/output, validators, formatos de artefato, fallbacks e consumidores.
-4. Reproduzir diferenças semânticas, workflow inexistente, grafo temporário e qualquer bypass dos validators F1.1–F1.3.
-5. Congelar implementação oficial única, compatibilidade do wrapper, paths, exit codes, migração mínima dos defaults, aceite positivo/negativo, rollback e checkpoint F1.4.
-6. Não alterar código F1.4 até o gate estar READY; separar normalização/digest/escrita atômica F1.5 e execução/runtime F2/F5.
-7. Não fazer push, PR, merge, tag remota ou alteração de proteção sem autorização explícita.
+IMPLEMENTAR F1.4 — SOMENTE O ESCOPO CONGELADO NO GATE READY:
+1. Confirmar branch phase/f1-compiler-unification, worktree limpo e checkpoint/f1.4-ready no commit documental.
+2. Reler integralmente o dossiê F1.4 e manter um único executor; não editar código antes dessa confirmação.
+3. Implementar package compiler único, wrapper/CLI delegados, MAFAdapter/visualizer tipados e remover fallback/GateInjector.
+4. Migrar exatamente os cinco grafos default e fixtures consumidoras conforme o contrato congelado.
+5. Executar todos os aceites de validators, paths, CLI/wrapper idênticos, defaults, integral, build e smokes da wheel.
+6. Se qualquer contrato F1.1–F1.3, dependência, F1.5 ou execução F2/F5 for necessário, parar e recongelar o gate.
+7. Registrar resultado e checkpoint/f1.4-complete somente após todos os critérios passarem; nenhuma operação remota.
 ```
 
 ---
