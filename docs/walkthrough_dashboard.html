@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI-Engineering-Harness — Tree & Internal Workflows Walkthrough</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    :root {
+      --bg-primary: #07090E;
+      --bg-secondary: #0F1420;
+      --bg-card: rgba(18, 24, 38, 0.75);
+      --bg-card-hover: rgba(26, 35, 56, 0.85);
+      --border-color: rgba(255, 255, 255, 0.08);
+      --border-glow: rgba(0, 242, 254, 0.25);
+      
+      --accent-cyan: #00F2FE;
+      --accent-blue: #3B82F6;
+      --accent-purple: #8B5CF6;
+      --accent-pink: #EC4899;
+      --accent-amber: #F59E0B;
+      --accent-emerald: #10B981;
+      
+      --text-main: #F3F4F6;
+      --text-muted: #9CA3AF;
+      --text-dim: #6B7280;
+      
+      --winston-color: #38BDF8;
+      --amelia-color: #F43F5E;
+      
+      --font-title: 'Outfit', sans-serif;
+      --font-body: 'Inter', sans-serif;
+      --font-code: 'Fira Code', monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--bg-primary);
+      color: var(--text-main);
+      font-family: var(--font-body);
+      line-height: 1.6;
+      overflow-x: hidden;
+      background-image: 
+        radial-gradient(circle at 10% 10%, rgba(0, 242, 254, 0.06) 0%, transparent 45%),
+        radial-gradient(circle at 90% 90%, rgba(139, 92, 246, 0.06) 0%, transparent 45%);
+    }
+
+    /* HEADER */
+    header {
+      background: rgba(15, 20, 32, 0.9);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border-color);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      padding: 1rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .brand-icon {
+      width: 42px; height: 42px;
+      background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 800; font-family: var(--font-title); color: #000;
+      box-shadow: 0 0 20px rgba(0, 242, 254, 0.4);
+    }
+    .brand-text h1 {
+      font-family: var(--font-title); font-size: 1.25rem; font-weight: 700;
+      background: linear-gradient(90deg, #FFF, #94A3B8);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .brand-text span {
+      font-size: 0.75rem; color: var(--accent-cyan); font-family: var(--font-code);
+      text-transform: uppercase; letter-spacing: 0.05em;
+    }
+
+    .agent-badges { display: flex; gap: 12px; }
+    .agent-badge {
+      display: flex; align-items: center; gap: 8px; padding: 6px 14px;
+      border-radius: 30px; font-size: 0.85rem; font-weight: 600;
+      background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border-color);
+    }
+    .agent-badge.winston { border-color: rgba(56, 189, 248, 0.3); color: var(--winston-color); }
+    .agent-badge.amelia { border-color: rgba(244, 63, 94, 0.3); color: var(--amelia-color); }
+
+    .status-pill {
+      background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.4);
+      color: #34D399; padding: 4px 12px; border-radius: 20px; font-size: 0.75rem;
+      font-family: var(--font-code); display: flex; align-items: center; gap: 6px;
+    }
+    .status-pill::before {
+      content: ''; width: 6px; height: 6px; background: #34D399; border-radius: 50%;
+      box-shadow: 0 0 8px #34D399;
+    }
+
+    /* NAVIGATION TABS */
+    nav.nav-tabs {
+      display: flex; gap: 8px; padding: 1rem 2rem 0 2rem;
+      background: var(--bg-secondary); border-bottom: 1px solid var(--border-color);
+      overflow-x: auto;
+    }
+
+    .tab-btn {
+      background: transparent; border: none; color: var(--text-muted);
+      padding: 12px 20px; font-family: var(--font-body); font-size: 0.9rem; font-weight: 600;
+      cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s ease;
+      white-space: nowrap; display: flex; align-items: center; gap: 8px;
+    }
+    .tab-btn:hover { color: var(--text-main); }
+    .tab-btn.active {
+      color: var(--accent-cyan); border-bottom-color: var(--accent-cyan);
+      background: rgba(0, 242, 254, 0.06); border-radius: 8px 8px 0 0;
+    }
+
+    /* MAIN CONTAINER */
+    main { padding: 2rem; max-width: 1400px; margin: 0 auto; }
+    .tab-content { display: none; animation: fadeIn 0.3s ease-in-out; }
+    .tab-content.active { display: block; }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* DIALOGUE BOX */
+    .dialogue-box {
+      background: rgba(15, 23, 42, 0.85); border: 1px solid var(--border-color);
+      border-radius: 16px; padding: 24px; margin-bottom: 2rem;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+    }
+    .dialogue-header {
+      display: flex; align-items: center; gap: 12px; margin-bottom: 16px;
+      padding-bottom: 12px; border-bottom: 1px solid var(--border-color);
+    }
+    .dialogue-entry { display: flex; gap: 16px; margin-bottom: 16px; }
+    .dialogue-entry:last-child { margin-bottom: 0; }
+    .avatar {
+      width: 44px; height: 44px; border-radius: 12px; display: flex;
+      align-items: center; justify-content: center; font-size: 1.4rem; flex-shrink: 0;
+    }
+    .avatar.winston { background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.4); }
+    .avatar.amelia { background: rgba(244, 63, 94, 0.15); border: 1px solid rgba(244, 63, 94, 0.4); }
+    .msg-body {
+      flex: 1; background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 12px; padding: 16px;
+    }
+    .msg-header { display: flex; justify-content: space-between; margin-bottom: 6px; }
+    .msg-author.winston { color: var(--winston-color); font-weight: 700; }
+    .msg-author.amelia { color: var(--amelia-color); font-weight: 700; }
+    .msg-role { font-size: 0.75rem; color: var(--text-dim); }
+    .msg-text { font-size: 0.92rem; color: #E2E8F0; }
+
+    /* CARD & PANELS */
+    .panel-card {
+      background: var(--bg-card); border: 1px solid var(--border-color);
+      border-radius: 16px; padding: 24px; margin-bottom: 2rem; position: relative;
+    }
+    .panel-card h3 {
+      font-family: var(--font-title); font-size: 1.25rem; margin-bottom: 16px;
+      display: flex; align-items: center; gap: 10px; color: var(--text-main);
+    }
+
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 2rem; }
+    @media (max-width: 992px) { .grid-2 { grid-template-columns: 1fr; } }
+
+    /* TREE COMPONENT STYLES */
+    .tree-box {
+      background: #080C14; border: 1px solid var(--border-color);
+      border-radius: 12px; padding: 20px; font-family: var(--font-code); font-size: 0.88rem;
+      overflow-x: auto; color: #CBD5E1; line-height: 1.8;
+    }
+    .tree-item { margin-left: 18px; position: relative; }
+    .tree-folder { color: var(--accent-cyan); font-weight: 600; }
+    .tree-file { color: #A5F3FC; }
+    .tree-comment { color: var(--text-dim); font-size: 0.8rem; margin-left: 10px; font-style: italic; }
+    .tree-badge {
+      font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; margin-left: 8px;
+      font-family: var(--font-body); font-weight: 600;
+    }
+    .badge-core { background: rgba(0, 242, 254, 0.15); color: var(--accent-cyan); border: 1px solid rgba(0, 242, 254, 0.3); }
+    .badge-spec { background: rgba(245, 158, 11, 0.15); color: var(--accent-amber); border: 1px solid rgba(245, 158, 11, 0.3); }
+    .badge-policy { background: rgba(236, 72, 153, 0.15); color: var(--accent-pink); border: 1px solid rgba(236, 72, 153, 0.3); }
+    .badge-test { background: rgba(16, 185, 129, 0.15); color: var(--accent-emerald); border: 1px solid rgba(16, 185, 129, 0.3); }
+
+    /* MERMAID WRAPPER */
+    .mermaid-box {
+      background: #080C14; border: 1px solid var(--border-color);
+      border-radius: 12px; padding: 20px; overflow-x: auto;
+      display: flex; justify-content: center; min-height: 250px;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="brand">
+      <div class="brand-icon">H</div>
+      <div class="brand-text">
+        <h1>AI-Engineering-Harness</h1>
+        <span>Tree & Workflows Walkthrough</span>
+      </div>
+    </div>
+    
+    <div class="agent-badges">
+      <div class="agent-badge winston"><span>🏛️</span> Winston (Architect)</div>
+      <div class="agent-badge amelia"><span>🛠️</span> Amelia (Dev)</div>
+      <div class="status-pill">100% AUDITADO (43/43 PASSED)</div>
+    </div>
+  </header>
+
+  <nav class="nav-tabs">
+    <button class="tab-btn active" onclick="switchTab('tree')">
+      <span>🌴</span> Árvore do Projeto Todo
+    </button>
+    <button class="tab-btn" onclick="switchTab('internal-workflows')">
+      <span>⚙️</span> Workflows Internos do Engine
+    </button>
+    <button class="tab-btn" onclick="switchTab('compiler-flow')">
+      <span>🛠️</span> Fluxo do Graph Compiler
+    </button>
+    <button class="tab-btn" onclick="switchTab('fsm-flow')">
+      <span>🔄</span> Fluxo FSM & Verification
+    </button>
+    <button class="tab-btn" onclick="switchTab('audit-rollback')">
+      <span>🔒</span> Audit Hash Chain & Rollback
+    </button>
+  </nav>
+
+  <main>
+    <!-- TAB 1: TREE DO PROJETO TODO -->
+    <div id="tree" class="tab-content active">
+      <div class="dialogue-box">
+        <div class="dialogue-header">
+          <h3 style="font-family: var(--font-title); color: var(--accent-cyan);">🏛️ Winston e 🛠️ Amelia Detalham a Estrutura do Repositório</h3>
+        </div>
+        <div class="dialogue-entry">
+          <div class="avatar winston">🏛️</div>
+          <div class="msg-body">
+            <div class="msg-header">
+              <span class="msg-author winston">Winston (System Architect)</span>
+              <span class="msg-role">Estruturação e Governança</span>
+            </div>
+            <div class="msg-text">
+              "A árvore do projeto <strong>AI-Engineering-Harness</strong> é rigorosamente dividida entre o <strong>Motor Instalável (`src/ai_engineering_harness/`)</strong>, as <strong>Especificações de Grafo (`graphs/`)</strong>, os <strong>Contratos Pydantic Imutáveis (`contracts/`)</strong>, as <strong>Políticas de Governança (`policies/`)</strong> e o <strong>Workspace Local de Estado (`.harness/`)</strong>."
+            </div>
+          </div>
+        </div>
+        <div class="dialogue-entry">
+          <div class="avatar amelia">🛠️</div>
+          <div class="msg-body">
+            <div class="msg-header">
+              <span class="msg-author amelia">Amelia (Senior Software Engineer)</span>
+              <span class="msg-role">Organização e Suíte de Testes</span>
+            </div>
+            <div class="msg-text">
+              "Exatamente, Winston! Todos os testes unitários e E2E estão em <code>tests/</code>, divididos entre <code>tests/unit/</code> (42 testes) e <code>tests/e2e/</code> (1 teste de ciclo de vida completo). Todos os 43 testes estão rodando e aprovados em sub-segundo!"
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel-card">
+        <h3><span>🌴</span> Árvore Completa e Detalhada de Arquivos do Projeto</h3>
+        <p style="color: var(--text-muted); margin-bottom: 16px;">
+          Abaixo está o mapa hierárquico exato de todos os diretórios e arquivos que compõem o AI-Engineering-Harness:
+        </p>
+
+        <div class="tree-box">
+          <div><span class="tree-folder">ai-engineering-harness/</span></div>
+          <div class="tree-item"><span class="tree-file">├── README.md</span> <span class="tree-comment"># Fórmula central e instruções rápidas</span></div>
+          <div class="tree-item"><span class="tree-file">├── pyproject.toml</span> <span class="tree-comment"># Empacotamento Python PEP 621 e scripts CLI (`harness`)</span></div>
+          <div class="tree-item"><span class="tree-file">├── task.md</span> <span class="tree-comment"># Checklist de resolução e roadmap do projeto</span></div>
+          
+          <!-- COMPILER -->
+          <div class="tree-item"><span class="tree-folder">├── compiler/</span> <span class="tree-badge badge-core">Compiler CLI Entrypoint</span></div>
+          <div class="tree-item" style="margin-left:36px;"><span class="tree-file">└── compile.py</span> <span class="tree-comment"># Script de compilação em design-time (YAML -> MAF JSON)</span></div>
+
+          <!-- CONTRACTS -->
+          <div class="tree-item"><span class="tree-folder">├── contracts/</span> <span class="tree-badge badge-spec">Immutability Layer</span></div>
+          <div class="tree-item" style="margin-left:36px;"><span class="tree-folder">├── events/</span> <span>└── knowledge_sync.py</span> <span class="tree-comment"># Contratos de eventos sincronizados</span></div>
+          <div class="tree-item" style="margin-left:36px;"><span class="tree-folder">├── nodes/</span> <span class="tree-comment"># Schemas de nós do grafo (architecture, code_gen, test_gen)</span></div>
+          <div class="tree-item" style="margin-left:36px;"><span class="tree-folder">└── transactions/</span> <span>└── knowledge_transaction.py</span> <span class="tree-comment"># Transações de conhecimento</span></div>
+
+          <!-- DOCS -->
+          <div class="tree-item"><span class="tree-folder">├── docs/</span> <span class="tree-comment"># Documentação formal e especificações</span></div>
+          <div class="tree-item" style="margin-left:36px;"><span class="tree-file">├── agentic_lifecycle_audit.md</span> <span class="tree-comment"># Matriz do Ciclo Agentic</span></div>
+          <div class="tree-item" style="margin-left:36px;"><span class="tree-file">├── agentic_operating_model.md</span> <span class="tree-comment"># Modelo Operacional & Diagramas</span></div>
+          <div class="tree-item" style="margin-left:36px;"><span class="tree-file">├── harness_architecture_spec.md</span> <span class="tree-comment"># Especificação Congelada v1.0</span></div>
+          <div class="tree-item" style="margin-left:36px;"><span class="tree-file">└── walkthrough_dashboard.html</span> <span class="tree-comment"># Visual Dashboard Interativo</span></div>
+
+          <!-- SRC MOTOR & DEFAULTS -->
+          <div class="tree-item"><span class="tree-folder">├── src/ai_engineering_harness/</span> <span class="tree-badge badge-core">Core Motor Engine</span></div>
+          <div class="tree-item" style="margin-left:36px;"><span class="tree-folder">├── defaults/</span> <span class="tree-comment"># Templates padrão empacotados (agents, graphs, policies, tools)</span></div>
+          <div class="tree-item" style="margin-left:36px;"><span class="tree-folder">├── cli/</span> <span>├── main.py</span> <span>└── commands/rollback.py</span> <span class="tree-comment"># Interface CLI Click & Rich</span></div>
+          <div class="tree-item" style="margin-left:36px;"><span class="tree-folder">├── compiler/</span> <span>├── compiler.py</span> <span>└── visualizer.py</span> <span class="tree-comment"># Validador & Mermaid Exporter</span></div>
+          <div class="tree-item" style="margin-left:36px;"><span class="tree-folder">├── doctor/</span> <span>├── checker.py</span> <span>└── probes.py</span> <span class="tree-comment"># Probes de Saúde</span></div>
+          <div class="tree-item" style="margin-left:36px;"><span class="tree-folder">├── governance/</span> <span>└── approval.py</span> <span class="tree-comment"># Approvals & Human-in-the-Loop</span></div>
+          <div class="tree-item" style="margin-left:36px;"><span class="tree-folder">├── observability/</span> <span>└── audit.py</span> <span class="tree-comment"># Hash Chain SHA-256 Audit Trail</span></div>
+          <div class="tree-item" style="margin-left:36px;"><span class="tree-folder">├── runtime/</span> <span class="tree-comment"># ContextAssembler, Planner, AgentExecutor, PromotionManager, Engine, FSM</span></div>
+          <div class="tree-item" style="margin-left:36px;"><span class="tree-folder">└── tools/</span> <span>├── router.py</span> <span>└── permissions.py</span> <span class="tree-comment"># ToolRouter Guardião de MCP/Terminal</span></div>
+
+          <!-- TESTS -->
+          <div class="tree-item"><span class="tree-folder">└── tests/</span> <span class="tree-badge badge-test">58/58 Passing Tests</span></div>
+          <div class="tree-item" style="margin-left:36px;"><span class="tree-folder">├── unit/</span> <span class="tree-comment"># test_agent_centric.py, test_structure.py, test_contracts.py, etc.</span></div>
+          <div class="tree-item" style="margin-left:36px;"><span class="tree-folder">└── e2e/</span> <span>└── test_full_lifecycle.py</span> <span class="tree-comment"># Teste E2E do ciclo completo com evidências</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 2: INTERNAL WORKFLOWS DO ENGINE -->
+    <div id="internal-workflows" class="tab-content">
+      <div class="panel-card">
+        <h3><span>⚙️</span> Workflow Interno 1: End-to-End Execution Flow (`harness run`)</h3>
+        <p style="color: var(--text-muted); margin-bottom: 16px;">
+          Fluxo completo percorrido internamente pelo motor quando o usuário invoca <code>harness run &lt;workflow&gt;</code>:
+        </p>
+
+        <div class="mermaid-box">
+          <pre class="mermaid">
+          sequenceDiagram
+              autonumber
+              actor User as Usuário / CLI
+              participant CLI as cli/main.py
+              participant Engine as runtime/engine.py
+              participant FSM as runtime/state_machine.py
+              participant MAF as runtime/maf_adapter.py
+              participant Agent as Serena MCP & Memory MCP
+              participant Gates as verification/engine.py
+              participant Audit as observability/audit.py
+
+              User->>CLI: harness run new-feature
+              CLI->>Engine: RuntimeEngine.run_workflow("new-feature")
+              Engine->>FSM: transition_to(INITIATED)
+              FSM->>Audit: log_event(INITIATED, hash_previous)
+              
+              Engine->>MAF: load_compiled_graph(".harness/state/compiled/new-feature.json")
+              Engine->>FSM: transition_to(PLANNING)
+              
+              Engine->>Agent: execute_node("code_generation")
+              Engine->>FSM: transition_to(EXECUTING)
+              Agent-->>Engine: Código alterado via AST
+              
+              Engine->>Gates: VerificationEngine.evaluate_gates()
+              Engine->>FSM: transition_to(VERIFYING)
+              
+              alt 100% Gates Aprovados
+                  Gates-->>Engine: GatesPassed
+                  Engine->>FSM: transition_to(COMPLETED)
+                  FSM->>Audit: log_event(COMPLETED, hash_SHA256)
+                  Engine-->>CLI: Execução concluída com sucesso!
+              else Algum Gate Falhou
+                  Gates-->>Engine: GatesFailed
+                  Engine->>FSM: transition_to(FAILED)
+                  Engine->>CLI: Dispara RollbackManager (2 Fases)
+              end
+          </pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 3: COMPILER FLOW -->
+    <div id="compiler-flow" class="tab-content">
+      <div class="panel-card">
+        <h3><span>🛠️</span> Workflow Interno 2: Design-Time Graph Compiler (`harness compile`)</h3>
+        <p style="color: var(--text-muted); margin-bottom: 16px;">
+          Como o compilador transforma um grafo YAML declarativo em uma máquina de estados MAF JSON determinística:
+        </p>
+
+        <div class="mermaid-box">
+          <pre class="mermaid">
+          flowchart TD
+              A["graphs/specs/workflow.yaml"] -->|1. Parse YAML| B["Compiler Engine (compiler.py)"]
+              C["contracts/nodes/*.py"] -->|2. Validate Schemas| B
+              D["policies/*.yaml"] -->|3. Inject Verification Gates| B
+              B -->|4. Generate Executable| E[".harness/state/compiled/workflow.maf.json"]
+              B -->|5. Render Mermaid Diagram| F["GraphVisualizer (visualizer.py)"]
+              F -->|Output Terminal/MD| G["Diagrama Flowchart TD"]
+          </pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 4: FSM FLOW -->
+    <div id="fsm-flow" class="tab-content">
+      <div class="panel-card">
+        <h3><span>🔄</span> Workflow Interno 3: FSM Transitions & Quality Verification Gates</h3>
+        <p style="color: var(--text-muted); margin-bottom: 16px;">
+          Fluxo de verificação poliglota acionado durante a fase <code>VERIFYING</code>:
+        </p>
+
+        <div class="mermaid-box">
+          <pre class="mermaid">
+          flowchart TD
+              A["Estado FSM: VERIFYING"] --> B["VerificationEngine.evaluate()"]
+              B --> C{"Detecta Linguagem do Projeto"}
+              C -->|Python| D["mypy + ruff + pytest"]
+              C -->|JS/TS| E["tsc --noEmit + eslint + vitest/npm test"]
+              C -->|Go| F["go vet + golangci-lint + go test"]
+              C -->|Rust| G["cargo check + clippy + cargo test"]
+              
+              D --> H{"Todos os Gates Aprovados?"}
+              E --> H
+              F --> H
+              G --> H
+              
+              H -->|Sim| I["Transição para COMPLETED / AWAITING_APPROVAL"]
+              H -->|Não| J["Transição para FAILED ➔ Rollback Engine"]
+          </pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 5: AUDIT & ROLLBACK -->
+    <div id="audit-rollback" class="tab-content">
+      <div class="grid-2">
+        <div class="panel-card">
+          <h3><span>🔒</span> Audit Hash Chain Workflow</h3>
+          <div class="mermaid-box">
+            <pre class="mermaid">
+            flowchart TD
+                E1["Evento N: State Transition"] --> H1["Captura SHA256(Hash N-1 + Payload N)"]
+                H1 --> H2["Persiste em event-journal.jsonl"]
+                H2 --> H3["harness audit (Validação de Não-Repúdio)"]
+                H3 --> H4["Exportação SARIF v2.1.0 / JSON"]
+            </pre>
+          </div>
+        </div>
+
+        <div class="panel-card">
+          <h3><span>⚡</span> Rollback em 2 Fases Workflow</h3>
+          <div class="mermaid-box">
+            <pre class="mermaid">
+            flowchart TD
+                F1["Falha em VERIFYING / Comandos"] --> R1["RollbackManager.execute()"]
+                R1 -->|Fase 1: Codebase| R2["Git Reset Working Tree + Restore Snapshot"]
+                R1 -->|Fase 2: Memory/Audit| R3["Invalida Eventos de Memória AST & Status FSM"]
+                R3 --> R4["Estado Restaurado com Segurança"]
+            </pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    mermaid.initialize({ startOnLoad: true, theme: 'dark' });
+
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+
+      document.getElementById(tabId).classList.add('active');
+      event.currentTarget.classList.add('active');
+
+      setTimeout(() => {
+        mermaid.contentLoaded();
+      }, 100);
+    }
+  </script>
+</body>
+</html>

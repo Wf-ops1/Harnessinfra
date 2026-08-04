@@ -1,0 +1,7 @@
+# tools/terminal_tool.yaml
+tool_name: terminal_tool
+description: Executor determinístico de comandos de terminal com sandbox e timeouts
+settings:
+  timeout_seconds: 120
+  allowed_shell: powershell
+  capture_output: true

@@ -1,0 +1,10 @@
+# agents/security_agent/agent.yaml
+name: security_agent
+role: Security Analysis Agent
+inherits: agents/_base/agent_base.yaml
+
+model: claude-sonnet-4
+allowed_tools:
+  - static_analysis_scanner
+  - dependency_vulnerability_checker
+system_prompt_file: system_prompt.md

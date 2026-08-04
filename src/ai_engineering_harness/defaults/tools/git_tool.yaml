@@ -1,0 +1,7 @@
+# tools/git_tool.yaml
+tool_name: git_tool
+description: Configuração de segurança e automação do Git no Harness
+settings:
+  allow_force_push: false
+  commit_convention: conventional_commits
+  branch_isolation_prefix: "harness/feature-"

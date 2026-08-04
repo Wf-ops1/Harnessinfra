@@ -1,0 +1,29 @@
+# policies/verification_policy.yaml
+policy_id: feature-completion-v1
+version: "3.2.0"
+applies_to:
+  - new-feature
+  - bug-fix
+  - refactoring
+  - migration
+
+required_gates:
+  - id: typecheck
+    executor: deterministic
+    command: "python -m mypy ."
+    blocking: true
+  - id: lint
+    executor: deterministic
+    command: "python -m ruff check ."
+    blocking: true
+  - id: tests
+    executor: deterministic
+    command: "pytest --maxfail=1"
+    blocking: true
+  - id: build
+    executor: deterministic
+    command: "python -m build"
+    blocking: true
+
+termination_rule: ALL_REQUIRED_GATES_PASSED
+on_failure: route_to_failure_classifier

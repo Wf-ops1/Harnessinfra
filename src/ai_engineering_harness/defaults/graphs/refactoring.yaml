@@ -1,0 +1,36 @@
+# graphs/specs/refactoring.yaml
+graph:
+  name: refactoring
+  version: "3.2.0"
+  description: "Grafo de refatoração estrutural mantendo contratos intactos (Modo 3: Limpeza e Refatoração)"
+
+policies:
+  - policies/verification_policy.yaml
+  - policies/tool_policy.yaml
+  - policies/sandbox_policy.yaml
+
+contracts:
+  - contracts/nodes/architecture_analysis.py
+  - contracts/nodes/code_generation.py
+  - contracts/nodes/test_generation.py
+
+nodes:
+  - id: refactor_impact_analysis
+    role: architecture_analyst
+    input_contract: contracts/nodes/architecture_analysis.py#ArchitectureAnalysisInput
+    output_contract: contracts/nodes/architecture_analysis.py#ArchitectureAnalysisOutput
+    on_success: execute_refactor
+    on_failure: escalate_to_human
+
+  - id: execute_refactor
+    role: code_agent
+    input_contract: contracts/nodes/code_generation.py#CodeGenerationInput
+    output_contract: contracts/nodes/code_generation.py#CodeGenerationOutput
+    on_success: verify_no_regression
+    on_failure: revert_and_escalate
+
+  - id: verify_no_regression
+    executor: deterministic_policy
+    policy_ref: policies/verification_policy.yaml
+    on_success: END
+    on_failure: revert_and_escalate

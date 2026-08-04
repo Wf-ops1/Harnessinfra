@@ -1,0 +1,22 @@
+# policies/incident_graph.yaml
+policy_id: incident-response-v1
+version: "3.2.0"
+
+automation_attempts:
+  P1: 0
+  P2: 1
+  P3: 2
+
+mttr_policy:
+  P1:
+    max_automated_seconds: 60
+    escalation_action: immediate_human_page
+  P2:
+    max_automated_seconds: 300
+    escalation_action: on_call_escalation
+  P3:
+    max_automated_seconds: 900
+    escalation_action: create_ticket
+
+knowledge_update_requires_incident_resolved: true
+evidence_retention: immutable

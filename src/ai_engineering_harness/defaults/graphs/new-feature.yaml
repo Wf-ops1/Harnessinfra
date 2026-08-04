@@ -1,0 +1,63 @@
+# graphs/specs/new-feature.yaml
+graph:
+  name: new-feature
+  version: "3.2.0"
+  description: "Grafo completo de entrega de nova funcionalidade (Modo 1: Canhão de Nova Feature)"
+
+policies:
+  - policies/verification_policy.yaml
+  - policies/tool_policy.yaml
+  - policies/context_sufficiency.yaml
+  - policies/sandbox_policy.yaml
+  - policies/retry_cost_policy.yaml
+  - policies/knowledge_sync.yaml
+
+contracts:
+  - contracts/nodes/context_sufficiency.py
+  - contracts/nodes/architecture_analysis.py
+  - contracts/nodes/code_generation.py
+  - contracts/nodes/test_generation.py
+  - contracts/events/knowledge_sync.py
+  - contracts/transactions/knowledge_transaction.py
+
+nodes:
+  - id: context_retrieval
+    role: requirement_analyst
+    input_contract: contracts/nodes/context_sufficiency.py#RetrievalRequest
+    output_contract: contracts/nodes/context_sufficiency.py#ContextSufficiencyReport
+    on_success: architecture_analysis
+    on_failure: escalate_to_human
+
+  - id: architecture_analysis
+    role: architecture_analyst
+    input_contract: contracts/nodes/architecture_analysis.py#ArchitectureAnalysisInput
+    output_contract: contracts/nodes/architecture_analysis.py#ArchitectureAnalysisOutput
+    on_success: code_generation
+    on_failure: escalate_to_human
+
+  - id: code_generation
+    role: code_agent
+    input_contract: contracts/nodes/code_generation.py#CodeGenerationInput
+    output_contract: contracts/nodes/code_generation.py#CodeGenerationOutput
+    on_success: test_generation
+    on_failure: retry_code_generation
+
+  - id: test_generation
+    role: test_agent
+    input_contract: contracts/nodes/test_generation.py#TestGenerationInput
+    output_contract: contracts/nodes/test_generation.py#TestGenerationOutput
+    on_success: verification_gates
+    on_failure: retry_code_generation
+
+  - id: verification_gates
+    executor: deterministic_policy
+    policy_ref: policies/verification_policy.yaml
+    on_success: knowledge_sync_update
+    on_failure: retry_code_generation
+
+  - id: knowledge_sync_update
+    role: knowledge_updater
+    input_contract: contracts/transactions/knowledge_transaction.py#KnowledgeTransaction
+    output_contract: contracts/events/knowledge_sync.py#KnowledgeSyncCompleted
+    on_success: END
+    on_failure: revert_and_fail

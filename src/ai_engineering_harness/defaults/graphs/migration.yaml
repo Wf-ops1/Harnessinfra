@@ -1,0 +1,41 @@
+# graphs/specs/migration.yaml
+graph:
+  name: migration
+  version: "3.2.0"
+  description: "Grafo de alteração de schema e migração de banco com rollback garantido (Modo 5: Migração de Banco)"
+
+policies:
+  - policies/verification_policy.yaml
+  - policies/production_health.yaml
+  - policies/tool_policy.yaml
+
+contracts:
+  - contracts/nodes/architecture_analysis.py
+  - contracts/nodes/code_generation.py
+
+nodes:
+  - id: analyze_migration_schema
+    role: architecture_analyst
+    input_contract: contracts/nodes/architecture_analysis.py#ArchitectureAnalysisInput
+    output_contract: contracts/nodes/architecture_analysis.py#ArchitectureAnalysisOutput
+    on_success: generate_migration_script
+    on_failure: escalate_to_human
+
+  - id: generate_migration_script
+    role: code_agent
+    input_contract: contracts/nodes/code_generation.py#CodeGenerationInput
+    output_contract: contracts/nodes/code_generation.py#CodeGenerationOutput
+    on_success: human_approval_gate
+    on_failure: abort_migration
+
+  - id: human_approval_gate
+    executor: human_approval
+    requires_explicit_strategy: true
+    on_success: verify_migration
+    on_failure: abort_migration
+
+  - id: verify_migration
+    executor: deterministic_policy
+    policy_ref: policies/verification_policy.yaml
+    on_success: END
+    on_failure: execute_database_rollback

@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ai-engineering-harness"
+version = "0.1.0"
+description = "Motor Agentic Autônomo e Instalável — Local-First AI Engineering Harness"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "pydantic>=2.7.0",
+    "pyyaml>=6.0.1",
+    "click>=8.1.0",
+    "rich>=13.0.0",
+    "httpx>=0.27.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "mypy>=1.8.0",
+]
+
+[project.scripts]
+harness = "ai_engineering_harness.cli.main:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"ai_engineering_harness.defaults" = ["*", "*/*", "*/*/*", "*/*/*/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests/unit", "tests/e2e"]

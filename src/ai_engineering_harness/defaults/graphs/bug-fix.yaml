@@ -1,0 +1,37 @@
+# graphs/specs/bug-fix.yaml
+graph:
+  name: bug-fix
+  version: "3.2.0"
+  description: "Grafo de diagnóstico rápido e correção de defeitos (Modo 2: Caçador de Bugs)"
+
+policies:
+  - policies/verification_policy.yaml
+  - policies/tool_policy.yaml
+  - policies/context_sufficiency.yaml
+  - policies/retry_cost_policy.yaml
+
+contracts:
+  - contracts/nodes/context_sufficiency.py
+  - contracts/nodes/code_generation.py
+  - contracts/nodes/test_generation.py
+
+nodes:
+  - id: bug_context_retrieval
+    role: requirement_analyst
+    input_contract: contracts/nodes/context_sufficiency.py#RetrievalRequest
+    output_contract: contracts/nodes/context_sufficiency.py#ContextSufficiencyReport
+    on_success: bug_code_fix
+    on_failure: escalate_to_human
+
+  - id: bug_code_fix
+    role: code_agent
+    input_contract: contracts/nodes/code_generation.py#CodeGenerationInput
+    output_contract: contracts/nodes/code_generation.py#CodeGenerationOutput
+    on_success: test_verification
+    on_failure: retry_bug_fix
+
+  - id: test_verification
+    executor: deterministic_policy
+    policy_ref: policies/verification_policy.yaml
+    on_success: END
+    on_failure: retry_bug_fix

@@ -1,0 +1,11 @@
+# agents/architecture_analyst/agent.yaml
+name: architecture_analyst
+role: System Architect Agent (Winston)
+inherits: agents/_base/agent_base.yaml
+
+model: claude-sonnet-4
+allowed_tools:
+  - codebase_memory_ast
+  - knowledge_retriever
+  - adr_writer
+system_prompt_file: system_prompt.md

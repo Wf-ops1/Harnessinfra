@@ -1,0 +1,33 @@
+# graphs/specs/incident.yaml
+graph:
+  name: incident
+  version: "3.2.0"
+  description: "Grafo de contenção e resposta rápida a incidentes de produção (Modo 4: Escudo de Emergência)"
+
+policies:
+  - policies/incident_graph.yaml
+  - policies/production_health.yaml
+  - policies/tool_policy.yaml
+
+contracts:
+  - contracts/events/knowledge_sync.py
+
+nodes:
+  - id: detect_and_contain
+    role: production_operator
+    input_contract: contracts/events/knowledge_sync.py#KnowledgeSyncFailed
+    output_contract: contracts/events/knowledge_sync.py#KnowledgeSyncFailed
+    on_success: evaluate_rollback
+    on_failure: immediate_human_page
+
+  - id: evaluate_rollback
+    role: production_operator
+    policy_ref: policies/production_health.yaml
+    on_success: confirm_resolution
+    on_failure: escalate_to_human
+
+  - id: confirm_resolution
+    executor: deterministic_gate
+    gate_name: incident_resolved
+    on_success: END
+    on_failure: escalate_to_human

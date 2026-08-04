@@ -1,0 +1,2 @@
+[console_scripts]
+harness = ai_engineering_harness.cli.main:main

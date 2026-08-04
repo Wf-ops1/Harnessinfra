@@ -1,0 +1,39 @@
+# policies/context_sufficiency.yaml
+policy_id: context-sufficiency-v1
+version: "3.2.0"
+
+minimum_confidence: 0.72
+dual_gate_mode: true
+
+required_artifacts_manifest:
+  new_feature:
+    mandatory:
+      - prd
+      - domain_model
+      - acceptance_criteria
+      - architecture
+      - non_functional_requirements
+    conditional:
+      - artifact: adr
+        condition: "architecture_change_required == true"
+      - artifact: security_spec
+        condition: "affected_modules contains auth OR payments"
+  bug_fix:
+    mandatory:
+      - bug_report
+      - reproduction_steps
+      - affected_module_spec
+  refactoring:
+    mandatory:
+      - target_module_spec
+      - architecture
+      - acceptance_criteria
+  migration:
+    mandatory:
+      - migration_spec
+      - rollback_plan
+      - data_schema
+      - acceptance_criteria
+
+conflict_handling: escalate_to_human
+max_retrieval_retries: 2

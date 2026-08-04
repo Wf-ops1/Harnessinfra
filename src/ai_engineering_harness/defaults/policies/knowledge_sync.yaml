@@ -1,0 +1,90 @@
+# policies/knowledge_sync.yaml
+policy_id: knowledge-sync-v1
+version: "3.2.0"
+
+sync_mode: event_driven_incremental
+change_detection:
+  root_comparison: "O(1) (root_atual == root_anterior)"
+  delta_traversal: "O(K) percorrendo apenas os ramos modificados da Merkle Tree"
+parsing_engine: tree_sitter
+sync_coordinator_timeout_seconds: 120
+partial_sync_action: revert_and_fail
+
+# Associação de Commit e Persistência de Índice (G1 e G5)
+commit_association:
+  primary_key: git_commit_sha   # O commit_sha é a identidade imutável principal
+  metadata_fields: [git_branch, execution_id, timestamp_iso]
+  index_storage_path: ".knowledge/structural_index/"
+  staging_dir: ".knowledge/structural_index/staging/"
+  snapshots_dir: ".knowledge/structural_index/snapshots/"
+  pointer_file: ".knowledge/structural_index/current.json"   # Ponteiro atômico seguro
+  temp_pointer_file: ".knowledge/structural_index/current.tmp"
+  lock_file: ".knowledge/structural_index/structural_index.lock"
+  bind_to_execution_id: true
+
+# Protocolo Estrito de Durabilidade do Ponteiro (4 Etapas)
+atomic_pointer_durability_protocol:
+  steps:
+    - 1_write_to_temp_file: "Gravar current.tmp"
+    - 2_fsync_temp_file: "flush + os.fsync(current.tmp)"
+    - 3_atomic_replace: "os.replace(current.tmp, current.json)"
+    - 4_fsync_parent_directory: "os.fsync(parent_directory_fd) apos o replace"
+  os_portability_note: "Garantias operacionais validadas via suíte de testes de estresse no Windows/NTFS."
+
+# Invariantes Invioláveis do Sistema
+system_invariants:
+  snapshot_exists_rule: "Se snapshots/<commit_sha> já existir, aceitar somente se o Merkle root for idêntico; senão sinalizar conflito/corrupção."
+  invalid_pointer_rule: "Se current.json for inválido, buscar apenas snapshot 'ready', exigir commit_sha igual ao Git atual e validar Merkle antes de servir."
+  no_matching_snapshot_rule: "Se nenhum snapshot válido existir para o commit atual, NUNCA servir commit diferente. Disparar reindexação limpa."
+
+# Concorrência Segura Monomáquina: Lease ID, Heartbeat e Monotonic Fencing Token
+concurrency_control:
+  scope: single_host_process_concurrency
+  mechanism: lease_lock_with_fencing_token
+  lock_file: ".knowledge/structural_index/structural_index.lock"
+  lock_metadata:
+    - owner_pid
+    - lease_id           # UUIDv4 único por execução
+    - fencing_token      # Inteiro estritamente crescente (monotônico)
+    - heartbeat_iso      # Atualização periódica a cada 5s
+    - ttl_seconds        # Expirado se heartbeat pifar por > 30s
+  stale_lock_recovery: auto_purge_if_heartbeat_dead_or_pid_gone
+
+# Integridade, Validação Estrita por Commit e Auto-Recuperação de Casos de Borda
+recovery_strategies:
+  snapshot_missing:
+    action: rebuild_index_from_ast
+  merkle_root_mismatch:
+    action: invalidate_snapshot_and_reindex
+  sqlite_corrupted:
+    action: restore_last_valid_or_reindex
+  commit_mismatch_on_restore:
+    rule: "Snapshot de commit diferente NUNCA é servido diretamente. Usar apenas como base Merkle para delta re-index O(K)."
+  current_json_corrupted_or_missing:
+    action: fallback_to_latest_valid_ready_snapshot_matching_git_commit
+  stale_writer_lost_lease:
+    action: reject_write_if_lease_expired_or_fencing_token_stale
+  out_of_order_token_writers:
+    rule: "Writer com fencing_token menor é rejeitado atomicamente pelo validador do ponteiro."
+  blocked_states_for_agent: [pending, failed, corrupted]  # NUNCA servidos ao agente
+
+# Métrica de Performance Medida em percentis
+performance_benchmark:
+  sla_targets:
+    p50_ms: 15
+    p95_ms: 25
+    p99_ms: 45
+  benchmark_conditions:
+    repo_symbols_limit: 50000
+    cache_state: warm
+    storage_type: local_ssd
+
+garbage_collection:
+  retention_policy: keep_last_50_snapshots
+  orphan_snapshot_action: purge_unreferenced_by_git_history
+
+context_snapshot_ttl:
+  new_feature: execution_duration
+  bug_fix: execution_duration
+  migration: 4h
+  default: 8h

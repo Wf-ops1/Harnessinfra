@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+env/
+venv/
+ENV/
+.pytest_cache/
+.mypy_cache/
+.coverage
+
+# Harness State & Artifacts
+.harness/state/executions/
+.harness/state/compiled/
+graphs/compiled/*.json
+!graphs/compiled/.gitkeep
+
+# IDE & OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

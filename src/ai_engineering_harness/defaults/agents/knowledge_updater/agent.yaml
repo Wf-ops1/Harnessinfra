@@ -1,0 +1,11 @@
+# agents/knowledge_updater/agent.yaml
+name: knowledge_updater
+role: Knowledge Base Synchronization Agent
+inherits: agents/_base/agent_base.yaml
+
+model: claude-sonnet-4
+allowed_tools:
+  - knowledge_retriever
+  - adr_writer
+  - file_writer
+system_prompt_file: system_prompt.md

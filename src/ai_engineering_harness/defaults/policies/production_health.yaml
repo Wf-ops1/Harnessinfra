@@ -1,0 +1,33 @@
+# policies/production_health.yaml
+policy_id: production-health-v1
+version: "3.2.0"
+
+observation_window_seconds: 300
+evaluation_strategy: slo_burn_rate
+
+slo_gates:
+  - slo_id: availability
+    metric: error_rate
+    baseline_window: 1h
+    threshold: 1.5x
+  - slo_id: latency
+    metric: p99_latency_ms
+    baseline_window: 1h
+    threshold: 1.3x
+  - slo_id: throughput
+    metric: requests_per_second
+    baseline_window: 1h
+    threshold: 0.8x
+
+canary_strategy:
+  progression: [5, 25, 100]
+  min_step_duration_seconds: 300
+  min_requests_per_step: 500
+
+rollback_trigger:
+  any_slo_gate_breached: true
+  rollback_grace_period_seconds: 0
+
+migration_rollback:
+  requires_explicit_strategy: true
+  default_on_missing_strategy: human_gate

@@ -1,0 +1,12 @@
+# agents/code_agent/agent.yaml
+name: code_agent
+role: Senior Software Engineer (Amelia)
+inherits: agents/_base/agent_base.yaml
+
+model: claude-sonnet-4
+allowed_tools:
+  - serena_mcp
+  - codebase_memory_ast
+  - test_runner
+  - file_writer
+system_prompt_file: system_prompt.md

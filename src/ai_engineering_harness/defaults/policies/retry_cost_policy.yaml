@@ -1,0 +1,18 @@
+# policies/retry_cost_policy.yaml
+policy_id: retry-cost-funnel-v1
+version: "3.2.0"
+
+context_strategy: snapshot_fixed_with_retry_evolution
+semantic_cache_threshold: 0.82
+context_deduplication_threshold: 0.85
+
+model_routing:
+  retry_0: claude-sonnet-4
+  retry_1: claude-sonnet-4
+  retry_2: claude-opus-4
+  retry_max: 2
+
+cost_budget:
+  max_tokens_per_node: 100000
+  max_cost_per_execution_usd: 5.00
+  escalate_on_budget_exceeded: true

@@ -1,0 +1,11 @@
+# agents/_base/agent_base.yaml
+version: "3.2.0"
+runtime_framework: microsoft_agent_framework
+
+defaults:
+  temperature: 0.1
+  max_tokens: 4096
+  timeout_seconds: 300
+  retry_policy:
+    max_retries: 2
+    backoff_factor: 2.0

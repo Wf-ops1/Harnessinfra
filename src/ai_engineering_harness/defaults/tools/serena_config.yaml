@@ -1,0 +1,8 @@
+# tools/serena_config.yaml
+version: "3.2.0"
+serena_settings:
+  ast_parser: tree_sitter
+  symbolic_navigation: true
+  diff_mode: AST_LEVEL
+  prohibit_placeholders: true
+  max_edit_chunk_lines: 300

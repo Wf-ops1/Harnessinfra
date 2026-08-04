@@ -1,0 +1,37 @@
+{
+  "title": "StructuralIndexPersistenceSchema",
+  "version": "3.2.0",
+  "storage_locations": {
+    "staging_dir": ".knowledge/structural_index/staging/<uuid>/",
+    "snapshots_dir": ".knowledge/structural_index/snapshots/<commit_sha>/",
+    "current_pointer": ".knowledge/structural_index/current.json",
+    "temp_pointer": ".knowledge/structural_index/current.tmp",
+    "lock_file": ".knowledge/structural_index/structural_index.lock"
+  },
+  "snapshot_status_enum": [
+    "pending",
+    "ready",
+    "failed",
+    "corrupted"
+  ],
+  "durability_protocol_4_steps": [
+    "1. Gravar current.tmp",
+    "2. flush + os.fsync(current.tmp)",
+    "3. os.replace(current.tmp, current.json)",
+    "4. os.fsync(parent_directory)"
+  ],
+  "invariants": {
+    "snapshot_exists": "Se snapshots/<commit_sha> ja existir, aceitar somente se o Merkle root for identico; senao sinalizar conflito/corrupção",
+    "invalid_pointer": "Se current.json for invalido, buscar apenas snapshot ready, exigir commit_sha igual ao Git atual e validar Merkle antes de servir",
+    "no_matching_snapshot": "Se nenhum snapshot valido existir para o commit atual, NUNCA servir commit diferente. Executar reindexação limpa"
+  },
+  "concurrency_and_fencing": {
+    "scope": "single_host_process_concurrency",
+    "mechanism": "Lease ID (UUIDv4) + Heartbeat (5s) + Monotonic Fencing Token"
+  },
+  "performance_sla_percentiles": {
+    "p50_ms": 15,
+    "p95_ms": 25,
+    "p99_ms": 45
+  }
+}

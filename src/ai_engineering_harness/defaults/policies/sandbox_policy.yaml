@@ -1,0 +1,31 @@
+# policies/sandbox_policy.yaml
+policy_id: sandbox-isolation-v1
+version: "3.2.0"
+
+workspace_scope: per_execution_id
+fan_out_isolation: per_node_namespace
+credential_injection: authorization_proxy
+lifecycle: ephemeral
+
+cold_start_budget_ms:
+  linux_namespace: 20
+  container_hardened: 40
+  gvisor: 60
+  microvm_firecracker: 150
+
+isolation_matrix:
+  read_analysis: linux_namespace
+  code_modification: container_hardened
+  test_execution: container_hardened
+  build_terminal: gvisor
+  ci_cd_deploy: external_executor
+
+fan_in_contract:
+  merge_strategy: explicit_manifest
+  conflict_resolution: fail_explicit
+  partial_node_failure:
+    action: collect_and_route
+    routing:
+      code_agent_failed: code_failure_path
+      security_agent_failed: security_failure_path
+      docs_agent_failed: continue_without_docs

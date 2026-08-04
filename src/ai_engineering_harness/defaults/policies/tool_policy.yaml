@@ -1,0 +1,52 @@
+# policies/tool_policy.yaml
+policy_id: tool-governance-v1
+version: "3.2.0"
+
+roles_permissions:
+  requirement_analyst:
+    allowed_tools:
+      - knowledge_retriever
+      - file_reader
+    forbidden_tools:
+      - file_writer
+      - terminal_executor
+      - git_committer
+
+  architecture_analyst:
+    allowed_tools:
+      - codebase_memory_ast
+      - knowledge_retriever
+      - adr_writer
+    forbidden_tools:
+      - production_deployer
+
+  code_agent:
+    allowed_tools:
+      - serena_mcp
+      - codebase_memory_ast
+      - test_runner
+      - file_writer
+    forbidden_tools:
+      - production_deployer
+
+  security_agent:
+    allowed_tools:
+      - static_analysis_scanner
+      - dependency_vulnerability_checker
+    forbidden_tools:
+      - file_writer
+
+  test_agent:
+    allowed_tools:
+      - test_runner
+      - test_generator
+      - file_writer
+    forbidden_tools:
+      - production_deployer
+
+  production_operator:
+    allowed_tools:
+      - ci_cd_pipeline
+      - feature_flag_manager
+      - rollback_executor
+    human_approval_required: true

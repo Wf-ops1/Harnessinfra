@@ -1,0 +1,25 @@
+# tools/mcp_config.yaml
+version: "3.2.0"
+mcp_servers:
+  serena:
+    type: stdio
+    command: npx
+    args:
+      - "-y"
+      - "@serena/mcp-server"
+    description: "Servidor MCP Serena para navegação simbólica e edições cirúrgicas de código na AST"
+
+  codebase_memory:
+    type: stdio
+    command: uvx
+    args:
+      - "codebase-memory-mcp"
+    description: "Servidor MCP Codebase-Memory para representação navegável 3D da estrutura do código via Tree-sitter"
+
+  git:
+    type: stdio
+    command: npx
+    args:
+      - "-y"
+      - "@modelcontextprotocol/server-git"
+    description: "Servidor MCP para operações versionadas no Git"

@@ -1,0 +1,11 @@
+# agents/test_agent/agent.yaml
+name: test_agent
+role: QA and Test Engineer Agent
+inherits: agents/_base/agent_base.yaml
+
+model: claude-sonnet-4
+allowed_tools:
+  - test_runner
+  - test_generator
+  - file_writer
+system_prompt_file: system_prompt.md
