@@ -65,17 +65,18 @@ Uma **fase** só avança quando todos os gates de saída estão verdes.
 **Objetivo:** garantir que o pacote compile, instale, rode testes reproduzivelmente
 e não anuncie capacidades inexistentes.
 
-**Status da fase:** `blocked` — F0.0 identificou ausência de `.git`; implementação aguarda decisão explícita sobre restaurar o histórico ou criar um baseline novo.
+**Status da fase:** `in_progress` — F0.0 concluída; próxima tarefa executável: F0.1.
 
 ### Coordenação e ambiente observado
 
 | Campo | Valor atual |
 |---|---|
-| **Executor ativo** | `Antigravity` — responsável por implementar e atualizar checkpoints |
-| **Auditor/revisor** | `Codex` — somente-leitura por padrão; só edita quando o usuário solicitar explicitamente |
+| **Executor ativo** | `Codex` — responsável por implementar, validar, manter checkpoints e criar commits locais |
+| **Auditor/revisor** | `Antigravity` — somente-leitura por padrão; só edita quando o usuário solicitar explicitamente ou transferir a execução |
 | **Workspace** | `C:\Users\walla\OneDrive\Desktop\ai-engineering-harness` |
-| **Git** | `initialized` — conectado e sincronizado com `https://github.com/Wf-ops1/Harnessinfra.git` (branch `main`) |
-| **python_command** | `unresolved` — `python` e `py` não estavam disponíveis no shell da auditoria; o executor deve repetir o preflight |
+| **Git** | `available` — branch de execução `phase/f0-baseline`, criada a partir de `main`/`origin/main` no baseline `6eef8e0`; remote `https://github.com/Wf-ops1/Harnessinfra.git` |
+| **python_command** | `& 'C:\Users\walla\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe'` — Python `3.12.13` |
+| **Dependências do projeto** | runtime suficiente para F0.1; `yaml`, `click`, `rich`, `httpx` e `pytest` ainda não estão disponíveis neste runtime e serão tratadas na F0.3 |
 | **Regra de escrita** | apenas um agente escreve por vez |
 
 ---
@@ -88,15 +89,15 @@ e não anuncie capacidades inexistentes.
 
 | Campo | Detalhe |
 |-------|---------|
-| **Status** | `blocked` |
+| **Status** | `completed` |
 | **Objetivo** | Definir um executor único e comprovar Python/Git disponíveis antes de qualquer alteração de código |
 | **Arquivos envolvidos** | `TASK.md`, `.agents/AGENTS.md`; nenhuma alteração de código nesta tarefa |
 | **Implementação esperada** | (1) escolher um único executor; (2) detectar `uv`, `python` e `py`; (3) registrar `python_command` com versão `>=3.11`; (4) verificar Git somente se `.git` existir; (5) se `.git` estiver ausente, solicitar decisão para restaurar histórico ou criar baseline; (6) não executar `git init` nem instalar runtime sem autorização |
 | **Critérios de aceite** | executor identificado; `python_command` válido ou bloqueio registrado; estado Git registrado; checkpoint e próxima ação atualizados |
 | **Comandos de verificação** | PowerShell: `Get-Command uv, python, py, git -ErrorAction SilentlyContinue`; filesystem: `Test-Path -LiteralPath .git`; executar `git rev-parse --is-inside-work-tree` apenas se o teste anterior retornar `True` |
-| **Dependências** | decisão do usuário sobre o Git quando `.git` estiver ausente |
+| **Dependências** | nenhuma |
 
-> Convenção: após o preflight, substituir `<PYTHON_CMD>` pelo comando efetivamente registrado, por exemplo `uv run python`, `python` ou `py -3`. Nunca assumir um deles sem detecção.
+> F0.0 validada: executor Codex definido; Git disponível; Python 3.12.13 detectado. Se o executor ou ambiente mudar, reabrir F0.0 e repetir o preflight.
 
 ---
 
@@ -108,8 +109,8 @@ e não anuncie capacidades inexistentes.
 | **Objetivo** | Eliminar erros de sintaxe, imports quebrados e assinaturas inválidas que impedem importação do pacote |
 | **Arquivos envolvidos** | `src/ai_engineering_harness/migrations/runner.py`, todos os módulos públicos do pacote |
 | **Implementação esperada** | (1) Corrigir assinatura inválida em `migrations/runner.py`; (2) executar `compileall` em `src/`, `compiler/`, `tests/`; (3) corrigir imports quebrados; (4) adicionar teste que importe todos os módulos públicos |
-| **Critérios de aceite** | `<PYTHON_CMD> -m compileall -q src compiler tests` exit 0; `<PYTHON_CMD> -c "import ai_engineering_harness.migrations"` exit 0 |
-| **Comandos de verificação** | `<PYTHON_CMD> -m compileall -q src compiler tests`; depois `<PYTHON_CMD> -c "import ai_engineering_harness.migrations"` |
+| **Critérios de aceite** | comando Python registrado executa `-m compileall -q src compiler tests` com exit 0; import de `ai_engineering_harness.migrations` com exit 0 |
+| **Comandos de verificação** | `& 'C:\Users\walla\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe' -m compileall -q src compiler tests`; depois `& 'C:\Users\walla\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe' -c "import ai_engineering_harness.migrations"` |
 | **Dependências** | F0.0 concluída |
 
 ---
@@ -121,7 +122,7 @@ e não anuncie capacidades inexistentes.
 | **Status** | `pending` |
 | **Objetivo** | Eliminar mojibake UTF-8 em todos os arquivos do projeto |
 | **Arquivos envolvidos** | Todos os `.py`, `.md`, `.yaml`, `.toml`, `.json`; novo `.editorconfig` |
-| **Implementação esperada** | (1) Converter todos os arquivos para UTF-8 válido; (2) corrigir strings corrompidas (`AutÃ´nomo`, `âœ"`, `Ã­ndice`); (3) remover lógica baseada em símbolos corrompidos; (4) criar `.editorconfig` com `charset = utf-8`; (5) validar CLI em Windows UTF-8 e console legado |
+| **Implementação esperada** | (1) Converter todos os arquivos para UTF-8 válido; (2) corrigir strings corrompidas (`AutÃ´nomo`, `âœ”`, `Ã­ndice`); (3) remover lógica baseada em símbolos corrompidos; (4) criar `.editorconfig` com `charset = utf-8`; (5) validar CLI em Windows UTF-8 e console legado |
 | **Critérios de aceite** | `rg` sem mojibake conhecido em src/docs/README; `harness --help` e `harness doctor` sem exceção |
 | **Comandos de verificação** | `rg -n 'Ã|âœ|ðŸ' src docs README.md` → sem resultados |
 | **Dependências** | F0.1 |
@@ -137,7 +138,7 @@ e não anuncie capacidades inexistentes.
 | **Arquivos envolvidos** | `pyproject.toml`, `uv.lock`, `README.md` |
 | **Implementação esperada** | (1) Adotar `uv` como gerenciador de ambiente; (2) criar e versionar `uv.lock`; (3) completar deps dev: pytest, pytest-cov, mypy, ruff, build; (4) usar `python -m ...` nos comandos internos; (5) definir versões Python suportadas; (6) documentar bootstrap no README |
 | **Critérios de aceite** | Em máquina limpa: `uv sync --all-extras` OK; `uv run python -m pytest` OK; `uv run python -m mypy src` OK; `uv run python -m ruff check .` OK; `uv run python -m build` OK |
-| **Comandos de verificação** | `uv sync --all-extras && uv run python -m pytest && uv run python -m mypy src && uv run python -m ruff check . && uv run python -m build` |
+| **Comandos de verificação** | Executar separadamente: `uv sync --all-extras`; `uv run python -m pytest`; `uv run python -m mypy src`; `uv run python -m ruff check .`; `uv run python -m build` |
 | **Dependências** | F0.1, F0.2 |
 
 ---
@@ -151,7 +152,7 @@ e não anuncie capacidades inexistentes.
 | **Arquivos envolvidos** | `pyproject.toml`, `src/ai_engineering_harness/__init__.py`, schemas de grafo/artifact/policy |
 | **Implementação esperada** | (1) `__version__` via `importlib.metadata.version`; (2) separar `package_version`, `graph_schema_version`, `artifact_schema_version`, `policy_schema_version`; (3) remover versões conflitantes (`0.1.0`, `1.0.0`, `3.2.0`) usadas para a mesma coisa |
 | **Critérios de aceite** | `harness --version`, metadata da wheel e `ai_engineering_harness.__version__` são idênticos; schemas com compatibilidade testada separadamente |
-| **Comandos de verificação** | `harness --version` e `<PYTHON_CMD> -c "import ai_engineering_harness; print(ai_engineering_harness.__version__)"` |
+| **Comandos de verificação** | `harness --version` e o `python_command` registrado com `-c "import ai_engineering_harness; print(ai_engineering_harness.__version__)"` |
 | **Dependências** | F0.1, F0.3 |
 
 ---
@@ -187,7 +188,7 @@ e não anuncie capacidades inexistentes.
 ### Gate de saída da Fase 0
 
 ```
-[ ] F0.0 concluída: executor, Python e estratégia Git registrados
+[x] F0.0 concluída: executor, Python e estratégia Git registrados
 [ ] Pacote compila e instala em ambiente limpo
 [ ] Testes reproduzíveis por um único comando
 [ ] Nenhum documento declara produção
@@ -227,8 +228,14 @@ e não anuncie capacidades inexistentes.
 
 | ID | Descrição | Tarefa bloqueada | Status |
 |----|-----------|-----------------|--------|
-| B-001 | `.git` não existe no workspace; não há diff, histórico ou rollback confiável | F0.0 e toda implementação subsequente | aguardando decisão do usuário: restaurar histórico ou autorizar baseline novo |
-| B-002 | Comando Python do executor ainda não foi resolvido; `python` e `py` não estavam disponíveis no shell da auditoria | F0.0 | executor deve repetir detecção e registrar `<PYTHON_CMD>` |
+| — | *Nenhum bloqueio ativo* | — | — |
+
+### Bloqueios resolvidos
+
+| ID | Resolução | Evidência |
+|----|-----------|----------|
+| B-001 | Repositório Git criado e conectado ao GitHub | `main...origin/main`, working tree limpo, remote `https://github.com/Wf-ops1/Harnessinfra.git`, HEAD `6eef8e0` |
+| B-002 | Runtime Python do executor resolvido | Python `3.12.13` em `C:\Users\walla\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe` |
 
 ---
 
@@ -238,10 +245,11 @@ e não anuncie capacidades inexistentes.
 Data:              2026-08-03
 Fase:              F0
 Tarefa:            F0.0
-Estado:            blocked
-Arquivos alterados: TASK.md, docs/plano_implementacao_harness_operacional.md, .agents/AGENTS.md
-Validações:         executor Antigravity definido; `.git` ausente; `python_command` não resolvido no shell da auditoria
-Resultado:          implementação não deve começar até resolver B-001 e B-002
+Estado:            completed
+Arquivos alterados: TASK.md
+Validações:         executor Codex definido; branch phase/f0-baseline criada a partir do baseline 6eef8e0; Python 3.12.13 disponível
+Observação:         dependências completas do projeto ainda não instaladas; responsabilidade da F0.3
+Resultado:          F0.1 liberada para execução
 ```
 
 ---
@@ -249,13 +257,14 @@ Resultado:          implementação não deve começar até resolver B-001 e B-0
 ## 11. Próxima Ação Exata
 
 ```text
-CONCLUIR F0.0:
-1. Antigravity, como executor ativo, repete a detecção de `uv`, `python`, `py` e registra `<PYTHON_CMD>`.
-2. Codex permanece como auditor somente-leitura, salvo pedido explícito do usuário.
-3. O usuário decide como recuperar versionamento: restaurar `.git` original é preferível; criar baseline novo exige autorização explícita.
-4. O executor confirma o estado Git sem executar `git init` automaticamente.
-5. Atualizar F0.0 e os bloqueios B-001/B-002.
-6. Somente após F0.0 ficar `completed`, iniciar F0.1.
+INICIAR F0.1:
+1. Criar um checkpoint Git local para a troca de executor e conclusão da F0.0.
+2. Inspecionar `src/ai_engineering_harness/migrations/runner.py` e corrigir a assinatura inválida.
+3. Executar `compileall` com o `python_command` registrado e anotar todos os erros.
+4. Corrigir imports quebrados encontrados no escopo da F0.1.
+5. Adicionar teste que importe todos os módulos públicos.
+6. Executar os dois critérios de aceite da F0.1.
+7. Atualizar este TASK.md e criar commit local da F0.1.
 ```
 
 ---
@@ -277,7 +286,7 @@ Localizar a seção da fase atual e ler todos os detalhes das tarefas pendentes.
 ### Passo 3 — Inspecionar estado do repositório
 
 1. Verificar se `.git` existe.
-2. Se `.git` não existir, não executar comandos Git; manter B-001 e solicitar decisão do usuário.
+2. Se `.git` não existir, não executar comandos Git; reabrir B-001 e solicitar decisão do usuário.
 3. Se `.git` existir, executar:
 
    ```bash
@@ -313,6 +322,7 @@ Atualizar status neste TASK.md ao concluir cada tarefa.
 - Atualizar status das tarefas ao concluir cada uma.
 - Nunca marcar `completed` sem executar os critérios de aceite.
 - Manter um único executor ativo; outros agentes devem auditar sem escrever.
+- Se o executor ou ambiente mudar, reabrir F0.0 e repetir o preflight antes de editar código.
 - Registrar em "Arquivos alterados" do checkpoint todos os arquivos modificados.
 - Registrar em "Decisões" qualquer divergência do plano principal.
 - Nunca depender apenas do histórico da conversa.
