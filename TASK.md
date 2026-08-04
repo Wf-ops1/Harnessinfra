@@ -302,13 +302,107 @@ defensibility:
 
 | Campo | Detalhe |
 |-------|---------|
-| **Status** | `pending` |
+| **Status** | `in_progress` — gate de defensabilidade `READY`; implementação autorizada em 2026-08-04T00:04:54-03:00 |
 | **Objetivo** | Eliminar mojibake UTF-8 em todos os arquivos do projeto |
 | **Arquivos envolvidos** | Todos os `.py`, `.md`, `.yaml`, `.toml`, `.json`; novo `.editorconfig` |
 | **Implementação esperada** | (1) Converter todos os arquivos para UTF-8 válido; (2) corrigir strings corrompidas (`AutÃ´nomo`, `âœ”`, `Ã­ndice`); (3) remover lógica baseada em símbolos corrompidos; (4) criar `.editorconfig` com `charset = utf-8`; (5) validar CLI em Windows UTF-8 e console legado |
 | **Critérios de aceite** | `rg` sem mojibake conhecido em src/docs/README; `harness --help` e `harness doctor` sem exceção |
-| **Comandos de verificação** | `rg -n 'Ã|âœ|ðŸ' src docs README.md` → sem resultados |
+| **Comandos de verificação** | `rg -n '\x{00C3}|\x{00E2}\x{0153}|\x{00F0}\x{0178}' src docs README.md` → exit 1, sem resultados |
 | **Dependências** | F0.1 |
+
+#### Gate de defensabilidade da F0.2
+
+| Campo | Estado atual |
+|---|---|
+| **Gate** | `READY` — lacunas reproduzidas, baseline conhecido, escopo/aceite congelados e rollback definido |
+| **Checkpoint de rollback** | `checkpoint/f0.1-complete` → `823406ce3f647e049bae51eb41f02e02b73e6351` |
+| **Checkpoint de liberação** | `checkpoint/f0.2-ready` — tag criada no commit documental que contém este dossiê |
+| **Próximo passo permitido** | Implementar somente o escopo congelado abaixo; qualquer ampliação reabre o gate |
+
+```yaml
+defensibility:
+  task_id: "F0.2"
+  gate: "READY"
+  executor: "Codex"
+  authorized_at: "2026-08-04T00:04:54-03:00"
+  problem_statement: >-
+    O repositório não possui configuração de editor que imponha UTF-8, o comando de busca de
+    mojibake encontra os próprios exemplos literais do plano e o CLI encerra com UnicodeEncodeError
+    em console OEM CP850 por emitir pontuação não representável.
+  evidence:
+    - command: "Test-Path -LiteralPath .editorconfig"
+      observed: "False"
+      location: ".editorconfig ausente"
+    - command: >-
+        rg -n 'Ã|âœ|ðŸ' src docs README.md
+      observed: >-
+        exit 0; duas ocorrências, ambas no plano: exemplos literais na linha 305 e o próprio
+        comando de busca na linha 312; nenhuma ocorrência em código Python
+      location: "docs/plano_implementacao_harness_operacional.md:305"
+    - command: "strict UTF-8 decode de todos os arquivos rastreados .py/.md/.yaml/.yml/.toml/.json"
+      observed: "INVALID_UTF8_COUNT=0"
+      location: "todos os arquivos rastreados com extensões do escopo"
+    - command: >-
+        com PYTHONIOENCODING=cp850, & '<python_command>' -m
+        ai_engineering_harness.cli.main --help e doctor
+      observed: >-
+        ambos exit 1; UnicodeEncodeError para U+2014 EM DASH em cli/main.py:33 e :75
+      location: "src/ai_engineering_harness/cli/main.py:33"
+    - command: >-
+        mesmos comandos com PYTHONIOENCODING=utf-8 e cp1252
+      observed: "--help e doctor exit 0 nos dois encodings"
+      location: "CLI baseline"
+  baseline:
+    branch: "phase/f0-baseline"
+    head: "823406ce3f647e049bae51eb41f02e02b73e6351"
+    status: "clean"
+    checkpoint: "checkpoint/f0.1-complete"
+  frozen_scope:
+    allowed:
+      - ".editorconfig — declarar UTF-8 e regras textuais básicas"
+      - "src/ai_engineering_harness/cli/main.py — substituir somente pontuação incompatível com console OEM"
+      - "tests/unit/test_encoding.py — regressão de UTF-8, mojibake, .editorconfig e CLI multi-encoding"
+      - "docs/plano_implementacao_harness_operacional.md — remover exemplos corrompidos literais e tornar a busca não autorreferente"
+      - "TASK.md — transições, evidências, handoff e checkpoint"
+    excluded:
+      - "regravação em massa: todos os arquivos rastreados já são UTF-8 válido"
+      - "mudança semântica dos comandos, doctor probes ou capacidades declaradas"
+      - "correção de encoding fora dos arquivos em que a evidência provar falha"
+      - "dependências, lockfile, versionamento, compilador e tarefas F0.3+"
+  verification_environment:
+    python: "python_command registrado"
+    dependencies: "C:/tmp/ai-engineering-harness-f0.1-deps, somente para executar o CLI"
+    constraint: "nenhuma instalação global e nenhuma alteração de manifesto"
+  frozen_acceptance:
+    - command: >-
+        & '<python_command>' -m compileall -q src compiler tests
+      expected: "exit 0"
+    - command: >-
+        rg -n '\x{00C3}|\x{00E2}\x{0153}|\x{00F0}\x{0178}' src docs README.md
+      expected: "exit 1 e nenhuma ocorrência"
+    - command: >-
+        com dependências temporárias no PYTHONPATH, & '<python_command>' -m unittest
+        discover -s tests/unit -p test_encoding.py -v
+      expected: >-
+        exit 0; todos os arquivos do escopo decodificam em UTF-8 estrito; .editorconfig impõe
+        UTF-8; --help e doctor encerram com 0 em utf-8, cp1252 e cp850, sem replacement character
+    - command: >-
+        com dependências temporárias no PYTHONPATH, & '<python_command>' -m unittest
+        discover -s tests/unit -p test_public_module_imports.py -v
+      expected: "exit 0 e zero skips"
+  rollback:
+    triggers:
+      - "necessidade de alterar arquivo fora do escopo congelado"
+      - "falha exigir mudança semântica do CLI ou enfraquecimento de critério"
+      - "sobreposição com mudança de outro executor"
+      - "qualquer arquivo anteriormente válido tornar-se UTF-8 inválido"
+    procedure: >-
+      interromper; não usar reset; antes do commit, inverter apenas os hunks F0.2 com apply_patch;
+      depois do commit, usar git revert no commit exclusivo da F0.2
+    verify: >-
+      git status --short; git diff checkpoint/f0.1-complete -- .editorconfig src/ai_engineering_harness/cli/main.py
+      tests/unit/test_encoding.py docs/plano_implementacao_harness_operacional.md TASK.md; repetir o baseline
+```
 
 ---
 
@@ -425,15 +519,15 @@ defensibility:
 ## 10. Último Checkpoint
 
 ```
-Data:              2026-08-03
+Data:              2026-08-04
 Fase:              F0
-Tarefa:            F0.1 — corrigir erros bloqueantes de código
-Estado:            completed
-Arquivos alterados: src/ai_engineering_harness/migrations/runner.py; tests/unit/test_public_module_imports.py; TASK.md
-Validações:         compileall exit 0; import migrations exit 0; unittest importou 85 módulos públicos, zero falhas/skips; git diff --check
-Checkpoint:         checkpoint/f0.1-complete na branch phase/f0-baseline; rollback em checkpoint/f0.1-ready
-Observação:         dependências declaradas foram usadas somente em C:/tmp; nenhum ambiente global ou manifesto foi alterado
-Resultado:          erro sintático removido; pacote e testes compilam; todos os módulos públicos são importáveis no ambiente declarado
+Tarefa:            F0.2 — gate de defensabilidade pré-execução
+Estado:            in_progress — gate READY; implementação ainda não iniciada
+Arquivos alterados: TASK.md
+Validações:         UTF-8 estrito válido; .editorconfig ausente; mojibake autorreferente no plano; CLI CP850 exit 1 comprovado
+Checkpoint:         checkpoint/f0.2-ready na branch phase/f0-baseline; rollback em checkpoint/f0.1-complete
+Observação:         escopo cirúrgico; nenhuma regravação em massa autorizada
+Resultado:          implementação F0.2 autorizada somente dentro do escopo congelado
 ```
 
 ---
@@ -441,13 +535,13 @@ Resultado:          erro sintático removido; pacote e testes compilam; todos os
 ## 11. Próxima Ação Exata
 
 ```text
-PREPARAR O GATE DE DEFENSABILIDADE DA F0.2 — AINDA NÃO ALTERAR ENCODING:
-1. Confirmar `checkpoint/f0.1-complete`, branch, HEAD e working tree limpo.
-2. Reproduzir a busca baseline de mojibake em `src`, `docs` e `README.md`, registrando arquivos e ocorrências.
-3. Inspecionar `.editorconfig`, comportamento atual da CLI e qualquer lógica dependente de símbolos corrompidos.
-4. Preencher o dossiê da F0.2 com problema comprovado, escopo permitido/excluído, aceite e rollback.
-5. Manter F0.2 `pending` se qualquer item do gate estiver incompleto.
-6. Somente depois do gate `READY`, mudar F0.2 para `in_progress` e iniciar alterações de encoding.
+EXECUTAR F0.2 DENTRO DO ESCOPO CONGELADO:
+1. Criar o commit documental e a tag `checkpoint/f0.2-ready` deste gate.
+2. Adicionar `.editorconfig` com UTF-8 e regras textuais determinísticas.
+3. Remover somente a pontuação CLI comprovadamente incompatível com CP850.
+4. Tornar os exemplos/comando de mojibake do plano não autorreferentes.
+5. Adicionar o teste de regressão de encoding e CLI multi-encoding.
+6. Executar todos os critérios congelados, responder o handoff, atualizar este TASK.md e criar o checkpoint final F0.2.
 ```
 
 ---
@@ -514,4 +608,4 @@ Atualizar status neste TASK.md ao concluir cada tarefa.
 
 ---
 
-*Gerado em: 2026-08-03 | Fonte de verdade: docs/plano_implementacao_harness_operacional.md*
+*Atualizado em: 2026-08-04 | Fonte de verdade: docs/plano_implementacao_harness_operacional.md*
