@@ -74,7 +74,7 @@ e não anuncie capacidades inexistentes.
 | **Executor ativo** | `Antigravity` — responsável por implementar e atualizar checkpoints |
 | **Auditor/revisor** | `Codex` — somente-leitura por padrão; só edita quando o usuário solicitar explicitamente |
 | **Workspace** | `C:\Users\walla\OneDrive\Desktop\ai-engineering-harness` |
-| **Git** | `missing` — `.git` não existe no workspace salvo |
+| **Git** | `initialized` — conectado e sincronizado com `https://github.com/Wf-ops1/Harnessinfra.git` (branch `main`) |
 | **python_command** | `unresolved` — `python` e `py` não estavam disponíveis no shell da auditoria; o executor deve repetir o preflight |
 | **Regra de escrita** | apenas um agente escreve por vez |
 
