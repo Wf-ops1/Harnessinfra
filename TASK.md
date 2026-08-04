@@ -161,7 +161,7 @@ e não anuncie capacidades inexistentes.
 | **Git** | `available` — branch de execução `phase/f0-baseline`, criada a partir de `main`/`origin/main` no baseline `6eef8e0`; remote `https://github.com/Wf-ops1/Harnessinfra.git` |
 | **python_command** | `& 'C:\Users\walla\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe'` — Python `3.12.13` |
 | **uv_command** | `& '.\build\f0.6-tools\uv\bin\uv.exe'` — uv `0.11.32` restaurado de forma isolada/ignorada, sem PATH ou instalação global; `lock --check` e `sync --all-extras --locked` verdes |
-| **Dependências do projeto** | `.venv` sincronizada pelo uv com Python 3.12.13 e `uv.lock`; 69 testes + 6 subtests, mypy em 86 arquivos, ruff e compileall verdes; build/wheel validados na F0.4 |
+| **Dependências do projeto** | `.venv` sincronizada pelo uv com Python 3.12.13 e `uv.lock`; 73 testes + 6 subtests, mypy em 86 arquivos, ruff, compileall, build e smoke isolado da wheel verdes |
 | **Regra de escrita** | apenas um agente escreve por vez |
 
 ---
@@ -916,7 +916,7 @@ defensibility:
 
 | Campo | Detalhe |
 |-------|---------|
-| **Status** | `in_progress` — gate defensável `READY`; implementação local autorizada, validação remota permanece obrigatória |
+| **Status** | `in_progress` — implementação local validada; execução remota e branch protection permanecem obrigatórias |
 | **Objetivo** | Pipeline automatizado impede merge com falhas em encoding, lint, tipos, testes ou build |
 | **Arquivos envolvidos** | `.github/workflows/*.yml` (ou equivalente CI) |
 | **Implementação esperada** | Pipeline Windows + Linux com jobs: encoding/compileall; ruff; mypy; testes unitários; E2E locais; build da wheel; instalação e smoke test. Merge bloqueado quando job obrigatório falha |
@@ -928,7 +928,7 @@ defensibility:
 
 | Campo | Estado atual |
 |---|---|
-| **Gate** | `READY` — ausência de CI comprovada; provider, matrizes, actions, aceite local/remoto e rollback congelados |
+| **Gate** | `READY → LOCAL_VALIDATED` — todos os critérios locais passaram; critérios remotos ainda pendentes |
 | **Checkpoint de rollback** | `checkpoint/f0.5-complete` → `7cd6d81137b64914b8f53f6067f76f42cfde2711` |
 | **Checkpoint de liberação** | `checkpoint/f0.6-ready` — tag criada no commit deste dossiê antes do primeiro workflow |
 | **Fronteira externa** | Nenhum push, PR ou branch protection autorizado nesta tarefa local; F0.6 não pode ser `completed` sem execução remota Windows/Linux e proteção comprovada |
@@ -1056,6 +1056,44 @@ defensibility:
       que o workflow/regras voltaram ao último estado conhecido
 ```
 
+#### Resultado local e handoff parcial da F0.6
+
+| Verificação local | Resultado |
+|---|---|
+| `uv lock --check` e `uv sync --all-extras --locked` | ambos exit 0; lock permaneceu consistente |
+| Contrato do workflow + documentação + encoding | exit 0; 12 testes + 6 subtests passaram |
+| Suíte integral | exit 0; 73 testes + 6 subtests passaram |
+| `mypy src` | exit 0; sem issues em 86 arquivos |
+| `ruff check .`, `compileall` e `git diff --check` | todos exit 0 |
+| Build | exit 0; wheel e sdist geradas |
+| Smoke isolado da wheel | exit 0; metadata=`0.1.0`, package=`0.1.0`, CLI=`harness, version 0.1.0`; import fora do checkout |
+| Contrato CI | quality/tests em Windows+Linux e Python 3.11/3.14; package em ambos SOs/Python 3.12; actions pinadas; `CI required` fail-closed |
+
+| Pergunta obrigatória | Resposta local F0.6 |
+|---|---|
+| **Qual comportamento anterior foi substituído?** | O repositório não possuía pipeline; todos os gates dependiam de execução manual. |
+| **Qual é o novo contrato público?** | Um workflow versionado executará quality, unit/E2E e package/smoke em Windows/Linux; o check estável `CI required` falha se qualquer família não concluir com sucesso. |
+| **Quais erros tipados podem ocorrer?** | Scripts retornam exit não zero para YAML/contrato inválido, teste/gate falho, número inesperado de wheels, bytecode no artefato, instalação/import/CLI divergente ou job dependente não sucedido. |
+| **Quais side effects são produzidos?** | Somente arquivos do workflow/testes e artefatos ignorados `build/`, `dist/`, egg-info e ambientes uv isolados. |
+| **Onde o estado é persistido?** | Workflow em `.github/workflows/ci.yml`, contratos em testes, evidência/checkpoints neste painel e Git local. |
+| **Como a operação é retomada após crash?** | Retomar de `checkpoint/f0.6-local-validated`; confirmar status limpo e repetir o teste do workflow antes de qualquer push. |
+| **Qual política autoriza a ação?** | DEC-001/002, dossiê F0.6 `READY` e `checkpoint/f0.6-ready`. |
+| **Como secrets são protegidos?** | Workflow usa apenas `contents: read`, checkout sem credenciais persistidas e nenhuma secret. |
+| **Quais eventos são emitidos?** | Localmente apenas saída de ferramentas; no GitHub serão check runs de quality, tests, package e `CI required`. |
+| **Quais testes provam sucesso?** | Quatro regressões do workflow, suíte 73+6, gates estáticos, build e smoke uv isolado. |
+| **Quais testes provam falha segura?** | O contrato rejeita action móvel, matriz/trigger/job ausente e aggregate não fail-closed; smoke rejeita bytecode, wheel ambígua, import do checkout e versões divergentes. |
+| **A wheel instalada externamente foi testada?** | Sim; uv `--isolated --no-project --with <wheel>`, com origem no cache isolado e CLI aprovada. |
+| **A documentação foi atualizada?** | Sim; README informa workflow local e mantém execução remota/branch protection como pendência. |
+
+**Aceite remoto ainda pendente — F0.6 não está concluída:**
+
+1. publicar a branch `phase/f0-baseline` no `origin`;
+2. observar 4 jobs quality, 4 jobs tests, 2 jobs package e o aggregate `CI required`;
+3. corrigir qualquer divergência Windows/Linux sem reduzir matriz ou gates;
+4. abrir PR para `main` e configurar `CI required` como status check obrigatório;
+5. comprovar com PR controlado que uma falha obrigatória impede merge;
+6. somente então marcar F0.6 e Fase 0 como `completed` e criar `checkpoint/f0.6-complete`.
+
 ---
 
 ### Gate de saída da Fase 0
@@ -1121,13 +1159,13 @@ defensibility:
 ```
 Data:              2026-08-04
 Fase:              F0
-Tarefa:            F0.6 — gate de CI mínima
-Estado:            in_progress — defensability READY; implementação local autorizada
-Arquivos alterados: TASK.md; nenhum workflow alterado no checkpoint de liberação
-Validações:         baseline 7cd6d81 limpo; workflow ausente; uv 0.11.32 restaurado; lock/sync verdes; actions oficiais e merge_group verificados
-Checkpoint:         checkpoint/f0.6-ready na branch phase/f0-baseline; rollback em checkpoint/f0.5-complete
-Observação:         push, execução GitHub e branch protection continuam fora do escopo local e são aceite obrigatório para conclusão
-Resultado:          provider, triggers, matrizes, pins, jobs, smoke, aggregate e rollback F0.6 congelados
+Tarefa:            F0.6 — CI mínima, implementação local
+Estado:            in_progress — local validated; aceite remoto pendente
+Arquivos alterados: .github/workflows/ci.yml; tests/ci/smoke_wheel.py; tests/unit/test_ci_workflow.py; README.md; TASK.md
+Validações:         lock/sync; 12 testes focados + 6 subtests; suíte 73 + 6; mypy 86; ruff/compileall/diff check; build e wheel smoke isolado — todos verdes
+Checkpoint:         checkpoint/f0.6-local-validated na branch phase/f0-baseline; rollback em checkpoint/f0.6-ready e checkpoint/f0.5-complete
+Observação:         nenhum push/PR/configuração GitHub executado; F0.6 e Fase 0 permanecem in_progress
+Resultado:          workflow local fail-closed pronto para ser publicado e validado em 10 matrizes + aggregate
 ```
 
 ---
@@ -1135,14 +1173,14 @@ Resultado:          provider, triggers, matrizes, pins, jobs, smoke, aggregate e
 ## 11. Próxima Ação Exata
 
 ```text
-EXECUTAR F0.6 LOCAL — SOMENTE ESCOPO CONGELADO:
-1. Criar e confirmar checkpoint/f0.6-ready no commit deste dossiê.
-2. Criar ci.yml com quality/tests/package em Windows+Linux e aggregate CI required.
-3. Criar smoke_wheel.py cross-platform e test_ci_workflow.py para contrato do pipeline.
-4. Atualizar somente o status/comando de CI no README.
-5. Executar todos os critérios locais, atualizar handoff e criar commit de implementação.
-6. Não marcar F0.6 completed nem a Fase 0 concluída até o workflow remoto e branch protection passarem.
-7. Solicitar autorização separada antes de push/PR/configuração remota.
+VALIDAR F0.6 REMOTAMENTE — EXIGE AUTORIZAÇÃO EXPLÍCITA:
+1. Criar e confirmar checkpoint/f0.6-local-validated no commit local já testado.
+2. Com autorização, publicar somente phase/f0-baseline no origin; não alterar main nem tags.
+3. Acompanhar todos os jobs GitHub até conclusão e registrar URLs/resultados.
+4. Se houver falha, reproduzir/corrigir localmente com recongelamento; não reduzir matriz/gates.
+5. Com nova autorização, abrir PR e configurar CI required como check obrigatório de main.
+6. Provar bloqueio de merge com falha controlada e depois restaurar a branch de teste.
+7. Somente após todos os critérios remotos marcar F0.6/Fase 0 completed e criar checkpoint/f0.6-complete.
 ```
 
 ---

@@ -44,7 +44,7 @@ auditável. Isso é a direção do produto, não uma descrição do estado entre
 | Verificação e auditoria | Subprocessos de gates e hash chain local possuem testes | Há caminhos de gate vazio e garantias ainda incompletas | Gates fail-closed, redaction e recovery operacional |
 | Doctor | Relatório e modelo de probe existem | Todos os seis estágios retornam saudáveis sem testar componentes | Probes reais de configuração, alcance, autenticação e capacidade |
 | Worktree, promoção e rollback | Estruturas e comandos prototípicos existem | Worktree é diretório comum; promoção usa dry-run/SHA sintético; rollback é parcial | `git worktree`, candidate commit, cherry-pick e `git revert` reais |
-| CI e release | Comandos locais de qualidade estão definidos | Não há pipeline obrigatório versionado | Matriz Windows/Linux na F0.6 e release operacional na F7 |
+| CI e release | Workflow e contrato local cobrem quality/tests/package em Windows e Linux | Execução remota e branch protection ainda precisam ser comprovadas | Check obrigatório após ativação da F0.6; release operacional na F7 |
 
 ## Dívidas técnicas críticas
 
@@ -84,6 +84,7 @@ uv run python -m mypy src
 uv run python -m ruff check .
 uv run python -m compileall -q src compiler tests
 uv run python -m build
+uv run python tests/ci/smoke_wheel.py
 ```
 
 Para inspecionar a superfície da CLI sem executar o runtime:
