@@ -147,8 +147,8 @@ para preparar o próprio dossiê é permitida; alteração de código da tarefa 
 
 **Objetivo:** transformar YAMLs declarativos em artefatos executáveis, validados e determinísticos.
 
-**Status da fase:** `preparing` — auditoria e gate de defensabilidade da F1.1 concluídos; F1.1 permanece
-`pending`, sem implementação, até uma próxima execução confirmar o checkpoint local `checkpoint/f1.1-ready`.
+**Status da fase:** `in_progress` — F1.1 concluída dentro do gate congelado; a próxima retomada deve
+preparar somente a auditoria e o gate de defensabilidade da F1.2 antes de qualquer nova implementação.
 
 ### Coordenação e ambiente observado
 
@@ -171,7 +171,7 @@ para preparar o próprio dossiê é permitida; alteração de código da tarefa 
 
 | Campo | Detalhe |
 |-------|---------|
-| **Status** | `pending` — gate `READY`; nenhum arquivo de implementação foi alterado |
+| **Status** | `completed` — gate `READY → COMPLETED`; implementação e critérios congelados aprovados |
 | **Objetivo** | Criar os dez modelos Pydantic exigidos pelo plano e validar a topologia do grafo em memória, sem integrar ainda compilador, runtime, policies ou defaults |
 | **Arquivos potencialmente alteráveis** | `src/ai_engineering_harness/contracts/graph.py` (novo), `src/ai_engineering_harness/contracts/__init__.py`, `tests/unit/test_graph_contracts.py` (novo), `TASK.md` |
 | **Dependências** | Fase 0 concluída; Pydantic v2 e namespaces de versão já disponíveis |
@@ -191,7 +191,7 @@ para preparar o próprio dossiê é permitida; alteração de código da tarefa 
 
 | Campo | Estado atual |
 |---|---|
-| **Gate** | `READY` — problema, baseline, escopo, decisões, aceite, compatibilidade e rollback congelados |
+| **Gate** | `READY → COMPLETED` — execução permaneceu no escopo e todos os critérios congelados passaram |
 | **Checkpoint de rollback** | `checkpoint/pre-f1.1-defensibility` → `4e3a3531cea44aadcebb9ff3b3e763b4e53adba6` |
 | **Checkpoint de liberação** | `checkpoint/f1.1-ready` — tag local no commit documental que contém este dossiê; não publicada |
 | **Próximo passo permitido** | Em nova execução, implementar somente os arquivos/símbolos congelados; descoberta fora do escopo reabre o gate |
@@ -367,6 +367,34 @@ defensibility:
 [x] Checkpoint Git local e rollback não destrutivo definidos
 [x] Executor único e horário de autorização registrados
 ```
+
+#### Resultado e handoff da F1.1
+
+| Verificação final | Resultado |
+|---|---|
+| API pública e casos positivos/negativos focados | exit 0; 28 testes passaram |
+| Suíte integral | exit 0; 98 testes + 6 subtests passaram |
+| `mypy src` | exit 0; sem issues em 87 arquivos |
+| `ruff check .`, `compileall` e `git diff --check` | todos exit 0 |
+| Build | exit 0; wheel e sdist geradas; `contracts/graph.py` presente na wheel e zero entradas de bytecode |
+| Smoke isolado da wheel | exit 0; metadata, pacote e CLI em `0.1.0`; origem fora do checkout; API de grafo `10/10` importável |
+| Escopo congelado | somente `contracts/graph.py`, `contracts/__init__.py`, `test_graph_contracts.py` e `TASK.md` alterados |
+
+| Pergunta obrigatória | Resposta |
+|---|---|
+| **Qual comportamento anterior foi substituído?** | O pacote não possuía contrato tipado de grafo; specs inválidos podiam permanecer como dicionários sem uma validação topológica comum. |
+| **Qual é o novo contrato público?** | Dez símbolos reexportados por `ai_engineering_harness.contracts`: `GraphSpec`, `GraphMetadata`, `NodeSpec`, três subtipos de nó, `TerminalStateSpec`, `RetryPolicySpec`, `ToolPermissionSpec` e `CompiledGraphArtifact`; modelos estritos, imutáveis e com extras proibidos. |
+| **Quais erros tipados podem ocorrer?** | `pydantic.ValidationError` para tipos/coerções indevidos, extras, IDs duplicados, entrypoint/arestas inválidos, terminais incompletos, nós inalcançáveis, ciclos sem retry e combinações incompatíveis de executor/campo. |
+| **Quais side effects são produzidos?** | Nenhum side effect de runtime; somente validação em memória, arquivos versionados do escopo e artefatos ignorados de teste/build. |
+| **Onde o estado é persistido?** | Nos modelos Python, testes unitários, neste painel e no histórico/checkpoints Git locais. |
+| **Como a operação é retomada após crash?** | Retomar de `checkpoint/f1.1-complete`, confirmar worktree/branch e preparar o dossiê F1.2 antes de qualquer implementação. |
+| **Qual política autoriza a ação?** | Dossiê F1.1 com gate `READY`, escopo congelado e checkpoint local `checkpoint/f1.1-ready`. |
+| **Como secrets são protegidos?** | A F1.1 não acessa nem persiste secrets e não realizou chamadas externas. |
+| **Quais eventos são emitidos?** | Nenhum evento de domínio ou externo; validações falham de forma síncrona antes de qualquer integração. |
+| **Quais testes provam sucesso?** | Construção/serialização dos três tipos de nó, grafo válido, ciclo governado, imutabilidade profunda, round-trip do artefato e os dez exports públicos. |
+| **Quais testes provam falha segura?** | Casos negativos rejeitam duplicidade, referências quebradas, ausência de terminais, inalcançabilidade, ciclo sem retry, valores vazios/zero, coerção, extras e combinações incompatíveis. |
+| **A wheel instalada externamente foi testada?** | Sim; instalação uv isolada importou os dez símbolos a partir do `site-packages`, fora do checkout. |
+| **A documentação foi atualizada?** | Sim; este painel registra resultado, limites e retomada. Compiladores, runtime e YAMLs ainda não consomem o schema e permanecem para F1.2–F1.5. |
 
 ---
 
@@ -1425,13 +1453,13 @@ de `main`.
 ```
 Data:              2026-08-04
 Fase:              F1
-Tarefa:            F1.1 — auditoria e gate de defensabilidade preparados
-Estado:            pending — gate READY; nenhuma implementação F1.1 iniciada
-Arquivos alterados: TASK.md somente; nenhum Python, YAML de produção ou schema alterado
-Validações:         snapshot Git/CI auditado; lacuna reproduzida; 73 testes + 6 subtests, mypy 86 arquivos, Ruff, compileall, build e smoke da wheel verdes
-Checkpoint:         checkpoint/pre-f1.1-defensibility no baseline 4e3a3531cea44aadcebb9ff3b3e763b4e53adba6; checkpoint/f1.1-ready no commit documental deste dossiê
-Observação:         branch local phase/f1-graph-contract; nenhuma branch/tag F1 publicada; proteção granular não reconsultável sem autenticação, mas protected=true e CI required atual verde
-Resultado:          escopo, contrato, aceite, compatibilidade e rollback da F1.1 congelados; implementação deve ocorrer somente em execução posterior
+Tarefa:            F1.1 — schema tipado do grafo
+Estado:            completed — gate READY → COMPLETED; todos os critérios congelados aprovados
+Arquivos alterados: contracts/graph.py, contracts/__init__.py, tests/unit/test_graph_contracts.py e TASK.md
+Validações:         28 testes focados; 98 testes + 6 subtests integrais; mypy 87 arquivos; Ruff, compileall, diff-check, build e smoke isolado verdes
+Checkpoint:         checkpoint/pre-f1.1-defensibility no baseline 4e3a3531cea44aadcebb9ff3b3e763b4e53adba6; checkpoint/f1.1-ready no dossiê; checkpoint/f1.1-complete no commit final
+Observação:         branch local phase/f1-graph-contract; nenhuma branch/tag F1 publicada; compiladores, runtime e defaults não foram alterados nem integrados
+Resultado:          API pública tipada, estrita e imutável criada; topologia inválida falha com ValidationError; integração permanece deliberadamente fora da F1.1
 ```
 
 ---
@@ -1439,12 +1467,12 @@ Resultado:          escopo, contrato, aceite, compatibilidade e rollback da F1.1
 ## 11. Próxima Ação Exata
 
 ```text
-IMPLEMENTAR F1.1 — SOMENTE EM NOVA EXECUÇÃO E DENTRO DO GATE CONGELADO:
-1. Confirmar branch phase/f1-graph-contract, worktree sem mudanças alheias e checkpoint/f1.1-ready resolvendo para o commit documental do dossiê.
-2. Reler a F1.1, o dossiê e os triggers de recongelamento; manter um único executor.
-3. Alterar somente contracts/graph.py, contracts/__init__.py, test_graph_contracts.py e TASK.md.
-4. Executar primeiro os casos positivos/negativos focados; depois suíte integral, mypy, Ruff, compileall, build e smoke da wheel.
-5. Se qualquer descoberta exigir compiler, runtime, defaults, dependency ou critério novo, interromper e recongelar antes de editar fora do escopo.
+PREPARAR F1.2 — SOMENTE AUDITORIA E GATE DE DEFENSABILIDADE, SEM IMPLEMENTAR:
+1. Confirmar branch phase/f1-graph-contract, worktree limpo e checkpoint/f1.1-complete no commit final da F1.1.
+2. Reler integralmente a F1.2 do plano e o handoff da F1.1; manter um único executor.
+3. Auditar o import dinâmico legado, referências atuais de contratos, consumidores e a fronteira de confiança do registry.
+4. Congelar problema, evidências, escopo permitido/proibido, API, compatibilidade, aceite positivo/negativo, rollback e checkpoint de liberação da F1.2.
+5. Não alterar código da F1.2 até o gate estar `READY` e uma retomada posterior confirmar o checkpoint local de liberação.
 6. Não fazer push, PR, merge, tag remota ou alteração de proteção sem autorização explícita.
 ```
 
