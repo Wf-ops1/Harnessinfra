@@ -160,7 +160,7 @@ e não anuncie capacidades inexistentes.
 | **Workspace** | `C:\Users\walla\OneDrive\Desktop\ai-engineering-harness` |
 | **Git** | `available` — branch de execução `phase/f0-baseline`, criada a partir de `main`/`origin/main` no baseline `6eef8e0`; remote `https://github.com/Wf-ops1/Harnessinfra.git` |
 | **python_command** | `& 'C:\Users\walla\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe'` — Python `3.12.13` |
-| **uv_command** | `missing` nesta retomada — o binário temporário `C:\tmp\ai-engineering-harness-uv-0.11.32-resume\bin\uv.exe` foi limpo; `.venv` e `uv.lock` permanecem válidos. F0.5 usa `.venv\Scripts\python.exe`; restaurar uv isolado antes do gate F0.6 |
+| **uv_command** | `& '.\build\f0.6-tools\uv\bin\uv.exe'` — uv `0.11.32` restaurado de forma isolada/ignorada, sem PATH ou instalação global; `lock --check` e `sync --all-extras --locked` verdes |
 | **Dependências do projeto** | `.venv` sincronizada pelo uv com Python 3.12.13 e `uv.lock`; 69 testes + 6 subtests, mypy em 86 arquivos, ruff e compileall verdes; build/wheel validados na F0.4 |
 | **Regra de escrita** | apenas um agente escreve por vez |
 
@@ -916,13 +916,145 @@ defensibility:
 
 | Campo | Detalhe |
 |-------|---------|
-| **Status** | `pending` |
+| **Status** | `in_progress` — gate defensável `READY`; implementação local autorizada, validação remota permanece obrigatória |
 | **Objetivo** | Pipeline automatizado impede merge com falhas em encoding, lint, tipos, testes ou build |
 | **Arquivos envolvidos** | `.github/workflows/*.yml` (ou equivalente CI) |
 | **Implementação esperada** | Pipeline Windows + Linux com jobs: encoding/compileall; ruff; mypy; testes unitários; E2E locais; build da wheel; instalação e smoke test. Merge bloqueado quando job obrigatório falha |
 | **Critérios de aceite** | Pipeline verde em Windows e Linux; PR com erro em job obrigatório é bloqueado |
 | **Comandos de verificação** | Execução local (`act`) ou validação manual na CI escolhida |
 | **Dependências** | F0.1, F0.2, F0.3, F0.4, F0.5 |
+
+#### Gate de defensabilidade da F0.6
+
+| Campo | Estado atual |
+|---|---|
+| **Gate** | `READY` — ausência de CI comprovada; provider, matrizes, actions, aceite local/remoto e rollback congelados |
+| **Checkpoint de rollback** | `checkpoint/f0.5-complete` → `7cd6d81137b64914b8f53f6067f76f42cfde2711` |
+| **Checkpoint de liberação** | `checkpoint/f0.6-ready` — tag criada no commit deste dossiê antes do primeiro workflow |
+| **Fronteira externa** | Nenhum push, PR ou branch protection autorizado nesta tarefa local; F0.6 não pode ser `completed` sem execução remota Windows/Linux e proteção comprovada |
+
+```yaml
+defensibility:
+  task_id: "F0.6"
+  gate: "READY"
+  executor: "Codex"
+  authorized_at: "2026-08-04T01:36:40-03:00"
+  problem_statement: >-
+    O repositório não possui workflow rastreado, portanto lint, tipos, testes, build e smoke dependem
+    exclusivamente de execução manual e nenhum check pode bloquear merge no GitHub.
+  evidence:
+    - command: "Test-Path .github/workflows; git ls-files '.github/workflows/*'"
+      observed: "False; zero arquivo rastreado"
+      location: ".github/workflows ausente"
+    - command: "git remote -v; git branch --show-current"
+      observed: >-
+        origin=https://github.com/Wf-ops1/Harnessinfra.git; branch local phase/f0-baseline;
+        nenhum push executado
+      location: ".git/config e refs locais"
+    - command: "uv --version; uv lock --check; uv sync --all-extras --locked"
+      observed: "uv 0.11.32; todos exit 0; 35 packages resolvidos e 34 verificados"
+      location: "build/f0.6-tools/uv/bin/uv.exe; .venv; uv.lock"
+    - command: "Get-Command act, gh"
+      observed: "ambos ausentes; validação remota não pode ser substituída localmente por act/gh"
+      location: "shell da execução"
+    - command: "inspeção oficial de releases/documentação em 2026-08-04"
+      observed: >-
+        actions/checkout v6.0.2=de0fac2e4500dabe0009e67214ff5f5447ce83dd;
+        actions/setup-python v6.2.0=a309ff8b426b58ec0e2a45f0f869d46889d02405;
+        astral-sh/setup-uv v8.1.0=08807647e7069bb48b6ef5acd8ec9567f424441b;
+        GitHub exige merge_group para required checks usados com merge queue
+      location: >-
+        github.com/actions/{checkout,setup-python}/releases;
+        github.com/astral-sh/setup-uv; docs.github.com required status checks
+  baseline:
+    branch: "phase/f0-baseline"
+    head: "7cd6d81137b64914b8f53f6067f76f42cfde2711"
+    status: "clean; somente ambientes/temporários ignorados em build/"
+    checkpoint: "checkpoint/f0.5-complete"
+  frozen_decisions:
+    provider: "GitHub Actions"
+    workflow: ".github/workflows/ci.yml"
+    permissions: "contents: read; checkout persist-credentials=false"
+    triggers:
+      push: ["main", "phase/**"]
+      pull_request: ["main"]
+      merge_group: true
+      workflow_dispatch: true
+    actions:
+      checkout: "de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2"
+      setup_python: "a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0"
+      setup_uv: "08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0"
+      uv_version: "0.11.32"
+    jobs:
+      quality:
+        os: ["ubuntu-latest", "windows-latest"]
+        python: ["3.11", "3.14"]
+        gates: ["lock/sync", "encoding/docs", "compileall", "ruff", "mypy"]
+      tests:
+        os: ["ubuntu-latest", "windows-latest"]
+        python: ["3.11", "3.14"]
+        gates: ["unit", "e2e"]
+      package:
+        os: ["ubuntu-latest", "windows-latest"]
+        python: ["3.12"]
+        gates: ["build", "wheel bytecode inspection", "isolated install/import/CLI smoke"]
+      aggregate:
+        name: "CI required"
+        contract: "always runs and fails unless quality, tests and package all succeeded"
+    branch_protection: >-
+      main deverá exigir o check estável CI required após ele existir no GitHub; configuração remota
+      não faz parte do commit local e precisa de autorização/credencial
+  frozen_scope:
+    allowed:
+      - ".github/workflows/ci.yml — workflow GitHub Actions"
+      - "tests/ci/smoke_wheel.py — smoke isolado e inspeção de artefato cross-platform"
+      - "tests/unit/test_ci_workflow.py — estrutura, matrizes, triggers e pins do workflow"
+      - "README.md — atualizar somente estado da CI e comando de smoke"
+      - "TASK.md — transições, evidências, handoff e checkpoints"
+      - "build/f0.6-*; build/; dist/ — efeitos ignorados de ferramentas e validação"
+    excluded:
+      - "src/, compiler/, pyproject.toml, uv.lock e dependências"
+      - "alterar testes existentes ou reduzir gates para acomodar a CI"
+      - "secrets, publishing, deploy, release e caches de terceiros"
+      - "push, criação de PR, alteração de main ou branch protection sem autorização explícita"
+  frozen_acceptance:
+    - command: "uv lock --check; uv sync --all-extras --locked"
+      expected: "ambos exit 0; lockfile não muda"
+    - command: >-
+        uv run python -m pytest tests/unit/test_ci_workflow.py
+        tests/unit/test_documentation.py tests/unit/test_encoding.py -q
+      expected: >-
+        exit 0; YAML parseia; triggers, permissions, matrizes, jobs, aggregate e três actions por SHA
+        exato são obrigatórios
+    - command: "uv run python -m build; uv run python tests/ci/smoke_wheel.py"
+      expected: >-
+        ambos exit 0; uma wheel sem bytecode instala em ambiente uv isolado; metadata, __version__,
+        origem externa e CLI coincidem
+    - command: >-
+        uv run python -m pytest; uv run python -m mypy src; uv run python -m ruff check .;
+        uv run python -m compileall -q src compiler tests; git diff --check
+      expected: "todos exit 0; nenhuma regra ou teste enfraquecido"
+    - command: "GitHub Actions no commit remoto, push/PR/merge_group"
+      expected: >-
+        quality, tests e package verdes em ubuntu-latest e windows-latest; CI required verde somente
+        quando todas as dependências tiverem sucesso
+    - command: "branch protection de main"
+      expected: "CI required configurado como required status check; PR com falha não pode ser mesclado"
+  rollback:
+    triggers:
+      - "workflow exige secret, permissão de escrita ou action não pinada"
+      - "Windows/Linux divergem sem causa reproduzida e registrada"
+      - "smoke importa o checkout ou aceita bytecode no artefato"
+      - "qualquer job pode falhar/ser cancelado e CI required ainda passar"
+      - "critério local ou remoto precisar ser enfraquecido"
+    procedure: >-
+      interromper; antes do commit inverter apenas hunks F0.6 por apply_patch; depois do commit usar
+      git revert; se já houver push, publicar o revert por fluxo autorizado; nunca editar branch
+      protection antes de um check real existir
+    verify: >-
+      git status --short; git diff checkpoint/f0.5-complete; repetir gates locais; no GitHub confirmar
+      que o workflow/regras voltaram ao último estado conhecido
+```
 
 ---
 
@@ -989,13 +1121,13 @@ defensibility:
 ```
 Data:              2026-08-04
 Fase:              F0
-Tarefa:            F0.5 — corrigir documentação de estado
-Estado:            completed — critérios e handoff aprovados
-Arquivos alterados: README.md; docs/agentic_{operating_model,lifecycle_audit}.md; docs/{audit_report,harness_architecture_spec,user_guide,walkthrough,walkthrough_audit}.md; plano operacional; test_documentation.py; TASK.md
-Validações:         buscas proibidas exit 1; links relativos resolvem; 8 testes documentais/encoding + 6 subtests; suíte 69 + 6 subtests; mypy 86; ruff/compileall/diff check exit 0
-Checkpoint:         checkpoint/f0.5-complete na branch phase/f0-baseline; rollback em checkpoint/f0.5-ready e checkpoint/f0.4-complete
-Observação:         adapters/providers/MCP/doctor/promoção/worktree/rollback continuam dívida explícita; nenhum runtime foi alterado
-Resultado:          documentação distingue base implementada, protótipo experimental/simulado e arquitetura planejada
+Tarefa:            F0.6 — gate de CI mínima
+Estado:            in_progress — defensability READY; implementação local autorizada
+Arquivos alterados: TASK.md; nenhum workflow alterado no checkpoint de liberação
+Validações:         baseline 7cd6d81 limpo; workflow ausente; uv 0.11.32 restaurado; lock/sync verdes; actions oficiais e merge_group verificados
+Checkpoint:         checkpoint/f0.6-ready na branch phase/f0-baseline; rollback em checkpoint/f0.5-complete
+Observação:         push, execução GitHub e branch protection continuam fora do escopo local e são aceite obrigatório para conclusão
+Resultado:          provider, triggers, matrizes, pins, jobs, smoke, aggregate e rollback F0.6 congelados
 ```
 
 ---
@@ -1003,14 +1135,14 @@ Resultado:          documentação distingue base implementada, protótipo exper
 ## 11. Próxima Ação Exata
 
 ```text
-PREPARAR F0.6 — NÃO CRIAR WORKFLOW AINDA:
-1. Criar/confirmar checkpoint/f0.5-complete e registrar branch, HEAD e status limpo.
-2. Restaurar uv isolado sem alterar PATH/global e comprovar uv lock --check + sync.
-3. Comprovar ausência/estado de .github/workflows e inspecionar remote/branch sem fazer push.
-4. Congelar matriz Windows/Linux, versões Python, eventos de trigger, jobs obrigatórios e smoke da wheel.
-5. Congelar arquivos permitidos, validação local de YAML/actions, suíte completa e estratégia de rollback.
-6. Registrar a fronteira externa: push, execução GitHub e branch protection exigem autorização/estado remoto.
-7. Somente com o dossiê READY criar checkpoint/f0.6-ready e editar o workflow.
+EXECUTAR F0.6 LOCAL — SOMENTE ESCOPO CONGELADO:
+1. Criar e confirmar checkpoint/f0.6-ready no commit deste dossiê.
+2. Criar ci.yml com quality/tests/package em Windows+Linux e aggregate CI required.
+3. Criar smoke_wheel.py cross-platform e test_ci_workflow.py para contrato do pipeline.
+4. Atualizar somente o status/comando de CI no README.
+5. Executar todos os critérios locais, atualizar handoff e criar commit de implementação.
+6. Não marcar F0.6 completed nem a Fase 0 concluída até o workflow remoto e branch protection passarem.
+7. Solicitar autorização separada antes de push/PR/configuração remota.
 ```
 
 ---
