@@ -147,8 +147,8 @@ para preparar o próprio dossiê é permitida; alteração de código da tarefa 
 
 **Objetivo:** transformar YAMLs declarativos em artefatos executáveis, validados e determinísticos.
 
-**Status da fase:** `in_progress` — F1.1 e F1.2 concluídas dentro dos gates congelados; a próxima
-retomada deve preparar somente a auditoria e o gate de defensabilidade da F1.3.
+**Status da fase:** `in_progress` — F1.1 e F1.2 concluídas; a auditoria da F1.3 está congelada em gate
+`READY`, mas sua implementação só pode começar em uma retomada posterior que confirme o checkpoint.
 
 ### Coordenação e ambiente observado
 
@@ -157,10 +157,10 @@ retomada deve preparar somente a auditoria e o gate de defensabilidade da F1.3.
 | **Executor ativo** | `Codex` — responsável por implementar, validar, manter checkpoints e criar commits locais |
 | **Auditor/revisor** | `Antigravity` — somente-leitura por padrão; só edita quando o usuário solicitar explicitamente ou transferir a execução |
 | **Workspace** | `C:\Users\walla\OneDrive\Desktop\ai-engineering-harness` |
-| **Git** | `available` — branch local `phase/f1-contract-registry` criada em `d61d4e36109f685ef237c5256e046cc71654d719`; `checkpoint/pre-f1.2-defensibility` aponta para esse baseline F1.1 concluído; nenhuma branch/tag da F1 foi publicada |
+| **Git** | `available` — branch local `phase/f1-policy-validation` criada em `c0aaadd117e9dfe90b3e7fd3c00392ff3ee01c6e`; `checkpoint/pre-f1.3-defensibility` aponta para esse baseline F1.2 concluído; nenhuma branch/tag da F1 foi publicada |
 | **python_command** | `& 'C:\Users\walla\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe'` — Python `3.12.13` |
 | **uv_command** | `& '.\build\f0.6-tools\uv\bin\uv.exe'` — uv `0.11.32` restaurado de forma isolada/ignorada, sem PATH ou instalação global; `lock --check` e `sync --all-extras --locked` verdes |
-| **Dependências do projeto** | `.venv` gerida pelo uv 0.11.32 com Python 3.12.13 e `uv.lock`; 98 testes + 6 subtests, mypy em 87 arquivos, Ruff, compileall, build e smoke isolado da wheel verdes no baseline F1.2 |
+| **Dependências do projeto** | `.venv` gerida pelo uv 0.11.32 com Python 3.12.13 e `uv.lock`; 135 testes, mypy em 88 arquivos, Ruff, compileall e lock verdes no baseline pré-F1.3 |
 | **Regra de escrita** | apenas um agente escreve por vez |
 
 ---
@@ -674,6 +674,279 @@ consumíveis pelo gate atual (`import-untyped` em `jsonschema.exceptions` e `jso
 | **Quais testes provam falha segura?** | Contrato ausente, alias arbitrário, traversal/symlink, JSON/schema/pointer inválido, digest adulterado, incompatibilidade e Python sem ambas as autorizações falham; o sentinel malicioso nunca é criado. |
 | **A wheel instalada externamente foi testada?** | Sim; smoke uv isolado importou `18/18` símbolos, `jsonschema 4.26.0` e confirmou origem fora do checkout. |
 | **A documentação foi atualizada?** | Sim; este painel registra implementação, recongelamento, provas e limites. O compilador oficial só consumirá `resolve_many` na F1.4 e a integração do trust engine permanece F5. |
+
+---
+
+### F1.3 — Validar políticas e ferramentas
+
+| Campo | Detalhe |
+|---|---|
+| **Status** | `pending` — gate `READY`; nenhuma implementação F1.3 foi iniciada |
+| **Objetivo** | Validar referências de policy, role e tool por catálogos explícitos, calcular a visão efetiva fail-closed e torná-la representável no artefato tipado |
+| **Arquivos potencialmente alteráveis** | Contratos/registry de policies, visão aditiva do artefato, adapter legado, catálogos default estritamente necessários, testes focados e `TASK.md` |
+| **Dependências** | F1.1 e F1.2 concluídas; Pydantic v2 e PyYAML já disponíveis; nenhuma dependência nova prevista |
+
+#### Auditoria concreta da F1.3
+
+| Superfície | Comportamento observado | Lacuna frente ao plano | Fronteira congelada |
+|---|---|---|---|
+| `compiler/validators/policy_validator.py` | `validate` verifica somente `graph.name` e retorna `True`; a lista de policies recebida nunca é inspecionada | Role, tool, autorização, referência e schema desconhecidos são aceitos | Virará adapter para o resolver F1.3; unificação do caminho de compilação continua F1.4 |
+| Prova controlada `build/f1.3-audit/probe_f1_3.py` | Validator retornou `True` para `missing_role`, `missing_tool`, `policies/missing.yaml` e uma policy com `unknown_key` | Comprova comportamento permissivo executável | Prova e artefatos permanecem ignorados por Git |
+| Compilador oficial | `GraphCompiler` gerou JSON com as mesmas referências inexistentes e exit 0 | O caminho oficial não chama validator de policy | Não alterar `src/.../compiler`, CLI ou formato oficial nesta tarefa; integração é F1.4 |
+| Roles default | Seis `agent.yaml`; grafos usam seis roles, mas `production_operator` não possui definição e `knowledge_updater` não existe em `tool_policy.roles_permissions` | Não há catálogo internamente consistente | Completar somente essas duas lacunas e validar identidade exata; persona/runtime real não pertence à F1.3 |
+| Tools default | Agentes citam 10 IDs e `tool_policy` cita 16; somente `git_tool` e `terminal_tool` aparecem em campos `tool_name` | Não existe registry canônico das capabilities citadas | Criar catálogo declarativo explícito; presença no catálogo não declara adapter operacional |
+| Policies default | Oito YAMLs possuem envelope comum de versão, mas payloads heterogêneos e sem modelos; todas as oito refs aparecem nos grafos | Chaves desconhecidas e conflitos não falham | Registrar as oito refs exatas em schemas Pydantic específicos, sem fallback genérico permissivo |
+| Referências de grafo | Todos os defaults incluem `tool_policy`; nós determinísticos usam `verification_policy`/`production_health`; nenhuma lista é resolvida hoje | `policy_ref` pode não existir nem pertencer a `graph.policies` | Exigir resolução exata e vínculo explícito à lista do grafo |
+| Runtime e governance | Router reconhece `serena_edit`/`terminal_run`; `PolicyEngine` assume `allowed=["*"]` se ausente | IDs e default permissivo não correspondem ao catálogo declarativo | Não criar aliases nem enforcement F1.3; convergência e decisão antes de side effect são F5 |
+| `CompiledGraphArtifact` | Possui `resolved_contracts`, mas nenhuma visão resolvida de policy | Aceite F1.3 não é serializável | Adicionar campo opcional com default vazio; preenchimento pelo compilador oficial é F1.4 |
+
+#### Gate de defensabilidade da F1.3
+
+| Campo | Estado atual |
+|---|---|
+| **Gate** | `READY` — problema, contrato, escopo, aceite, rollback e fronteiras foram congelados; código ainda não autorizado nesta retomada |
+| **Checkpoint anterior** | `checkpoint/pre-f1.3-defensibility` → `c0aaadd117e9dfe90b3e7fd3c00392ff3ee01c6e` |
+| **Checkpoint de liberação** | `checkpoint/f1.3-ready` será criado no commit exclusivamente documental deste dossiê |
+| **Próximo passo permitido** | Em nova retomada, confirmar checkpoint/limpeza e implementar somente o allowlist abaixo; qualquer descoberta material reabre o gate |
+
+```yaml
+defensibility:
+  task_id: "F1.3"
+  gate: "READY"
+  executor: "Codex"
+  authorized_at: "2026-08-04T17:24:21-03:00"
+  problem_statement: >-
+    Policies, roles e tools são hoje texto não resolvido: o validator legado aceita identidades,
+    permissões e chaves arbitrárias, o compilador oficial preserva referências inexistentes e os
+    defaults não formam catálogos consistentes nem uma visão efetiva serializável.
+  evidence:
+    - command: >-
+        <uv_command> run python build/f1.3-audit/probe_f1_3.py
+      observed: >-
+        exit 0; legacy_policy_validator_accepted_unknowns=true e
+        official_compiler_accepted_unknowns=true; o artefato preservou missing_role e
+        policies/missing.yaml
+      location: >-
+        compiler/validators/policy_validator.py; src/ai_engineering_harness/compiler/compiler.py;
+        build/f1.3-audit/ — prova ignorada
+    - command: >-
+        enumerar defaults/agents/*/agent.yaml, defaults/policies/tool_policy.yaml e roles dos cinco
+        defaults/graphs/*.yaml
+      observed: >-
+        seis agentes e seis roles usados; production_operator é usado sem agent.yaml e
+        knowledge_updater possui agent.yaml mas não seção na tool policy
+      location: "src/ai_engineering_harness/defaults/agents, policies e graphs"
+    - command: >-
+        enumerar allowed_tools/forbidden_tools e comparar com campos tool_name em defaults/tools/*.yaml
+      observed: >-
+        10 IDs em agentes e 16 na policy; os únicos tool_name são git_tool e terminal_tool, sem
+        interseção com os 16 IDs de policy
+      location: "src/ai_engineering_harness/defaults/agents, tools e policies/tool_policy.yaml"
+    - command: >-
+        enumerar graph.policies e node.policy_ref nos cinco grafos default
+      observed: >-
+        oito refs únicas, todas para os oito YAMLs packaged; nenhuma é resolvida pelo validator atual
+      location: "src/ai_engineering_harness/defaults/graphs/*.yaml"
+    - command: >-
+        rg -n 'allowed=|allowed_tools|tool_name ==' src/ai_engineering_harness/governance
+        src/ai_engineering_harness/tools src/ai_engineering_harness/runtime
+      observed: >-
+        runtime dispatcha serena_edit/terminal_run e PolicyEngine usa wildcard quando config falta;
+        não há consumidor da policy compilada
+      location: >-
+        src/ai_engineering_harness/tools/router.py e governance/policy_engine.py
+  git_baseline:
+    branch: "phase/f1-policy-validation"
+    head: "c0aaadd117e9dfe90b3e7fd3c00392ff3ee01c6e"
+    base_checkpoint: "checkpoint/f1.2-complete"
+    rollback_checkpoint: "checkpoint/pre-f1.3-defensibility"
+    worktree: "limpa antes do dossiê; apenas build/f1.3-audit e bytecode ignorados nas provas"
+    remote_boundary: "nenhuma branch ou tag F1 publicada"
+  baseline_verification:
+    - command: "<uv_command> lock --check"
+      observed: "exit 0; 41 pacotes resolvidos"
+    - command: "<uv_command> run python -m pytest"
+      observed: "exit 0; 135 testes passaram"
+    - command: "<uv_command> run python -m mypy src"
+      observed: "exit 0; sem issues em 88 arquivos"
+    - command: >-
+        <uv_command> run python -m ruff check .; <uv_command> run python -m compileall -q src compiler tests
+      observed: "ambos exit 0"
+  frozen_contract:
+    references: >-
+      As oito referências packaged atuais usam exclusivamente a forma normalizada
+      policies/<nome>.yaml e mapping explícito; vazio, whitespace, barra invertida, absoluto,
+      traversal, extensão diferente e referência não registrada falham sem fallback de filesystem.
+    strict_policy_schemas: >-
+      Cada referência packaged é associada a um modelo Pydantic frozen/strict/extra=forbid
+      específico para seu envelope e payload conhecido; não existe modelo coringa. Objetos de
+      autorização de role/tool são recursivamente estritos e qualquer chave não declarada falha.
+    role_identity: >-
+      O ID canônico é agent.yaml.name, deve coincidir com o diretório e ser único. O catálogo passa
+      a conter exatamente architecture_analyst, code_agent, knowledge_updater, production_operator,
+      requirement_analyst, security_agent e test_agent; role é apenas rótulo humano.
+    tool_identity: >-
+      defaults/tools/tool_registry.yaml será a única lista canônica de capability IDs e conterá os
+      16 nomes referidos por tool_policy mais git_tool e terminal_tool. Cada entrada explicita que é
+      capability declarada; existência no registry não afirma disponibilidade de adapter/runtime.
+    catalog_consistency: >-
+      Todo allowed_tools/forbidden_tools de agente ou policy deve existir no ToolRegistry; toda role
+      da tool policy deve existir no RoleRegistry; cada agente deve possuir seção de policy; IDs e
+      listas devem ser únicos e allowed/forbidden não podem se sobrepor.
+    default_repairs: >-
+      Adicionar somente a definição declarativa de production_operator e sua prompt packaged,
+      adicionar knowledge_updater à tool_policy com os três tools já declarados pelo agente e criar
+      o tool_registry; os demais valores/versionamentos default permanecem inalterados.
+    graph_policy_rules: >-
+      Toda graph.policies deve resolver exatamente e sem duplicata. Todo node.policy_ref deve
+      resolver e também aparecer em graph.policies. Grafo com node agent exige tool_policy; role do
+      node deve existir antes de qualquer decisão de tool.
+    permission_precedence: >-
+      A permissão efetiva começa vazia. Node effect=allow só concede tool registrada presente tanto
+      no allowed_tools da role quanto no allowed_tools da tool policy e ausente de forbidden_tools;
+      effect=deny remove a tool. Deny sempre vence; duplicata ou allow/deny conflitante no mesmo node
+      falha, e node não pode ampliar role/policy.
+    resolution_api: >-
+      PolicyRegistry.resolve_graph recebe GraphSpec e retorna a tupla resolvida; o adapter legado
+      aceita somente mapping com nodes em lista e faz normalização mínima de role, policy_ref e
+      tool_permissions, sem fingir validação de topologia ou migrar o grafo para o schema F1.1.
+    effective_view: >-
+      PolicyRegistry.resolve_graph retorna ResolvedPolicySpec frozen em ordem estável, contendo
+      referência, policy_id, versões e somente payload efetivo tipado. Para tool policy, serializa
+      apenas roles/nodes usados, allowed/denied finais e exigência de aprovação; não inclui YAML cru,
+      comentários, paths absolutos, roles inativas ou objetos mutáveis compartilhados.
+    artifact: >-
+      CompiledGraphArtifact recebe resolved_policies: tuple[ResolvedPolicySpec, ...] com default vazio,
+      preservando construções F1.1/F1.2. Digest semântico, sources e escrita atômica permanecem F1.5.
+    errors:
+      - "PolicyRegistryError — base tipada do domínio"
+      - "InvalidPolicyReferenceError — sintaxe, duplicidade ou referência insegura"
+      - "PolicyNotFoundError — policy_ref sem entrada registrada"
+      - "InvalidPolicySchemaError — YAML/envelope/payload/chave extra inválidos"
+      - "RoleNotFoundError — role ausente ou catálogo inconsistente"
+      - "ToolNotFoundError — capability citada sem entrada no registry"
+      - "UnauthorizedToolError — allow do node excede role/policy ou conflita com deny"
+    adapter: >-
+      PolicyValidator e PolicyValidationError legados permanecem importáveis; validate retorna True
+      somente após delegação completa e converte PolicyRegistryError em PolicyValidationError com
+      contexto, sem omitir policy ausente.
+    enforcement_boundary: >-
+      F1.3 decide e serializa a visão efetiva em design-time, mas não autoriza side effect. Router,
+      PolicyEngine, wildcard, trust, aprovação e bloqueio runtime só podem mudar na F5.
+  frozen_scope:
+    allowed:
+      - "src/ai_engineering_harness/contracts/policies.py — modelos estritos, visão efetiva e erros F1.3"
+      - "src/ai_engineering_harness/contracts/policy_registry.py — catálogos e resolução fail-closed"
+      - "src/ai_engineering_harness/contracts/graph.py — campo aditivo resolved_policies"
+      - "src/ai_engineering_harness/contracts/__init__.py — exports públicos F1.3"
+      - "compiler/validators/policy_validator.py — adapter legado delegado, sem loader permissivo"
+      - "src/ai_engineering_harness/defaults/tools/tool_registry.yaml — catálogo declarativo canônico"
+      - "src/ai_engineering_harness/defaults/policies/tool_policy.yaml — somente knowledge_updater"
+      - "src/ai_engineering_harness/defaults/agents/production_operator/{agent.yaml,system_prompt.md}"
+      - "tests/unit/test_policy_registry.py e test_policy_validator.py — provas focadas"
+      - "tests/unit/test_graph_contracts.py, test_public_module_imports.py e test_structure.py — somente regressões aditivas necessárias"
+      - "TASK.md — transições, evidências, resultado e checkpoints F1.3"
+      - "build/f1.3-*; build/; dist/; C:/tmp — temporários ignorados/confinados de verificação"
+    excluded:
+      - "src/ai_engineering_harness/compiler/**, compiler/compile.py e CLI — consumo/unificação F1.4"
+      - "src/ai_engineering_harness/defaults/graphs/*.yaml — migração para GraphSpec F1.4"
+      - "governance, tools/router.py, runtime, permissions, trust, secrets e approval — enforcement F5"
+      - "aliases entre serena_edit/terminal_run e IDs declarativos; adapters reais pertencem F3/F5"
+      - "policy externa ao catálogo packaged, Python dinâmico ou busca arbitrária por path"
+      - "digest/source manifest, normalização integral e escrita atômica do artefato — F1.5"
+      - "pyproject.toml, uv.lock ou nova dependência; qualquer necessidade reabre o gate"
+      - "push, PR, merge, tag remota ou alteração de branch protection"
+  compatibility_strategy:
+    graph_and_artifact: >-
+      GraphSpec não muda; resolved_policies é aditivo com default vazio, preservando JSON e construção
+      dos artefatos existentes até a integração F1.4.
+    packaged_references: >-
+      Os oito paths, policy_id, policy_schema_version e definition_version atuais são preservados;
+      os YAMLs de grafo não são reescritos.
+    legacy_adapter: >-
+      Assinaturas públicas e erro externo permanecem, mas sucesso permissivo deixa de ser
+      compatibilidade válida; inválidos passam a falhar fechado.
+    defaults: >-
+      As seis definições de agente existentes e suas permissões não mudam. As adições apenas fecham
+      production_operator, knowledge_updater e o catálogo inexistente.
+    runtime: >-
+      Nenhum consumidor atual é alterado ou declarado governado. F1.4 deverá preencher a visão no
+      artefato oficial; F5 deverá consumi-la antes de side effects e remover o wildcard permissivo.
+  frozen_acceptance:
+    - command: >-
+        <uv_command> run python -m pytest tests/unit/test_policy_registry.py
+        tests/unit/test_policy_validator.py tests/unit/test_graph_contracts.py
+        tests/unit/test_public_module_imports.py tests/unit/test_structure.py -q
+      expected: >-
+        exit 0; oito policies, sete roles e 18 tools resolvem; visão efetiva, adapter e round-trip passam
+    - command: >-
+        casos negativos parametrizados para policy/role/tool ausentes, ref insegura, duplicidade,
+        conflito allow/deny, tool não autorizada e policy_ref fora de graph.policies
+      expected: "cada caso levanta o erro tipado congelado antes de produzir ResolvedPolicySpec"
+    - command: >-
+        adicionar unknown_key ao topo de cada uma das oito policies e aos objetos de autorização
+      expected: "InvalidPolicySchemaError em todos os schemas estritos; nenhuma chave é ignorada"
+    - command: >-
+        validar cada um dos cinco grafos default pelo adapter contra os catálogos packaged, sem invocar o compilador
+      expected: >-
+        todas as refs/roles resolvem; nenhuma tool fica sem catálogo; permissões efetivas de nodes sem
+        tool_permissions permanecem vazias; nenhum warning/fallback
+    - command: >-
+        teste de precedência com allow válido, deny, forbidden, node conflitante e tentativa de ampliar role
+      expected: >-
+        allow válido aparece na visão; deny vence; forbidden/conflito/ampliação falham com UnauthorizedToolError
+    - command: >-
+        serializar e restaurar CompiledGraphArtifact com resolved_contracts e resolved_policies
+      expected: >-
+        igualdade estrutural, tuplas imutáveis e ausência de YAML cru/path absoluto; construção antiga sem
+        resolved_policies continua válida
+    - command: >-
+        git diff --name-only checkpoint/pre-f1.3-defensibility...HEAD e rg dos compiladores/runtime
+      expected: >-
+        somente allowlist F1.3 alterado; compilador oficial, compiler/compile.py, CLI, graphs e runtime idênticos
+    - command: >-
+        <uv_command> lock --check; <uv_command> run python -m pytest; <uv_command> run python -m mypy src;
+        <uv_command> run python -m ruff check .; <uv_command> run python -m compileall -q src compiler tests;
+        git diff --check
+      expected: "todos exit 0; 135+ testes, sem skips/ignores e lock inalterado"
+    - command: >-
+        <uv_command> run python -m build; <uv_command> run python tests/ci/smoke_wheel.py;
+        smoke isolado importa PolicyRegistry, ResolvedPolicySpec e erros públicos
+      expected: >-
+        wheel/sdist sem bytecode; instalação fora do checkout; versões 0.1.0; APIs F1.1/F1.2 preservadas
+  rollback:
+    triggers:
+      - "policy, role ou tool ausente/extra resolver ou ser omitida sem erro"
+      - "chave desconhecida em schema estrito ser aceita"
+      - "node ampliar role/policy, deny perder precedência ou effective view divergir"
+      - "catálogo declarar adapter/runtime inexistente como operacional"
+      - "API F1.1/F1.2, default conhecido, lock, teste, build ou smoke regredir"
+      - "compilador oficial, CLI, graph default, runtime ou dependência precisar mudar"
+      - "critério congelado precisar ser removido, ignorado ou enfraquecido"
+    procedure: >-
+      interromper e preservar logs; antes de commit inverter apenas hunks F1.3 por apply_patch;
+      depois de commit usar git revert nos commits exclusivos da F1.3; nunca resetar nem descartar
+      trabalho preexistente; preservar checkpoint/pre-f1.3-defensibility.
+    verify: >-
+      git status --short; git diff checkpoint/pre-f1.3-defensibility -- nos caminhos do allowlist;
+      confirmar ausência de mudanças nos caminhos excluídos e repetir baseline integral.
+  external_boundary: >-
+    nenhum push, PR, merge, tag remota ou mudança de proteção está autorizado nesta tarefa sem
+    pedido explícito adicional do usuário
+```
+
+#### Checklist de liberação da F1.3
+
+```text
+[x] Comportamento permissivo reproduzido no validator legado e compilador oficial
+[x] Inconsistências exatas de roles, tools, policies e consumidores registradas
+[x] Baseline Git limpo, branch e checkpoint de rollback registrados
+[x] Schemas, identidade, precedência, visão efetiva e erros congelados
+[x] Escopo permitido e fronteiras F1.4/F1.5/F3/F5 congelados
+[x] Critérios positivos, negativos, defaults, regressão integral e wheel congelados
+[x] Rollback não destrutivo e fronteira externa definidos
+[x] Nenhum código, YAML default ou schema F1.3 implementado nesta preparação
+```
 
 ---
 
@@ -1707,6 +1980,7 @@ de `main`.
 | 2026-08-04 | DEC-003 | Versionar pacote, schemas e definições em namespaces separados | Evitar que 0.1.0, 1.0/1.0.0 e 3.2.0 sejam comparados ou atualizados como se representassem o mesmo contrato | Metadata instalada governa package version; schemas começam em 1.0; 3.2.0 permanece definition version até migrações futuras |
 | 2026-08-04 | DEC-004 | Classificar claims públicos como implementados, experimentais/simulados ou planejados | Impedir que presença de classe/teste interno seja confundida com efeito operacional real | README/docs e regressão automatizada devem expor limitações e bloquear rótulos positivos sem evidência |
 | 2026-08-04 | DEC-005 | Exigir `CI required` em `main`, com branch atualizada e regra aplicada a administradores | Fazer o aggregate fail-closed governar merges reais, sem bypass administrativo implícito | PR #2 comprovou estado bloqueado no vermelho e restauração para limpo após revert; PR #1 permanece aberto e verde |
+| 2026-08-04 | DEC-006 | Separar capability declarada de adapter operacional e aplicar default-deny/deny-wins na resolução F1.3 | Evitar que um nome presente em YAML seja confundido com ferramenta executável ou que policy/role seja ampliada pelo node | F1.3 produz visão efetiva tipada; F1.4 integra o compilador, F3 implementa adapters e F5 impõe a decisão antes de side effects |
 
 > Registre aqui toda decisão arquitetural que diverge do plano. Formato: data ISO, ID (ADR-XXX), descrição, motivo, arquivos impactados.
 
@@ -1732,13 +2006,13 @@ de `main`.
 ```
 Data:              2026-08-04
 Fase:              F1
-Tarefa:            F1.2 — registry seguro de contratos
-Estado:            completed — gate READY → COMPLETED; todos os critérios congelados e R1 aprovados
-Arquivos alterados: registry.py, graph.py, contracts/__init__.py, adapter legado, dois testes, pyproject.toml, uv.lock e TASK.md
-Validações:         63 testes focados; 135 testes + 6 subtests integrais; mypy 88 arquivos; Ruff, compileall, loader-search, lock/sync, build e dois smokes verdes
-Checkpoint:         checkpoint/pre-f1.2-defensibility em d61d4e36109f685ef237c5256e046cc71654d719; checkpoint/f1.2-ready no dossiê; checkpoint/f1.2-complete no commit final
-Observação:         branch local phase/f1-contract-registry; nenhuma branch/tag F1 publicada; compilador oficial, CLI, defaults, runtime e trust engine não foram integrados
-Resultado:          catálogo fail-closed, JSON Schema confinado, Python sob confiança+aprovação, digest, artifact view e compatibilidade conservadora entregues
+Tarefa:            F1.3 — auditoria e gate de policies/roles/tools
+Estado:            pending — gate READY; implementação deliberadamente não iniciada nesta retomada
+Arquivos alterados: somente TASK.md; probes e artefatos de auditoria sob build/f1.3-audit estão ignorados
+Validações:         prova permissiva reproduzida; 135 testes; mypy 88 arquivos; Ruff, compileall, lock e diff-check verdes
+Checkpoint:         checkpoint/pre-f1.3-defensibility em c0aaadd117e9dfe90b3e7fd3c00392ff3ee01c6e; checkpoint/f1.3-ready no commit documental
+Observação:         branch local phase/f1-policy-validation; nenhuma branch/tag F1 publicada; compilador oficial, CLI e runtime permanecem fora do escopo
+Resultado:          schemas, catálogos, precedência deny-wins, visão efetiva, aceite e rollback congelados para execução posterior
 ```
 
 ---
@@ -1746,13 +2020,13 @@ Resultado:          catálogo fail-closed, JSON Schema confinado, Python sob con
 ## 11. Próxima Ação Exata
 
 ```text
-PREPARAR F1.3 — SOMENTE AUDITORIA E GATE DE DEFENSABILIDADE, SEM IMPLEMENTAR:
-1. Confirmar branch phase/f1-contract-registry, worktree limpo e checkpoint/f1.2-complete no commit final da F1.2.
-2. Reler integralmente a F1.3 do plano e o handoff da F1.2; manter um único executor.
-3. Auditar o `pass`/comportamento do policy validator, catálogos atuais de roles/tools, policies default, referências e consumidores.
-4. Congelar problema, evidências, escopo permitido/proibido, schemas estritos, compatibilidade, aceite positivo/negativo, rollback e checkpoint F1.3.
-5. Não alterar código F1.3 até o gate estar `READY` e uma retomada posterior confirmar o checkpoint local de liberação.
-6. Se a F1.3 exigir integração do compilador oficial/CLI da F1.4 ou enforcement runtime/F5, separar explicitamente antes de congelar.
+IMPLEMENTAR F1.3 — SOMENTE O ESCOPO CONGELADO NO GATE READY:
+1. Confirmar branch phase/f1-policy-validation, worktree limpo e checkpoint/f1.3-ready no commit documental.
+2. Reler integralmente o dossiê F1.3 e manter um único executor; não editar código antes dessa confirmação.
+3. Implementar modelos/registry, adapter legado, visão aditiva do artefato e reparos default estritamente listados.
+4. Executar todos os aceites positivos/negativos, defaults, suíte integral, qualidade, build e smoke da wheel.
+5. Se qualquer arquivo, dependência, integração F1.4/F1.5 ou enforcement F3/F5 for necessário, parar e recongelar o gate.
+6. Registrar resultado, handoff e checkpoint/f1.3-complete somente após todos os critérios passarem.
 7. Não fazer push, PR, merge, tag remota ou alteração de proteção sem autorização explícita.
 ```
 
