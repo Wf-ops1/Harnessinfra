@@ -160,7 +160,8 @@ e não anuncie capacidades inexistentes.
 | **Workspace** | `C:\Users\walla\OneDrive\Desktop\ai-engineering-harness` |
 | **Git** | `available` — branch de execução `phase/f0-baseline`, criada a partir de `main`/`origin/main` no baseline `6eef8e0`; remote `https://github.com/Wf-ops1/Harnessinfra.git` |
 | **python_command** | `& 'C:\Users\walla\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe'` — Python `3.12.13` |
-| **Dependências do projeto** | runtime base disponível; dependências declaradas usadas isoladamente em `C:\tmp\ai-engineering-harness-f0.1-deps`; ambiente reproduzível e deps dev serão tratados na F0.3 |
+| **uv_command** | `& 'C:\tmp\ai-engineering-harness-uv-0.11.32\bin\uv.exe'` — uv `0.11.32`; instalação temporária isolada |
+| **Dependências do projeto** | `.venv` criada pelo uv com Python 3.12.13; `uv.lock` gerado; 63 testes verdes; mypy/ruff ainda em correção controlada na F0.3 |
 | **Regra de escrita** | apenas um agente escreve por vez |
 
 ---
@@ -532,6 +533,28 @@ defensibility:
       src compiler tests; checkpoints F0.2 continuam apontando para commits íntegros
 ```
 
+#### Recongelamento F0.3-R1 — baseline real de mypy/ruff
+
+A primeira sincronização revelou arquivos adicionais dentro do comando de aceite `ruff check .`.
+Conforme a seção 4.1.3, a implementação foi interrompida antes de qualquer autofix e o escopo foi
+recongelado sem remover ou enfraquecer critérios.
+
+| Evidência | Resultado observado |
+|---|---|
+| `uv lock --check` | exit 0 |
+| `uv run python -m pytest` | 63 testes passaram |
+| `uv run python -m mypy src` | 11 erros em 7 arquivos: 5 imports YAML sem stubs, 5 atribuições em resultado heterogêneo e 1 factory mal tipada |
+| `uv run python -m ruff check . --statistics` | 373 violações em 87 arquivos; 271 marcadas como safe-fix; 19 famílias de regras |
+
+**Expansão autorizada:** `compiler/**/*.py`, `src/**/*.py` e `tests/**/*.py`, exclusivamente para
+correções indicadas por mypy/ruff que preservem comportamento. `pyproject.toml` pode receber
+`types-PyYAML` no extra dev. Nenhuma regra será ignorada, removida ou restringida após a falha.
+
+**Método congelado:** criar `checkpoint/f0.3-tooling-baseline`; executar apenas
+`ruff check . --fix` sem `--unsafe-fixes`; revisar o diff; corrigir manualmente apenas violações
+remanescentes; repetir `pytest`, `mypy`, `ruff`, `compileall` e `build`. Qualquer correção funcional
+ou alteração fora desses paths reabre o gate novamente.
+
 ---
 
 ### F0.4 — Unificar versionamento
@@ -637,12 +660,12 @@ defensibility:
 Data:              2026-08-04
 Fase:              F0
 Tarefa:            F0.3 — gate de ambiente reproduzível
-Estado:            in_progress — gate READY; implementação ainda não iniciada
-Arquivos alterados: TASK.md
-Validações:         uv/lock ausentes; quatro módulos dev exit 1; pyproject/README/metadata gerada inspecionados; baseline Git limpo
-Checkpoint:         checkpoint/f0.3-ready na branch phase/f0-baseline; rollback em checkpoint/f0.2-complete
-Observação:         instalação autorizada somente em .venv/C:/tmp; nenhum arquivo de implementação F0.3 alterado neste checkpoint
-Resultado:          F0.3 em in_progress dentro do escopo, ambiente e critérios congelados
+Estado:            in_progress — bootstrap funcional; correções mypy/ruff recongeladas
+Arquivos alterados: pyproject.toml; uv.lock; README.md; .gitignore; remoção de src/ai_engineering_harness.egg-info/**; TASK.md
+Validações:         uv 0.11.32; lock check exit 0; sync exit 0; 63 testes verdes; mypy 11 erros; ruff 373 violações/87 arquivos
+Checkpoint:         checkpoint/f0.3-tooling-baseline na branch phase/f0-baseline; rollback em checkpoint/f0.3-ready
+Observação:         .venv usa Python 3.12.13 registrado; nenhum Python/global/PATH alterado; autofix ainda não executado
+Resultado:          ambiente e suíte reproduzidos; escopo ampliado somente para correções mecânicas comprovadas
 ```
 
 ---
@@ -650,13 +673,13 @@ Resultado:          F0.3 em in_progress dentro do escopo, ambiente e critérios 
 ## 11. Próxima Ação Exata
 
 ```text
-EXECUTAR F0.3 DENTRO DO ESCOPO CONGELADO:
-1. Criar o commit documental e a tag `checkpoint/f0.3-ready` deste gate.
-2. Instalar uv 0.11.32 somente em C:/tmp e registrar `uv_command`; não alterar PATH/perfil.
-3. Atualizar pyproject, README e .gitignore; remover metadata egg-info gerada do versionamento.
-4. Gerar uv.lock e sincronizar .venv usando o Python registrado, sem baixar outro runtime.
-5. Executar pytest, mypy e ruff; corrigir apenas falhas mecânicas comprovadas dentro do escopo.
-6. Executar build e todos os critérios congelados, responder handoff e criar checkpoint/f0.3-complete.
+CONTINUAR F0.3 APÓS RECONGELAMENTO R1:
+1. Criar commit parcial e tag `checkpoint/f0.3-tooling-baseline` antes de qualquer autofix.
+2. Adicionar `types-PyYAML` ao extra dev, atualizar uv.lock e sincronizar .venv.
+3. Executar `ruff check . --fix` sem unsafe fixes e revisar o diff mecânico completo.
+4. Corrigir apenas as violações remanescentes e os tipos de rollback/registry apontados pelo mypy.
+5. Repetir lock check, 63+ testes, mypy, ruff, compileall e build sem reduzir critérios.
+6. Responder handoff, atualizar este TASK.md e criar `checkpoint/f0.3-complete`.
 ```
 
 ---

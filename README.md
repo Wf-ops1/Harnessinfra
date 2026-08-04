@@ -25,18 +25,44 @@ O Harness executa o desenvolvimento de software através de um ciclo rigoroso de
 ## 🚀 Instalação Rápida em Qualquer Repositório
 
 ```bash
-# 1. Instalar o harness em modo editável ou via pip
-pip install -e .
+# 1. Criar/sincronizar o ambiente local a partir do lockfile
+uv sync --all-extras
 
 # 2. Inicializar a estrutura .harness/ no repositório de produto
-harness init
+uv run harness init
 
 # 3. Executar o probe de saúde dos 6 estágios
-harness doctor
+uv run harness doctor
 
 # 4. Executar um workflow agentic autônomo
-harness run new-feature
+uv run harness run new-feature
 ```
+
+---
+
+## Ambiente de desenvolvimento reproduzível
+
+Pré-requisitos:
+
+- Python 3.11, 3.12, 3.13 ou 3.14;
+- `uv` 0.11.32 ou superior;
+- Git.
+
+O arquivo `uv.lock` é versionado e deve permanecer sincronizado com `pyproject.toml`. Após clonar o
+repositório, execute:
+
+```bash
+uv sync --all-extras
+uv lock --check
+uv run python -m pytest
+uv run python -m mypy src
+uv run python -m ruff check .
+uv run python -m build
+```
+
+O `uv` cria `.venv` localmente. Não é necessário ativar o ambiente: `uv run` executa cada comando no
+ambiente sincronizado. Alterações de dependências devem atualizar `pyproject.toml` e `uv.lock` na mesma
+mudança.
 
 ---
 
