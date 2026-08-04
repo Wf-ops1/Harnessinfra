@@ -27,8 +27,8 @@ ser corrigido em `TASK.md`.
 |---|---|
 | Repositório | `https://github.com/Wf-ops1/Harnessinfra.git` |
 | Branch ativa | `main` |
-| HEAD local/remoto | `1aaaba8dfe88ee500d31d1138823d5704a04521e` |
-| Worktree | limpa; `main...origin/main` |
+| HEAD local/remoto | deve ser idêntico entre `main` e `origin/main`, conter este handoff e ser descendente dos marcos abaixo; não congelar SHA autorreferente |
+| Worktree | limpa; `main...origin/main`, sem ahead/behind |
 | Checkpoint local da Fase 0 | `checkpoint/f0.6-complete` |
 | Commit do checkpoint | `fd4de2c119daf9a401f450a907f1d07bf3f580e9`; deve ser ancestral de `main` |
 | Tags remotas | nenhuma; o checkpoint não foi publicado |
@@ -36,11 +36,14 @@ ser corrigido em `TASK.md`.
 | PR de promoção | [#1](https://github.com/Wf-ops1/Harnessinfra/pull/1), mesclado em `3f29c4c894808eb47464c96a01c9048198d971c9` |
 | Prova de bloqueio | [#2](https://github.com/Wf-ops1/Harnessinfra/pull/2), fechado sem merge após falha controlada e revert |
 | PR do registro | [#3](https://github.com/Wf-ops1/Harnessinfra/pull/3), mesclado em `1aaaba8dfe88ee500d31d1138823d5704a04521e` |
-| CI final de `main` | [run 30917657879](https://github.com/Wf-ops1/Harnessinfra/actions/runs/30917657879), `completed/success`, 11/11 jobs |
+| PR de publicação deste handoff | [#4](https://github.com/Wf-ops1/Harnessinfra/pull/4), mesclado em `7e9d828c8b1bbf297ad3b1c10ac73df53e9b4c7f` |
+| CI de fechamento da Fase 0 | [run 30917657879](https://github.com/Wf-ops1/Harnessinfra/actions/runs/30917657879), `completed/success`, 11/11 jobs |
+| CI corrente de `main` | consultar o run mais recente; ele deve corresponder ao HEAD observado e estar `completed/success` com `CI required=success` |
 | Estado de F1.1 | `pending`; nenhum código da Fase 1 autorizado |
 
-Se qualquer item divergir, interromper a implementação, investigar e alinhar `TASK.md` antes de
-preparar a F1.1.
+SHAs de PRs e runs acima são marcos históricos. Se uma **invariante corrente** divergir — sincronização,
+ancestralidade, proteção, CI do HEAD ou estado de F1.1 — interromper a implementação, investigar e
+alinhar `TASK.md` antes de preparar a F1.1.
 
 ## 4. O que a Fase 0 entregou
 

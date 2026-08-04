@@ -1224,9 +1224,9 @@ Fase:              F0
 Tarefa:            F0.6 — CI mínima, gate remoto e promoção concluídos
 Estado:            completed — Fase 0 integrada em main; F1 ainda não iniciada
 Arquivos alterados: .github/workflows/ci.yml; testes/README/docs/TASK; metadata Git executável de compiler/compile.py
-Validações:         PR #1 verde e mesclado; PR #2 blocked no vermelho e clean após revert; run final main 30917657879 com 11/11 success
-Checkpoint:         checkpoint/f0.6-complete em fd4de2c119daf9a401f450a907f1d07bf3f580e9; main em 1aaaba8dfe88ee500d31d1138823d5704a04521e
-Observação:         main local/remota sincronizadas; PRs #1/#3 mesclados; PR #2 fechado sem merge; tags remotas não foram alteradas; handoff em docs/handoff_fase_1.md
+Validações:         PR #1 verde e mesclado; PR #2 blocked no vermelho e clean após revert; run de fechamento 30917657879 com 11/11 success; CI corrente deve ser consultada pelo HEAD
+Checkpoint:         checkpoint/f0.6-complete em fd4de2c119daf9a401f450a907f1d07bf3f580e9; promoção PR #1 em 3f29c4c894808eb47464c96a01c9048198d971c9
+Observação:         main local/remota sincronizadas; PRs #1/#3/#4 mesclados; PR #2 fechado sem merge; tags remotas não foram alteradas; handoff em docs/handoff_fase_1.md
 Resultado:          F0.0–F0.6 integradas em main; quality 4/4, tests 4/4, package 2/2 e CI required governam merges em Windows/Linux
 ```
 
@@ -1236,7 +1236,7 @@ Resultado:          F0.0–F0.6 integradas em main; quality 4/4, tests 4/4, pack
 
 ```text
 PREPARAR F1.1 — DEFINIR SCHEMA TIPADO DO GRAFO, PREFERENCIALMENTE EM NOVA CONVERSA:
-1. Confirmar main local/remota sincronizadas, worktree limpa, checkpoint/f0.6-complete ancestral e run 30917657879 verde.
+1. Confirmar main local/remota sincronizadas, worktree limpa, checkpoint/f0.6-complete ancestral e CI required verde no HEAD observado; run 30917657879 é o marco de fechamento da Fase 0.
 2. Ler integralmente .agents/AGENTS.md, este painel, docs/handoff_fase_1.md e a seção Fase 1/F1.1 do plano operacional.
 3. Auditar os schemas, modelos e dois caminhos de compilação existentes; comprovar problemas com arquivos/comandos concretos.
 4. Criar o dossiê de defensabilidade da F1.1: baseline, escopo permitido/proibido, aceite, checkpoint e rollback.
