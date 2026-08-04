@@ -148,8 +148,8 @@ para preparar o próprio dossiê é permitida; alteração de código da tarefa 
 **Objetivo:** garantir que o pacote compile, instale, rode testes reproduzivelmente
 e não anuncie capacidades inexistentes.
 
-**Status da fase:** `in_progress` — F0.0, F0.1, F0.2 e F0.3 concluídas; próxima tarefa: F0.4, que
-permanece `pending` até seu próprio gate de defensabilidade ser comprovado e marcado como `READY`.
+**Status da fase:** `in_progress` — F0.0, F0.1, F0.2 e F0.3 concluídas; F0.4 está `in_progress` após
+seu gate de defensabilidade ser comprovado e marcado como `READY`.
 
 ### Coordenação e ambiente observado
 
@@ -615,13 +615,104 @@ sem ignorar o aviso no handoff.
 
 | Campo | Detalhe |
 |-------|---------|
-| **Status** | `pending` |
+| **Status** | `in_progress` — gate de defensabilidade `READY`; implementação autorizada em 2026-08-04T00:47:55-03:00 |
 | **Objetivo** | Uma única fonte de versão do pacote; schemas versionados separadamente |
 | **Arquivos envolvidos** | `pyproject.toml`, `src/ai_engineering_harness/__init__.py`, schemas de grafo/artifact/policy |
 | **Implementação esperada** | (1) `__version__` via `importlib.metadata.version`; (2) separar `package_version`, `graph_schema_version`, `artifact_schema_version`, `policy_schema_version`; (3) remover versões conflitantes (`0.1.0`, `1.0.0`, `3.2.0`) usadas para a mesma coisa |
 | **Critérios de aceite** | `harness --version`, metadata da wheel e `ai_engineering_harness.__version__` são idênticos; schemas com compatibilidade testada separadamente |
 | **Comandos de verificação** | `harness --version` e o `python_command` registrado com `-c "import ai_engineering_harness; print(ai_engineering_harness.__version__)"` |
 | **Dependências** | F0.1, F0.3 |
+
+#### Gate de defensabilidade da F0.4
+
+| Campo | Estado atual |
+|---|---|
+| **Gate** | `READY` — duplicação do pacote e ambiguidade dos schemas comprovadas; escopo, aceite e rollback congelados |
+| **Checkpoint de rollback** | `checkpoint/f0.3-complete` → `517b9e0285b70e65d7839452575f3c370174a35f` |
+| **Checkpoint de liberação** | `checkpoint/f0.4-ready` — tag a ser criada no commit documental deste dossiê antes da primeira edição de implementação |
+
+```yaml
+defensibility:
+  task_id: "F0.4"
+  gate: "READY"
+  executor: "Codex"
+  authorized_at: "2026-08-04T00:47:55-03:00"
+  problem_statement: >-
+    A versão 0.1.0 coincide hoje nas superfícies públicas, mas está copiada manualmente em quatro
+    pontos; versões 1.0, 1.0.0 e 3.2.0 aparecem em artefato, grafos e políticas sem namespaces
+    explícitos, permitindo drift e comparações entre conceitos diferentes.
+  evidence:
+    - command: "rg de __version__, version options e constantes"
+      observed: >-
+        pyproject.toml, __init__.py, click.version_option e GraphCompiler.HARNESS_VERSION mantêm
+        literais 0.1.0 independentes; runtime_adapter_version repete o mesmo literal
+      location: "pyproject.toml; src/ai_engineering_harness/{__init__.py,cli/main.py,compiler/compiler.py}"
+    - command: ".venv/Scripts/python -c metadata/__version__; harness --version"
+      observed: "todos imprimem 0.1.0 e CLI exit 0, mas por duplicação não vinculada"
+      location: "ambiente F0.3"
+    - command: "rg de schema/version em compiler, defaults e testes"
+      observed: >-
+        artifact_schema_version=1.0 no compilador oficial, maf_schema_version=1.0.0 no legado,
+        graph/policy version=3.2.0 e profile version=1.0; não há graph_schema_version nem
+        policy_schema_version explícitos
+      location: "compiler/compile.py; src/ai_engineering_harness/compiler/compiler.py; defaults/**/*.yaml"
+  baseline:
+    branch: "phase/f0-baseline"
+    head: "517b9e0285b70e65d7839452575f3c370174a35f"
+    status: "clean"
+    checkpoint: "checkpoint/f0.3-complete"
+  frozen_decisions:
+    package_version: >-
+      pyproject.toml permanece fonte autoral 0.1.0; runtime lê a metadata instalada por
+      importlib.metadata.version sem fallback literal
+    graph_schema_version: "1.0; separado da definition_version 3.2.0 dos grafos padrão"
+    artifact_schema_version: "1.0; igual nos compiladores oficial e legado"
+    policy_schema_version: "1.0; separado da definition_version 3.2.0 das políticas padrão"
+    compatibility: "comparação exata por namespace nesta fase; evolução backward-compatible será definida na F1/F5"
+  frozen_scope:
+    allowed:
+      - "pyproject.toml e uv.lock — somente consistência da metadata/lock, sem mudar 0.1.0 ou dependências"
+      - "src/ai_engineering_harness/versioning.py — constantes separadas e leitura da metadata instalada"
+      - "src/ai_engineering_harness/__init__.py e cli/main.py — expor a mesma package version"
+      - "src/ai_engineering_harness/compiler/compiler.py e compiler/compile.py — consumir package/artifact schema version sem literal duplicado"
+      - "src/ai_engineering_harness/defaults/graphs/*.yaml — graph_schema_version e definition_version explícitos"
+      - "src/ai_engineering_harness/defaults/policies/*.yaml — policy_schema_version e definition_version explícitos"
+      - "tests/unit/test_packaging.py, tests/unit/test_phase5.py e tests/unit/test_versioning.py — regressões das quatro superfícies"
+      - "README.md e TASK.md — contrato, evidências, handoff e checkpoints"
+      - "build, dist, *.egg-info, .venv e C:/tmp — efeitos ignorados/temporários de verificação"
+    excluded:
+      - "mudar package version 0.1.0, adicionar dependência ou alterar faixa Python"
+      - "unificar os dois compiladores, criar modelos GraphSpec/PolicySpec ou implementar migração de schema (F1/F5)"
+      - "reinterpretar versões de agent, tool, profile ou observability; pertencem às fases dos respectivos contratos"
+      - "alterar comportamento do runtime, providers, gates, promoção ou rollback"
+  frozen_acceptance:
+    - command: "<uv_command> lock --check; <uv_command> sync --all-extras"
+      expected: "ambos exit 0; uv.lock permanece consistente"
+    - command: "<uv_command> run python -m pytest"
+      expected: "exit 0; 63+ testes, incluindo compatibilidade separada das versões"
+    - command: "<uv_command> run python -m mypy src; <uv_command> run python -m ruff check ."
+      expected: "ambos exit 0; nenhuma regra reduzida ou ignorada"
+    - command: "<uv_command> run python -m compileall -q src compiler tests; <uv_command> run python -m build"
+      expected: "ambos exit 0; wheel e sdist sem bytecode"
+    - command: "instalar wheel em venv C:/tmp e comparar importlib.metadata, __version__ e harness --version"
+      expected: "três valores exatamente iguais a 0.1.0 e import originado de site-packages"
+    - command: "testes carregam todos os defaults graphs/policies e compilam um artefato"
+      expected: >-
+        graph_schema_version=1.0, artifact_schema_version=1.0 e policy_schema_version=1.0;
+        definition_version=3.2.0 permanece independente
+  rollback:
+    triggers:
+      - "import do pacote exigir fallback literal ou falhar após uv sync/wheel install"
+      - "consumer atual depender do campo genérico version e não puder migrar no escopo"
+      - "necessidade de unificar compiladores ou implementar migração backward-compatible agora"
+      - "metadata, CLI e __version__ divergirem ou qualquer gate F0.3 regredir"
+    procedure: >-
+      interromper e preservar logs; antes do commit inverter hunks F0.4 por apply_patch; após o
+      commit usar git revert; nunca reset; preservar checkpoint/f0.3-complete
+    verify: >-
+      git status --short; git diff checkpoint/f0.3-complete; uv lock --check; uv run python -m pytest;
+      metadata, __version__ e harness --version retornam ao baseline 0.1.0
+```
 
 ---
 
@@ -688,6 +779,7 @@ sem ignorar o aviso no handoff.
 |------|----|----------|--------|---------|
 | 2026-08-03 | DEC-001 | Adotar gate obrigatório de defensabilidade antes de toda transição para `in_progress` | Impedir implementação baseada apenas em hipótese e garantir aceite e recuperação definidos antes de editar código | Toda tarefa deve comprovar problema, congelar escopo/aceite e registrar checkpoint/rollback |
 | 2026-08-04 | DEC-002 | Adotar `uv`, `uv.lock` e Python `>=3.11,<3.15` como contrato do ambiente | Eliminar bootstrap ad hoc e tornar sync/test/lint/typecheck/build reproduzíveis | F0.3 cria ambiente local `.venv`; F0.6 deverá validar a faixa Python na CI |
+| 2026-08-04 | DEC-003 | Versionar pacote, schemas e definições em namespaces separados | Evitar que 0.1.0, 1.0/1.0.0 e 3.2.0 sejam comparados ou atualizados como se representassem o mesmo contrato | Metadata instalada governa package version; schemas começam em 1.0; 3.2.0 permanece definition version até migrações futuras |
 
 > Registre aqui toda decisão arquitetural que diverge do plano. Formato: data ISO, ID (ADR-XXX), descrição, motivo, arquivos impactados.
 
@@ -713,13 +805,13 @@ sem ignorar o aviso no handoff.
 ```
 Data:              2026-08-04
 Fase:              F0
-Tarefa:            F0.3 — gate de ambiente reproduzível
-Estado:            completed — critérios congelados R1/R2 e handoff aprovados
-Arquivos alterados: pyproject.toml; uv.lock; README.md; .gitignore; TASK.md; remoção de egg-info versionado; correções mecânicas em compiler/**/*.py, src/**/*.py e tests/**/*.py (manifesto exato no commit/tag)
-Validações:         uv 0.11.32; lock/sync exit 0; 63 testes; mypy 85 arquivos; ruff/compileall/build exit 0; artefatos sem bytecode; wheel externa import/CLI exit 0
-Checkpoint:         checkpoint/f0.3-complete na branch phase/f0-baseline; rollback intermediário em checkpoint/f0.3-tooling-baseline
-Observação:         .venv e smoke usam Python 3.12.13 registrado; nenhum Python global, PATH ou perfil alterado
-Resultado:          ambiente reproduzível, lock versionado, toolchain verde e artefatos instaláveis comprovados
+Tarefa:            F0.4 — gate de versionamento único e schemas separados
+Estado:            in_progress — dossiê READY; nenhuma implementação F0.4 editada neste checkpoint
+Arquivos alterados: TASK.md
+Validações:         baseline clean em 517b9e0/checkpoint/f0.3-complete; metadata, __version__ e CLI=0.1.0; duplicações e versões ambíguas localizadas por rg
+Checkpoint:         checkpoint/f0.4-ready na branch phase/f0-baseline; rollback em checkpoint/f0.3-complete
+Observação:         3.2.0 será preservado como definition_version, não reclassificado como schema; nenhum pacote/dependência muda
+Resultado:          escopo, quatro namespaces, compatibilidade, aceite e rollback congelados antes do primeiro arquivo de implementação
 ```
 
 ---
@@ -727,13 +819,13 @@ Resultado:          ambiente reproduzível, lock versionado, toolchain verde e a
 ## 11. Próxima Ação Exata
 
 ```text
-PREPARAR F0.4 — NÃO ALTERAR VERSIONAMENTO AINDA:
-1. Criar/confirmar `checkpoint/f0.3-complete` e registrar branch, HEAD e status limpo.
-2. Comprovar todas as fontes atuais de versão (`pyproject.toml`, `__version__`, CLI e schemas) com busca e comandos reproduzíveis.
-3. Definir separadamente package version e versões de schemas; congelar arquivos permitidos, itens excluídos e compatibilidade esperada.
-4. Congelar os comandos que compararão CLI, metadata da wheel e importlib.metadata, além dos testes de compatibilidade de schema.
-5. Registrar rollback a partir de `checkpoint/f0.3-complete`, marcar o gate F0.4 como `READY` e criar `checkpoint/f0.4-ready`.
-6. Somente depois mudar F0.4 para `in_progress` e editar código.
+IMPLEMENTAR F0.4 APÓS CRIAR `checkpoint/f0.4-ready`:
+1. Criar versioning.py e derivar __version__/CLI da metadata instalada, sem fallback literal.
+2. Fazer compiladores consumirem package/artifact schema versions únicas e emitir package_version explícita.
+3. Separar graph_schema_version/policy_schema_version=1.0 de definition_version=3.2.0 nos defaults autorizados.
+4. Adicionar testes de identidade das superfícies públicas e compatibilidade separada dos três schemas.
+5. Executar todos os critérios congelados, incluindo build limpo e wheel instalada externamente.
+6. Responder handoff, atualizar este painel e criar `checkpoint/f0.4-complete`.
 ```
 
 ---
