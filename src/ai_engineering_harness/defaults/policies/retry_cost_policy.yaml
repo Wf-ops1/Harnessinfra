@@ -1,6 +1,7 @@
 # policies/retry_cost_policy.yaml
 policy_id: retry-cost-funnel-v1
-version: "3.2.0"
+policy_schema_version: "1.0"
+definition_version: "3.2.0"
 
 context_strategy: snapshot_fixed_with_retry_evolution
 semantic_cache_threshold: 0.82

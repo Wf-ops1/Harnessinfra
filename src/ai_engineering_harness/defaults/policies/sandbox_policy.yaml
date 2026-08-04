@@ -1,6 +1,7 @@
 # policies/sandbox_policy.yaml
 policy_id: sandbox-isolation-v1
-version: "3.2.0"
+policy_schema_version: "1.0"
+definition_version: "3.2.0"
 
 workspace_scope: per_execution_id
 fan_out_isolation: per_node_namespace

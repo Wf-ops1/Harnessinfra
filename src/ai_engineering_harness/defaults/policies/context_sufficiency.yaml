@@ -1,6 +1,7 @@
 # policies/context_sufficiency.yaml
 policy_id: context-sufficiency-v1
-version: "3.2.0"
+policy_schema_version: "1.0"
+definition_version: "3.2.0"
 
 minimum_confidence: 0.72
 dual_gate_mode: true

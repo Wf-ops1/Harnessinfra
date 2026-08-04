@@ -1,7 +1,8 @@
 # graphs/specs/bug-fix.yaml
 graph:
   name: bug-fix
-  version: "3.2.0"
+  graph_schema_version: "1.0"
+  definition_version: "3.2.0"
   description: "Grafo de diagnóstico rápido e correção de defeitos (Modo 2: Caçador de Bugs)"
 
 policies:

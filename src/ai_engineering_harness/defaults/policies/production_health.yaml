@@ -1,6 +1,7 @@
 # policies/production_health.yaml
 policy_id: production-health-v1
-version: "3.2.0"
+policy_schema_version: "1.0"
+definition_version: "3.2.0"
 
 observation_window_seconds: 300
 evaluation_strategy: slo_burn_rate

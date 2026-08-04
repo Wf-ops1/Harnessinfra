@@ -25,6 +25,7 @@ if hasattr(sys.stdout, "reconfigure"):
 
 import yaml
 
+from ai_engineering_harness.versioning import ARTIFACT_SCHEMA_VERSION, PACKAGE_VERSION
 from compiler.validators.contract_validator import ContractValidationError, ContractValidator
 from compiler.validators.gate_injector import GateInjector
 from compiler.validators.policy_validator import PolicyValidationError, PolicyValidator
@@ -91,7 +92,8 @@ def main() -> None:
         output_file = output_dir / f"{graph_name}.maf.json"
 
         compiled_payload = {
-            "maf_schema_version": "1.0.0",
+            "artifact_schema_version": ARTIFACT_SCHEMA_VERSION,
+            "package_version": PACKAGE_VERSION,
             "graph_metadata": graph_spec.get("graph", {}),
             "compiled_at_utc": "2026-08-03T01:25:00Z",
             "policies_applied": graph_spec.get("policies", []),

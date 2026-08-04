@@ -11,6 +11,7 @@ import click
 from rich.console import Console
 from rich.table import Table
 
+from ai_engineering_harness import __version__
 from ai_engineering_harness.cli.commands.rollback import RollbackManager
 from ai_engineering_harness.compiler.compiler import GraphCompiler
 from ai_engineering_harness.compiler.visualizer import GraphVisualizer
@@ -32,7 +33,7 @@ def _get_symbol(success: bool) -> str:
     return "✖ " if supports_unicode else "[FAIL] "
 
 @click.group(help="AI-Engineering-Harness - Motor Agentic Autônomo e Instalável")
-@click.version_option(version="0.1.0", prog_name="harness")
+@click.version_option(version=__version__, prog_name="harness")
 def main():
     pass
 

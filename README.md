@@ -66,6 +66,18 @@ mudança.
 
 ---
 
+## Contrato de versionamento
+
+A versão do pacote é definida em `pyproject.toml`. Em runtime, tanto
+`ai_engineering_harness.__version__` quanto `harness --version` leem a metadata da distribuição
+instalada; nenhum deles mantém um literal independente.
+
+Versões serializadas evoluem separadamente: `graph_schema_version`, `artifact_schema_version` e
+`policy_schema_version` identificam seus respectivos contratos. `definition_version` identifica a
+revisão de uma definição padrão e não deve ser comparada com a versão do pacote ou de um schema.
+
+---
+
 ## 📚 Documentação e Guias
 
 - **Modelo Operacional & Ciclo Agentic:** [agentic_operating_model.md](file:///c:/Users/walla/OneDrive/Desktop/ai-engineering-harness/docs/agentic_operating_model.md)

@@ -1,7 +1,8 @@
 # graphs/specs/incident.yaml
 graph:
   name: incident
-  version: "3.2.0"
+  graph_schema_version: "1.0"
+  definition_version: "3.2.0"
   description: "Grafo de contenção e resposta rápida a incidentes de produção (Modo 4: Escudo de Emergência)"
 
 policies:

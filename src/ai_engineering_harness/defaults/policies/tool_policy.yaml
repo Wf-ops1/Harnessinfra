@@ -1,6 +1,7 @@
 # policies/tool_policy.yaml
 policy_id: tool-governance-v1
-version: "3.2.0"
+policy_schema_version: "1.0"
+definition_version: "3.2.0"
 
 roles_permissions:
   requirement_analyst:

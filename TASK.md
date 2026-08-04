@@ -148,8 +148,8 @@ para preparar o próprio dossiê é permitida; alteração de código da tarefa 
 **Objetivo:** garantir que o pacote compile, instale, rode testes reproduzivelmente
 e não anuncie capacidades inexistentes.
 
-**Status da fase:** `in_progress` — F0.0, F0.1, F0.2 e F0.3 concluídas; F0.4 está `in_progress` após
-seu gate de defensabilidade ser comprovado e marcado como `READY`.
+**Status da fase:** `in_progress` — F0.0 a F0.4 concluídas; próxima tarefa: F0.5, que permanece
+`pending` até seu próprio gate de defensabilidade ser comprovado e marcado como `READY`.
 
 ### Coordenação e ambiente observado
 
@@ -161,7 +161,7 @@ seu gate de defensabilidade ser comprovado e marcado como `READY`.
 | **Git** | `available` — branch de execução `phase/f0-baseline`, criada a partir de `main`/`origin/main` no baseline `6eef8e0`; remote `https://github.com/Wf-ops1/Harnessinfra.git` |
 | **python_command** | `& 'C:\Users\walla\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe'` — Python `3.12.13` |
 | **uv_command** | `& 'C:\tmp\ai-engineering-harness-uv-0.11.32-resume\bin\uv.exe'` — uv `0.11.32`; instalação temporária isolada, sem PATH/global |
-| **Dependências do projeto** | `.venv` sincronizada pelo uv com Python 3.12.13 e `uv.lock`; 63 testes, mypy em 85 arquivos, ruff, compileall e build verdes |
+| **Dependências do projeto** | `.venv` sincronizada pelo uv com Python 3.12.13 e `uv.lock`; 65 testes, mypy em 86 arquivos, ruff, compileall e build verdes |
 | **Regra de escrita** | apenas um agente escreve por vez |
 
 ---
@@ -615,7 +615,7 @@ sem ignorar o aviso no handoff.
 
 | Campo | Detalhe |
 |-------|---------|
-| **Status** | `in_progress` — gate de defensabilidade `READY`; implementação autorizada em 2026-08-04T00:47:55-03:00 |
+| **Status** | `completed` — package version única, schemas separados e todos os critérios congelados passaram |
 | **Objetivo** | Uma única fonte de versão do pacote; schemas versionados separadamente |
 | **Arquivos envolvidos** | `pyproject.toml`, `src/ai_engineering_harness/__init__.py`, schemas de grafo/artifact/policy |
 | **Implementação esperada** | (1) `__version__` via `importlib.metadata.version`; (2) separar `package_version`, `graph_schema_version`, `artifact_schema_version`, `policy_schema_version`; (3) remover versões conflitantes (`0.1.0`, `1.0.0`, `3.2.0`) usadas para a mesma coisa |
@@ -714,6 +714,37 @@ defensibility:
       metadata, __version__ e harness --version retornam ao baseline 0.1.0
 ```
 
+#### Resultado e handoff da F0.4
+
+| Verificação final | Resultado |
+|---|---|
+| `uv lock --check` e `uv sync --all-extras` | ambos exit 0; lock permaneceu consistente e sem nova dependência |
+| `uv run python -m pytest` | exit 0; 65 testes passaram |
+| `uv run python -m mypy src` | exit 0; sem issues em 86 arquivos |
+| `uv run python -m ruff check .` | exit 0; todas as verificações passaram |
+| `uv run python -m compileall -q src compiler tests` | exit 0 |
+| `uv run python -m build` | exit 0; wheel e sdist; 0 entradas de bytecode; `versioning.py` presente na wheel |
+| wheel instalada em ambiente externo | metadata=`0.1.0`; `__version__`=`0.1.0`; CLI=`harness, version 0.1.0`; import de `site-packages` |
+| schemas na wheel externa | graph=`1.0`; artifact=`1.0`; policy=`1.0` |
+| compilador legado | exit 0; emitiu `artifact_schema_version=1.0` e `package_version=0.1.0` |
+| buscas de duplicação | nenhum literal independente em `__version__`, CLI, compiler/runtime adapter; nenhum `maf_schema_version` legado |
+
+| Pergunta obrigatória | Resposta F0.4 |
+|---|---|
+| **Qual comportamento anterior foi substituído?** | Quatro literais independentes de package version e campos genéricos `version` em grafos/políticas; o compilador legado emitia schema `1.0.0` enquanto o oficial emitia `1.0`. |
+| **Qual é o novo contrato público?** | `pyproject.toml` é a única fonte autoral do pacote; `PACKAGE_VERSION` lê a distribuição instalada; `__version__` e CLI a reutilizam. Grafos/políticas expõem schema `1.0` e definition `3.2.0` separadamente; artefatos expõem package/schema explicitamente. |
+| **Quais erros tipados podem ocorrer?** | `importlib.metadata.PackageNotFoundError` quando alguém importa o pacote sem instalar a distribuição; esse caminho não recebe fallback literal e o bootstrap oficial exige `uv sync`. |
+| **Quais side effects são produzidos?** | Somente caches, build/sdist/wheel e venv de smoke em `C:/tmp`; o JSON de prova do compilador legado foi removido após validação. |
+| **Onde o estado é persistido?** | Package version em `pyproject.toml`/metadata; namespaces em `versioning.py`; versões serializadas nos YAMLs padrão; evidências neste painel e no Git. |
+| **Como a operação é retomada após crash?** | Retomar de `checkpoint/f0.4-complete`; reinstalar/sincronizar por uv se metadata não estiver disponível; reexecutar os testes de versionamento antes de nova alteração. |
+| **Qual política autoriza a ação?** | DEC-003, dossiê F0.4 `READY` e `checkpoint/f0.4-ready`. |
+| **Como secrets são protegidos?** | Nenhum secret é lido ou persistido por versionamento, build ou testes. |
+| **Quais eventos são emitidos?** | Nenhum evento de domínio; somente saída dos comandos de validação. |
+| **Quais testes provam sucesso?** | `test_packaging`, `test_phase5`, `test_versioning`, suíte integral, compilador legado, build inspecionado e wheel externa. |
+| **Quais testes provam falha segura?** | Testes rejeitam divergência metadata/import/CLI, campo genérico `version`, schema incompatível e ausência dos defaults; import sem distribuição falha em vez de inventar versão. |
+| **A wheel instalada externamente foi testada?** | Sim; ambiente `C:/tmp/ai-engineering-harness-wheel-smoke-f0.4`, instalação offline, import/CLI/metadata/schemas aprovados. |
+| **A documentação foi atualizada?** | Sim; contrato em `README.md` e estado/decisão/handoff neste `TASK.md`. |
+
 ---
 
 ### F0.5 — Corrigir documentação de estado
@@ -805,13 +836,13 @@ defensibility:
 ```
 Data:              2026-08-04
 Fase:              F0
-Tarefa:            F0.4 — gate de versionamento único e schemas separados
-Estado:            in_progress — dossiê READY; nenhuma implementação F0.4 editada neste checkpoint
-Arquivos alterados: TASK.md
-Validações:         baseline clean em 517b9e0/checkpoint/f0.3-complete; metadata, __version__ e CLI=0.1.0; duplicações e versões ambíguas localizadas por rg
-Checkpoint:         checkpoint/f0.4-ready na branch phase/f0-baseline; rollback em checkpoint/f0.3-complete
-Observação:         3.2.0 será preservado como definition_version, não reclassificado como schema; nenhum pacote/dependência muda
-Resultado:          escopo, quatro namespaces, compatibilidade, aceite e rollback congelados antes do primeiro arquivo de implementação
+Tarefa:            F0.4 — versionamento único e schemas separados
+Estado:            completed — critérios e handoff aprovados
+Arquivos alterados: versioning.py; __init__.py; cli/main.py; compiladores oficial/legado; defaults graphs/policies; test_packaging.py; test_phase5.py; test_versioning.py; README.md; TASK.md
+Validações:         lock/sync exit 0; 65 testes; mypy 86 arquivos; ruff/compileall/build exit 0; artefatos sem bytecode; wheel externa e compilador legado aprovados
+Checkpoint:         checkpoint/f0.4-complete na branch phase/f0-baseline; rollback em checkpoint/f0.4-ready e checkpoint/f0.3-complete
+Observação:         package=0.1.0 por metadata; graph/artifact/policy schemas=1.0; definition=3.2.0; nenhuma dependência alterada
+Resultado:          versões deixam de competir entre conceitos e as superfícies públicas não podem divergir por literal duplicado
 ```
 
 ---
@@ -819,13 +850,13 @@ Resultado:          escopo, quatro namespaces, compatibilidade, aceite e rollbac
 ## 11. Próxima Ação Exata
 
 ```text
-IMPLEMENTAR F0.4 APÓS CRIAR `checkpoint/f0.4-ready`:
-1. Criar versioning.py e derivar __version__/CLI da metadata instalada, sem fallback literal.
-2. Fazer compiladores consumirem package/artifact schema versions únicas e emitir package_version explícita.
-3. Separar graph_schema_version/policy_schema_version=1.0 de definition_version=3.2.0 nos defaults autorizados.
-4. Adicionar testes de identidade das superfícies públicas e compatibilidade separada dos três schemas.
-5. Executar todos os critérios congelados, incluindo build limpo e wheel instalada externamente.
-6. Responder handoff, atualizar este painel e criar `checkpoint/f0.4-complete`.
+PREPARAR F0.5 — NÃO ALTERAR CLAIMS/LINKS AINDA:
+1. Criar/confirmar `checkpoint/f0.4-complete` e registrar branch, HEAD e status limpo.
+2. Comprovar claims de produção/capacidades e links quebrados em README.md/docs/*.md por buscas e resolução de paths.
+3. Congelar a matriz Capacidade/Implementada/Experimental/Planejada e os arquivos documentais permitidos.
+4. Congelar comandos para ausência de claims de produção, links absolutos/quebrados, encoding e consistência Markdown.
+5. Registrar rollback a partir de `checkpoint/f0.4-complete`, marcar F0.5 `READY` e criar `checkpoint/f0.5-ready`.
+6. Somente depois mudar F0.5 para `in_progress` e editar documentação.
 ```
 
 ---
