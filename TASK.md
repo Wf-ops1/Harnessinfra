@@ -147,8 +147,8 @@ para preparar o próprio dossiê é permitida; alteração de código da tarefa 
 
 **Objetivo:** transformar YAMLs declarativos em artefatos executáveis, validados e determinísticos.
 
-**Status da fase:** `in_progress` — F1.1 e F1.2 concluídas; a auditoria da F1.3 está congelada em gate
-`READY`, mas sua implementação só pode começar em uma retomada posterior que confirme o checkpoint.
+**Status da fase:** `in_progress` — F1.1, F1.2 e F1.3 concluídas dentro dos gates congelados; a próxima
+retomada deve preparar somente a auditoria e o gate de defensabilidade da F1.4.
 
 ### Coordenação e ambiente observado
 
@@ -160,7 +160,7 @@ para preparar o próprio dossiê é permitida; alteração de código da tarefa 
 | **Git** | `available` — branch local `phase/f1-policy-validation` criada em `c0aaadd117e9dfe90b3e7fd3c00392ff3ee01c6e`; `checkpoint/pre-f1.3-defensibility` aponta para esse baseline F1.2 concluído; nenhuma branch/tag da F1 foi publicada |
 | **python_command** | `& 'C:\Users\walla\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe'` — Python `3.12.13` |
 | **uv_command** | `& '.\build\f0.6-tools\uv\bin\uv.exe'` — uv `0.11.32` restaurado de forma isolada/ignorada, sem PATH ou instalação global; `lock --check` e `sync --all-extras --locked` verdes |
-| **Dependências do projeto** | `.venv` gerida pelo uv 0.11.32 com Python 3.12.13 e `uv.lock`; 135 testes, mypy em 88 arquivos, Ruff, compileall e lock verdes no baseline pré-F1.3 |
+| **Dependências do projeto** | `.venv` gerida pelo uv 0.11.32 com Python 3.12.13 e `uv.lock`; 176 testes, mypy em 90 arquivos, Ruff, compileall, lock/sync, build e dois smokes da wheel verdes após F1.3 |
 | **Regra de escrita** | apenas um agente escreve por vez |
 
 ---
@@ -681,7 +681,7 @@ consumíveis pelo gate atual (`import-untyped` em `jsonschema.exceptions` e `jso
 
 | Campo | Detalhe |
 |---|---|
-| **Status** | `pending` — gate `READY`; nenhuma implementação F1.3 foi iniciada |
+| **Status** | `completed` — gate `READY → COMPLETED`; implementação e todos os critérios congelados aprovados |
 | **Objetivo** | Validar referências de policy, role e tool por catálogos explícitos, calcular a visão efetiva fail-closed e torná-la representável no artefato tipado |
 | **Arquivos potencialmente alteráveis** | Contratos/registry de policies, visão aditiva do artefato, adapter legado, catálogos default estritamente necessários, testes focados e `TASK.md` |
 | **Dependências** | F1.1 e F1.2 concluídas; Pydantic v2 e PyYAML já disponíveis; nenhuma dependência nova prevista |
@@ -704,10 +704,10 @@ consumíveis pelo gate atual (`import-untyped` em `jsonschema.exceptions` e `jso
 
 | Campo | Estado atual |
 |---|---|
-| **Gate** | `READY` — problema, contrato, escopo, aceite, rollback e fronteiras foram congelados; código ainda não autorizado nesta retomada |
+| **Gate** | `READY → COMPLETED` — execução permaneceu no allowlist e todos os critérios passaram |
 | **Checkpoint anterior** | `checkpoint/pre-f1.3-defensibility` → `c0aaadd117e9dfe90b3e7fd3c00392ff3ee01c6e` |
 | **Checkpoint de liberação** | `checkpoint/f1.3-ready` será criado no commit exclusivamente documental deste dossiê |
-| **Próximo passo permitido** | Em nova retomada, confirmar checkpoint/limpeza e implementar somente o allowlist abaixo; qualquer descoberta material reabre o gate |
+| **Próximo passo permitido** | Preparar somente auditoria e gate F1.4; nenhuma unificação de compilador está autorizada sem novo checkpoint READY |
 
 ```yaml
 defensibility:
@@ -947,6 +947,37 @@ defensibility:
 [x] Rollback não destrutivo e fronteira externa definidos
 [x] Nenhum código, YAML default ou schema F1.3 implementado nesta preparação
 ```
+
+#### Resultado e handoff da F1.3
+
+| Verificação final | Resultado |
+|---|---|
+| Casos focados de policy registry, adapter, grafo, imports e estrutura | exit 0; 71 testes passaram |
+| Suíte integral | exit 0; 176 testes passaram |
+| `mypy src` | exit 0; sem issues em 90 arquivos |
+| `ruff check .`, `compileall` e `git diff --check` | todos exit 0 |
+| Catálogos packaged | 8 policies estritas, 7 roles e 18 capabilities declaradas; cinco grafos default resolvidos pelo adapter sem warning/fallback |
+| Precedência e falha segura | default-deny e deny-wins provados; role/tool/policy ausentes, extra keys, conflito e ampliação falham com erros tipados |
+| Lock e ambiente | `uv lock --check` e `uv sync --all-extras --locked` exit 0; 41 pacotes resolvidos; nenhuma dependência alterada |
+| Build e smoke padrão | wheel/sdist 0.1.0 geradas sem bytecode; instalação isolada fora do checkout e CLI verdes |
+| Smoke público adicional | 9/9 símbolos F1.3, 8 policies, 7 roles e 18 tools importados da wheel em `site-packages` |
+| Escopo congelado | somente os 14 arquivos do allowlist; compilador oficial, `compiler/compile.py`, CLI, grafos default, runtime, governance, adapters, dependências e lock intocados |
+
+| Pergunta obrigatória | Resposta |
+|---|---|
+| **Qual comportamento anterior foi substituído?** | `PolicyValidator` aceitava qualquer role/tool/policy e ignorava todos os documentos; agora delega a resolução estrita e nunca omite policy não carregada. |
+| **Qual é o novo contrato público?** | `PolicyRegistry`, `ResolvedPolicySpec`, schemas de role/tool/policy e sete erros tipados; refs packaged exatas, catálogos consistentes e visão efetiva aditiva no artefato. |
+| **Qual é a regra de autorização?** | Permissão de node começa vazia; `allow` exige tool registrada e autorizada simultaneamente pela role e tool policy; `deny` vence e node nunca amplia o catálogo. |
+| **Quais side effects são produzidos?** | Apenas leitura dos resources packaged e retorno de valores/erros em design-time; nenhuma tool é executada, nenhum runtime é autorizado e nenhuma policy externa é carregada. |
+| **Onde o estado é persistido?** | Schemas e registry em código, catálogos em YAML packaged, visão em `resolved_policies` quando construída e checkpoints em Git local. |
+| **Como a operação é retomada após crash?** | Retomar de `checkpoint/f1.3-complete`; confirmar branch/worktree e preparar o dossiê F1.4 antes de integrar qualquer compilador. |
+| **Qual política autoriza a ação?** | Dossiê F1.3 `READY` e `checkpoint/f1.3-ready`; implementação permaneceu integralmente no allowlist congelado. |
+| **Como secrets são protegidos?** | F1.3 não acessa credenciais; visão efetiva contém somente configuração normalizada e não inclui YAML cru, path absoluto ou secret. |
+| **Quais eventos são emitidos?** | Nenhum evento externo ou de domínio; resolução é síncrona e fail-closed. |
+| **Quais testes provam sucesso?** | Oito policies, sete roles, 18 tools, cinco grafos default, allow válido, default-deny, artifact com contracts+policies, adapter e wheel instalada. |
+| **Quais testes provam falha segura?** | Ref insegura/ausente/duplicada, extra key nas oito policies e autorização aninhada, role/tool ausentes, catálogo inconsistente, ampliação e conflito allow/deny. |
+| **A wheel instalada externamente foi testada?** | Sim; smoke `-I` importou 9 símbolos e instanciou os catálogos a partir de `site-packages`, fora de `src`. |
+| **A documentação foi atualizada?** | Sim; este painel registra implementação, provas e limites. O compilador oficial só preencherá `resolved_policies` na F1.4; enforcement continua F5. |
 
 ---
 
@@ -2006,13 +2037,13 @@ de `main`.
 ```
 Data:              2026-08-04
 Fase:              F1
-Tarefa:            F1.3 — auditoria e gate de policies/roles/tools
-Estado:            pending — gate READY; implementação deliberadamente não iniciada nesta retomada
-Arquivos alterados: somente TASK.md; probes e artefatos de auditoria sob build/f1.3-audit estão ignorados
-Validações:         prova permissiva reproduzida; 135 testes; mypy 88 arquivos; Ruff, compileall, lock e diff-check verdes
-Checkpoint:         checkpoint/pre-f1.3-defensibility em c0aaadd117e9dfe90b3e7fd3c00392ff3ee01c6e; checkpoint/f1.3-ready no commit documental
-Observação:         branch local phase/f1-policy-validation; nenhuma branch/tag F1 publicada; compilador oficial, CLI e runtime permanecem fora do escopo
-Resultado:          schemas, catálogos, precedência deny-wins, visão efetiva, aceite e rollback congelados para execução posterior
+Tarefa:            F1.3 — validação de policies, roles e tools
+Estado:            completed — gate READY → COMPLETED; todos os critérios congelados aprovados
+Arquivos alterados: models/registry F1.3, graph/__init__, adapter legado, três superfícies default, dois testes novos, duas regressões e TASK.md
+Validações:         71 testes focados; 176 integrais; mypy 90 arquivos; Ruff, compileall, lock/sync, build e dois smokes verdes
+Checkpoint:         checkpoint/pre-f1.3-defensibility em c0aaadd117e9dfe90b3e7fd3c00392ff3ee01c6e; checkpoint/f1.3-ready no dossiê; checkpoint/f1.3-complete no commit final
+Observação:         branch local phase/f1-policy-validation; nenhuma branch/tag F1 publicada; compilador oficial, CLI, grafos e runtime não foram integrados
+Resultado:          8 policies estritas, 7 roles, 18 capabilities, default-deny/deny-wins, erros tipados, adapter fail-closed e visão resolved_policies entregues
 ```
 
 ---
@@ -2020,13 +2051,13 @@ Resultado:          schemas, catálogos, precedência deny-wins, visão efetiva,
 ## 11. Próxima Ação Exata
 
 ```text
-IMPLEMENTAR F1.3 — SOMENTE O ESCOPO CONGELADO NO GATE READY:
-1. Confirmar branch phase/f1-policy-validation, worktree limpo e checkpoint/f1.3-ready no commit documental.
-2. Reler integralmente o dossiê F1.3 e manter um único executor; não editar código antes dessa confirmação.
-3. Implementar modelos/registry, adapter legado, visão aditiva do artefato e reparos default estritamente listados.
-4. Executar todos os aceites positivos/negativos, defaults, suíte integral, qualidade, build e smoke da wheel.
-5. Se qualquer arquivo, dependência, integração F1.4/F1.5 ou enforcement F3/F5 for necessário, parar e recongelar o gate.
-6. Registrar resultado, handoff e checkpoint/f1.3-complete somente após todos os critérios passarem.
+PREPARAR F1.4 — SOMENTE AUDITORIA E GATE DE DEFENSABILIDADE, SEM IMPLEMENTAR:
+1. Confirmar branch phase/f1-policy-validation, worktree limpo e checkpoint/f1.3-complete no commit final da F1.3.
+2. Reler integralmente a F1.4 do plano e os handoffs F1.1–F1.3; manter um único executor.
+3. Auditar os dois compiladores, CLI compile/run, caminhos de specs/output, validators, formatos de artefato, fallbacks e consumidores.
+4. Reproduzir diferenças semânticas, workflow inexistente, grafo temporário e qualquer bypass dos validators F1.1–F1.3.
+5. Congelar implementação oficial única, compatibilidade do wrapper, paths, exit codes, migração mínima dos defaults, aceite positivo/negativo, rollback e checkpoint F1.4.
+6. Não alterar código F1.4 até o gate estar READY; separar normalização/digest/escrita atômica F1.5 e execução/runtime F2/F5.
 7. Não fazer push, PR, merge, tag remota ou alteração de proteção sem autorização explícita.
 ```
 

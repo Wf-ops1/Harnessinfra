@@ -15,6 +15,7 @@ from pydantic import (
     model_validator,
 )
 
+from .policies import ResolvedPolicySpec
 from .registry import ResolvedContractSpec
 
 _NonEmptyStr: TypeAlias = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
@@ -227,20 +228,24 @@ class GraphSpec(_StrictFrozenModel):
 
 
 class CompiledGraphArtifact(_StrictFrozenModel):
-    """Typed artifact envelope with an additive resolved-contract view."""
+    """Typed artifact envelope with additive resolved contract and policy views."""
 
     artifact_schema_version: _NonEmptyStr
     package_version: _NonEmptyStr
     graph: GraphSpec
     resolved_contracts: tuple[ResolvedContractSpec, ...] = ()
+    resolved_policies: tuple[ResolvedPolicySpec, ...] = ()
 
-    @field_validator("resolved_contracts", mode="before")
+    @field_validator("resolved_contracts", "resolved_policies", mode="before")
     @classmethod
-    def freeze_resolved_contracts(cls, value: object) -> object:
+    def freeze_resolved_views(cls, value: object) -> object:
         return tuple(value) if isinstance(value, list) else value
 
     @model_validator(mode="after")
     def validate_resolved_contract_integrity(self) -> Self:
         for contract in self.resolved_contracts:
             contract.verify_integrity()
+        policy_references = [policy.requested_reference for policy in self.resolved_policies]
+        if len(set(policy_references)) != len(policy_references):
+            raise ValueError("resolved policy references must be unique")
         return self
