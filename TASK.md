@@ -148,8 +148,8 @@ para preparar o próprio dossiê é permitida; alteração de código da tarefa 
 **Objetivo:** garantir que o pacote compile, instale, rode testes reproduzivelmente
 e não anuncie capacidades inexistentes.
 
-**Status da fase:** `in_progress` — F0.0, F0.1 e F0.2 concluídas; próxima tarefa: F0.3, que permanece
-`pending` até seu próprio gate de defensabilidade ser comprovado e marcado como `READY`.
+**Status da fase:** `in_progress` — F0.0, F0.1, F0.2 e F0.3 concluídas; próxima tarefa: F0.4, que
+permanece `pending` até seu próprio gate de defensabilidade ser comprovado e marcado como `READY`.
 
 ### Coordenação e ambiente observado
 
@@ -160,8 +160,8 @@ e não anuncie capacidades inexistentes.
 | **Workspace** | `C:\Users\walla\OneDrive\Desktop\ai-engineering-harness` |
 | **Git** | `available` — branch de execução `phase/f0-baseline`, criada a partir de `main`/`origin/main` no baseline `6eef8e0`; remote `https://github.com/Wf-ops1/Harnessinfra.git` |
 | **python_command** | `& 'C:\Users\walla\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe'` — Python `3.12.13` |
-| **uv_command** | `& 'C:\tmp\ai-engineering-harness-uv-0.11.32\bin\uv.exe'` — uv `0.11.32`; instalação temporária isolada |
-| **Dependências do projeto** | `.venv` criada pelo uv com Python 3.12.13; `uv.lock` gerado; 63 testes verdes; mypy/ruff ainda em correção controlada na F0.3 |
+| **uv_command** | `& 'C:\tmp\ai-engineering-harness-uv-0.11.32-resume\bin\uv.exe'` — uv `0.11.32`; instalação temporária isolada, sem PATH/global |
+| **Dependências do projeto** | `.venv` sincronizada pelo uv com Python 3.12.13 e `uv.lock`; 63 testes, mypy em 85 arquivos, ruff, compileall e build verdes |
 | **Regra de escrita** | apenas um agente escreve por vez |
 
 ---
@@ -428,9 +428,9 @@ defensibility:
 
 | Campo | Detalhe |
 |-------|---------|
-| **Status** | `in_progress` — gate de defensabilidade `READY`; implementação autorizada em 2026-08-04T00:15:37-03:00 |
+| **Status** | `completed` — todos os critérios congelados R1/R2 e o smoke externo da wheel passaram |
 | **Objetivo** | Qualquer máquina limpa consegue instalar, testar e construir o pacote com um único conjunto de comandos |
-| **Arquivos envolvidos** | `pyproject.toml`, `uv.lock`, `README.md` |
+| **Arquivos envolvidos** | `pyproject.toml`, `uv.lock`, `README.md`, `.gitignore`, remoção de metadata gerada e correções mecânicas em `compiler/**/*.py`, `src/**/*.py`, `tests/**/*.py` conforme R1 |
 | **Implementação esperada** | (1) Adotar `uv` como gerenciador de ambiente; (2) criar e versionar `uv.lock`; (3) completar deps dev: pytest, pytest-cov, mypy, ruff, build; (4) usar `python -m ...` nos comandos internos; (5) definir versões Python suportadas; (6) documentar bootstrap no README |
 | **Critérios de aceite** | Em máquina limpa: `uv sync --all-extras` OK; `uv run python -m pytest` OK; `uv run python -m mypy src` OK; `uv run python -m ruff check .` OK; `uv run python -m build` OK |
 | **Comandos de verificação** | Executar separadamente: `uv sync --all-extras`; `uv run python -m pytest`; `uv run python -m mypy src`; `uv run python -m ruff check .`; `uv run python -m build` |
@@ -555,6 +555,60 @@ correções indicadas por mypy/ruff que preservem comportamento. `pyproject.toml
 remanescentes; repetir `pytest`, `mypy`, `ruff`, `compileall` e `build`. Qualquer correção funcional
 ou alteração fora desses paths reabre o gate novamente.
 
+#### Recongelamento F0.3-R2 — pureza dos artefatos de distribuição
+
+Depois de todos os gates R1 passarem, o primeiro build completo revelou que o padrão amplo de
+`package-data` incluiu bytecode local de `src/**/__pycache__` na wheel e no sdist. O setuptools também
+registrou `ai_engineering_harness.defaults.__pycache__` como pacote ambíguo e deixou um diretório de
+staging na raiz após contenção de arquivo do OneDrive. A tarefa permanece `in_progress` até o artefato
+ser reconstruído sem conteúdo dependente da máquina executora.
+
+| Evidência | Resultado observado |
+|---|---|
+| `uv run python -m build` após `compileall` | exit 0, porém o log adicionou `defaults/__pycache__/*.pyc` à wheel e emitiu aviso de pacote ausente da configuração |
+| `git status --short` após o build | diretório gerado `ai_engineering_harness-0.1.0/` apareceu como untracked; `build/`, `dist/` e `*.egg-info` permaneceram ignorados |
+
+**Expansão autorizada:** `pyproject.toml` pode excluir `*.pyc`, `*.pyo` e conteúdo de `__pycache__`
+via `tool.setuptools.exclude-package-data`; `.gitignore` pode ignorar o staging transitório
+`ai_engineering_harness-*/`. É permitida a remoção somente dos paths gerados e previamente resolvidos
+dentro do workspace: `build/`, `dist/`, `src/ai_engineering_harness.egg-info/` e
+`ai_engineering_harness-0.1.0/`.
+
+**Aceite adicional congelado:** após limpar os paths gerados, repetir `compileall` e `build`; listar o
+conteúdo da wheel e do sdist e exigir zero entradas contendo `__pycache__` ou terminando em `.pyc`/`.pyo`;
+`git status --short` não pode exibir staging de build não ignorado. Falha nesse aceite reabre a correção,
+sem ignorar o aviso no handoff.
+
+#### Resultado e handoff da F0.3
+
+| Verificação final | Resultado |
+|---|---|
+| `uv lock --check` | exit 0 |
+| `uv sync --all-extras` | exit 0; `.venv` em Python 3.12.13 |
+| `uv run python -m pytest` | exit 0; 63 testes passaram |
+| `uv run python -m mypy src` | exit 0; sem issues em 85 arquivos |
+| `uv run python -m ruff check .` | exit 0; todas as verificações passaram, sem regra ignorada e sem unsafe fix |
+| `uv run python -m compileall -q src compiler tests` | exit 0 |
+| `uv run python -m build` | exit 0; wheel e sdist geradas |
+| inspeção wheel/sdist | 0 entradas em `__pycache__`, `.pyc` ou `.pyo` |
+| instalação externa da wheel | exit 0 em `C:/tmp/ai-engineering-harness-wheel-smoke-f0.3-resume`; import carregado de `site-packages`; CLI `--help` exit 0 |
+
+| Pergunta obrigatória | Resposta F0.3 |
+|---|---|
+| **Qual comportamento anterior foi substituído?** | Bootstrap ad hoc por pip, sem lock e sem toolchain completa; baseline com 11 erros mypy, 373 violações ruff e metadata gerada versionada. |
+| **Qual é o novo contrato público?** | Python `>=3.11,<3.15`; `uv sync --all-extras` materializa o ambiente de `uv.lock`; testes, tipos, lint e build são executados por `uv run python -m ...`. |
+| **Quais erros tipados podem ocorrer?** | Nenhum erro público novo. Falhas de lock, sync, teste, tipo, lint, compilação ou build são expostas por exit code não zero. |
+| **Quais side effects são produzidos?** | `.venv`, caches uv/pytest/mypy/ruff, `build/`, `dist/`, `*.egg-info` e ambientes de smoke em `C:/tmp`; todos locais e ignorados ou externos ao repositório. |
+| **Onde o estado é persistido?** | Contrato em `pyproject.toml`, resolução em `uv.lock`, instruções em `README.md`, evidências neste `TASK.md` e histórico Git. |
+| **Como a operação é retomada após crash?** | Ler este painel, restaurar uv 0.11.32 isoladamente se o temporário tiver sido limpo, executar `uv sync --all-extras` e retomar de `checkpoint/f0.3-complete`. |
+| **Qual política autoriza a ação?** | DEC-002, gate F0.3 `READY`, recongelamentos R1/R2 e autorização do usuário limitada a `.venv`, build e `C:/tmp`. |
+| **Como secrets são protegidos?** | A tarefa não lê nem persiste secrets; downloads ocorreram apenas de índices públicos para ambiente/cache temporário. |
+| **Quais eventos são emitidos?** | Nenhum evento de domínio; somente saída determinística das ferramentas de desenvolvimento. |
+| **Quais testes provam sucesso?** | 63 testes, mypy em 85 arquivos, ruff integral, compileall, build limpo, inspeção dos artefatos e smoke da wheel externa. |
+| **Quais testes provam falha segura?** | Baseline comprovou módulos ausentes por exit 1; smoke offline sem cache terminou com exit 1 antes de instalar parcialmente o pacote; inspeção R2 falharia com qualquer bytecode no artefato. |
+| **A wheel instalada externamente foi testada?** | Sim; versão `0.1.0`, import a partir do `site-packages` temporário e `harness --help` com exit 0. |
+| **A documentação foi atualizada?** | Sim; bootstrap no `README.md`, decisões/evidências/handoff neste `TASK.md` e configuração declarativa no `pyproject.toml`. |
+
 ---
 
 ### F0.4 — Unificar versionamento
@@ -603,8 +657,8 @@ ou alteração fora desses paths reabre o gate novamente.
 
 ```
 [x] F0.0 concluída: executor, Python e estratégia Git registrados
-[ ] Pacote compila e instala em ambiente limpo
-[ ] Testes reproduzíveis por um único comando
+[x] Pacote compila e instala em ambiente limpo
+[x] Testes reproduzíveis por um único comando
 [ ] Nenhum documento declara produção
 [x] Nenhum erro de sintaxe ou encoding permanece
 ```
@@ -660,12 +714,12 @@ ou alteração fora desses paths reabre o gate novamente.
 Data:              2026-08-04
 Fase:              F0
 Tarefa:            F0.3 — gate de ambiente reproduzível
-Estado:            in_progress — bootstrap funcional; correções mypy/ruff recongeladas
-Arquivos alterados: pyproject.toml; uv.lock; README.md; .gitignore; remoção de src/ai_engineering_harness.egg-info/**; TASK.md
-Validações:         uv 0.11.32; lock check exit 0; sync exit 0; 63 testes verdes; mypy 11 erros; ruff 373 violações/87 arquivos
-Checkpoint:         checkpoint/f0.3-tooling-baseline na branch phase/f0-baseline; rollback em checkpoint/f0.3-ready
-Observação:         .venv usa Python 3.12.13 registrado; nenhum Python/global/PATH alterado; autofix ainda não executado
-Resultado:          ambiente e suíte reproduzidos; escopo ampliado somente para correções mecânicas comprovadas
+Estado:            completed — critérios congelados R1/R2 e handoff aprovados
+Arquivos alterados: pyproject.toml; uv.lock; README.md; .gitignore; TASK.md; remoção de egg-info versionado; correções mecânicas em compiler/**/*.py, src/**/*.py e tests/**/*.py (manifesto exato no commit/tag)
+Validações:         uv 0.11.32; lock/sync exit 0; 63 testes; mypy 85 arquivos; ruff/compileall/build exit 0; artefatos sem bytecode; wheel externa import/CLI exit 0
+Checkpoint:         checkpoint/f0.3-complete na branch phase/f0-baseline; rollback intermediário em checkpoint/f0.3-tooling-baseline
+Observação:         .venv e smoke usam Python 3.12.13 registrado; nenhum Python global, PATH ou perfil alterado
+Resultado:          ambiente reproduzível, lock versionado, toolchain verde e artefatos instaláveis comprovados
 ```
 
 ---
@@ -673,13 +727,13 @@ Resultado:          ambiente e suíte reproduzidos; escopo ampliado somente para
 ## 11. Próxima Ação Exata
 
 ```text
-CONTINUAR F0.3 APÓS RECONGELAMENTO R1:
-1. Criar commit parcial e tag `checkpoint/f0.3-tooling-baseline` antes de qualquer autofix.
-2. Adicionar `types-PyYAML` ao extra dev, atualizar uv.lock e sincronizar .venv.
-3. Executar `ruff check . --fix` sem unsafe fixes e revisar o diff mecânico completo.
-4. Corrigir apenas as violações remanescentes e os tipos de rollback/registry apontados pelo mypy.
-5. Repetir lock check, 63+ testes, mypy, ruff, compileall e build sem reduzir critérios.
-6. Responder handoff, atualizar este TASK.md e criar `checkpoint/f0.3-complete`.
+PREPARAR F0.4 — NÃO ALTERAR VERSIONAMENTO AINDA:
+1. Criar/confirmar `checkpoint/f0.3-complete` e registrar branch, HEAD e status limpo.
+2. Comprovar todas as fontes atuais de versão (`pyproject.toml`, `__version__`, CLI e schemas) com busca e comandos reproduzíveis.
+3. Definir separadamente package version e versões de schemas; congelar arquivos permitidos, itens excluídos e compatibilidade esperada.
+4. Congelar os comandos que compararão CLI, metadata da wheel e importlib.metadata, além dos testes de compatibilidade de schema.
+5. Registrar rollback a partir de `checkpoint/f0.3-complete`, marcar o gate F0.4 como `READY` e criar `checkpoint/f0.4-ready`.
+6. Somente depois mudar F0.4 para `in_progress` e editar código.
 ```
 
 ---

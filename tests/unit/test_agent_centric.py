@@ -2,17 +2,23 @@
 
 import json
 from pathlib import Path
+
 import pytest
-from ai_engineering_harness.runtime.context_assembler import ContextAssembler, InsufficientContextError
-from ai_engineering_harness.runtime.planner import Planner, InvalidPlanError, PlanDocument
-from ai_engineering_harness.runtime.agent_executor import AgentExecutor
-from ai_engineering_harness.tools.router import ToolRouter
-from ai_engineering_harness.models.router import ModelRouter
-from ai_engineering_harness.runtime.state_machine import WorkflowStateMachine, WorkflowState, InvalidStateTransitionError
-from ai_engineering_harness.runtime.engine import RuntimeEngine
+
 from ai_engineering_harness.cli.commands.rollback import RollbackManager
-from ai_engineering_harness.observability.audit import AuditTrailManager
 from ai_engineering_harness.compiler.compiler import GraphCompiler
+from ai_engineering_harness.models.router import ModelRouter
+from ai_engineering_harness.observability.audit import AuditTrailManager
+from ai_engineering_harness.runtime.agent_executor import AgentExecutor
+from ai_engineering_harness.runtime.context_assembler import ContextAssembler, InsufficientContextError
+from ai_engineering_harness.runtime.engine import RuntimeEngine
+from ai_engineering_harness.runtime.planner import PlanDocument, Planner
+from ai_engineering_harness.runtime.state_machine import (
+    InvalidStateTransitionError,
+    WorkflowState,
+    WorkflowStateMachine,
+)
+from ai_engineering_harness.tools.router import ToolRouter
 
 
 def test_context_assembly_produces_context_json(tmp_path: Path):
@@ -115,5 +121,5 @@ def test_audit_append_only_after_rollback(tmp_path: Path):
     rb_mgr.execute_rollback("exec-rollback-integrity", is_promoted=False)
     
     audit = AuditTrailManager(project_root=tmp_path, execution_id="exec-rollback-integrity")
-    is_valid, msg = audit.verify_integrity()
+    is_valid, _ = audit.verify_integrity()
     assert is_valid is True

@@ -1,18 +1,20 @@
 """Roteador central de ferramentas com verificação de permissões."""
 
 from pathlib import Path
-from typing import Any, Dict, List
-from ai_engineering_harness.tools.permissions import ToolPermissions
+from typing import Any
+
 from ai_engineering_harness.tools.adapters.serena import SerenaAdapter
 from ai_engineering_harness.tools.adapters.terminal import TerminalAdapter
+from ai_engineering_harness.tools.permissions import ToolPermissions
+
 
 class ToolRouter:
     """Valida permissões e despacha chamadas de ferramentas."""
 
-    def __init__(self, allowed_tools: List[str]):
+    def __init__(self, allowed_tools: list[str]):
         self.permissions = ToolPermissions(allowed_tools=allowed_tools)
 
-    def dispatch(self, tool_name: str, payload: Dict[str, Any]) -> Any:
+    def dispatch(self, tool_name: str, payload: dict[str, Any]) -> Any:
         if not self.permissions.is_allowed(tool_name):
             raise PermissionError(f"[POLICY VIOLATION] Ferramenta '{tool_name}' não autorizada.")
 

@@ -5,7 +5,6 @@ from typing import Any
 
 class ContractValidationError(Exception):
     """Exceção levantada quando um nó referencia um contrato inexistente ou inválido."""
-    pass
 
 
 class ContractValidator:
@@ -54,7 +53,7 @@ class ContractValidator:
                         )
             except Exception as e:
                 if isinstance(e, ContractValidationError):
-                    raise e
+                    raise
                 raise ContractValidationError(
                     f"Erro ao carregar contrato '{class_name}' de '{rel_path}': {e}"
                 )

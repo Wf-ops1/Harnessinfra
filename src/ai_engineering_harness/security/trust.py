@@ -1,8 +1,9 @@
 """Avaliador de Fronteira de Confiança do Repositório e Regra Universal de Aprovação."""
 
 from pathlib import Path
-from typing import Dict, List, Optional
+
 from pydantic import BaseModel, ConfigDict
+
 
 class TrustEvaluationResult(BaseModel):
     model_config = ConfigDict(strict=True, frozen=True)
@@ -11,12 +12,12 @@ class TrustEvaluationResult(BaseModel):
     mode: str  # "trusted" ou "restricted"
     allow_python_contracts: bool
     allow_unprompted_commands: bool
-    reasons: List[str]
+    reasons: list[str]
 
 class TrustBoundaryEvaluator:
     """Governa permissões de execução baseadas na confiança do repositório-alvo."""
 
-    def __init__(self, project_root: Optional[Path] = None):
+    def __init__(self, project_root: Path | None = None):
         self.project_root = project_root or Path.cwd()
 
     def evaluate(self, force_untrusted: bool = False) -> TrustEvaluationResult:

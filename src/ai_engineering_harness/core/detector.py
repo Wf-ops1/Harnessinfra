@@ -1,23 +1,24 @@
 """Auto-detecção de stack tecnológica do projeto-alvo."""
 
 from pathlib import Path
-from typing import Dict, List, Optional
+
 from pydantic import BaseModel, ConfigDict
+
 
 class DetectedStack(BaseModel):
     model_config = ConfigDict(strict=True, frozen=True)
 
     language: str
-    package_manager: Optional[str]
-    test_runner: Optional[str]
-    linter: Optional[str]
-    build_tool: Optional[str]
-    detected_files: List[str]
+    package_manager: str | None
+    test_runner: str | None
+    linter: str | None
+    build_tool: str | None
+    detected_files: list[str]
 
 class StackDetector:
     """Analisa o diretório raiz do projeto para identificar a stack."""
 
-    def __init__(self, project_root: Optional[Path] = None):
+    def __init__(self, project_root: Path | None = None):
         self.project_root = project_root or Path.cwd()
 
     def detect(self) -> DetectedStack:

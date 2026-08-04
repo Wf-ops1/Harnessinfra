@@ -15,6 +15,7 @@ htmlcov/
 build/
 dist/
 *.egg-info/
+ai_engineering_harness-*/
 
 # Harness State & Artifacts
 .harness/state/executions/

@@ -1,4 +1,5 @@
 from typing import Literal
+
 from pydantic import BaseModel, Field
 
 SnapshotStatus = Literal["pending", "ready", "failed", "corrupted"]

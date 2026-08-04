@@ -1,14 +1,15 @@
 """Roteador inteligente de LLMs com controle de Data Egress e Fallback Seguro."""
 
 import time
-from typing import Any, Dict, List, Optional
-from ai_engineering_harness.models.provider import BaseLLMProvider, LLMResponse
+
+from ai_engineering_harness.models.provider import LLMResponse
 from ai_engineering_harness.models.registry import ProviderRegistry
+
 
 class ModelRouter:
     """Roteador com checagem de Data Egress e política de Fallback."""
 
-    def __init__(self, allowed_providers: List[str]):
+    def __init__(self, allowed_providers: list[str]):
         self.allowed_providers = allowed_providers
 
     def _validate_egress(self, provider_id: str) -> None:
@@ -22,7 +23,7 @@ class ModelRouter:
         self,
         prompt: str,
         primary_provider_id: str,
-        fallback_provider_ids: Optional[List[str]] = None,
+        fallback_provider_ids: list[str] | None = None,
         max_retries: int = 2
     ) -> LLMResponse:
         """Executa a conclusão no provedor primário com fallback seguro."""
@@ -39,7 +40,7 @@ class ModelRouter:
             for attempt in range(max_retries + 1):
                 try:
                     return provider.complete(prompt)
-                except Exception as e:
+                except (OSError, RuntimeError, TimeoutError, TypeError, ValueError) as e:
                     last_error = e
                     if attempt < max_retries:
                         time.sleep(0.1 * (2 ** attempt))  # Exponential backoff

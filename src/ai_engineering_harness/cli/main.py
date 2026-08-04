@@ -1,25 +1,26 @@
 """Interface CLI unificada final com todos os subcomandos do AI-Engineering-Harness."""
 
-import sys
 import json
-import uuid
 import shutil
-from datetime import datetime, timezone
+import sys
+import uuid
+from datetime import UTC, datetime
 from pathlib import Path
+
 import click
 from rich.console import Console
 from rich.table import Table
-from ai_engineering_harness.doctor.checker import DoctorChecker
-from ai_engineering_harness.doctor.report import DoctorReport
+
+from ai_engineering_harness.cli.commands.rollback import RollbackManager
 from ai_engineering_harness.compiler.compiler import GraphCompiler
 from ai_engineering_harness.compiler.visualizer import GraphVisualizer
-from ai_engineering_harness.indexer.codebase_memory_adapter import CodebaseMemoryAdapter
-from ai_engineering_harness.verification.engine import VerificationEngine
-from ai_engineering_harness.observability.audit import AuditTrailManager
-from ai_engineering_harness.cli.commands.rollback import RollbackManager
+from ai_engineering_harness.doctor.checker import DoctorChecker
+from ai_engineering_harness.doctor.report import DoctorReport
 from ai_engineering_harness.governance.approval import ApprovalManager
+from ai_engineering_harness.indexer.codebase_memory_adapter import CodebaseMemoryAdapter
+from ai_engineering_harness.observability.audit import AuditTrailManager
 from ai_engineering_harness.runtime.engine import RuntimeEngine
-from ai_engineering_harness.core.config import ConfigResolver
+from ai_engineering_harness.verification.engine import VerificationEngine
 
 console = Console()
 
@@ -103,7 +104,7 @@ def index():
 @click.option("--approval-required", is_flag=True, help="Requer aprovação humana prévia para promoção.")
 def run(workflow_name, approval_required):
     project_root = Path.cwd()
-    timestamp_str = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
+    timestamp_str = datetime.now(UTC).strftime("%Y%m%d%H%M%S")
     short_hash = uuid.uuid4().hex[:6]
     execution_id = f"exec-{timestamp_str}-{short_hash}"
 

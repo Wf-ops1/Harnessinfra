@@ -1,8 +1,10 @@
 """Adaptador único de comunicação com o Codebase-Memory MCP."""
 
 from pathlib import Path
-from typing import Dict, Any
+from typing import Any
+
 from ai_engineering_harness.indexer.snapshot_manager import SnapshotManager
+
 
 class CodebaseMemoryAdapter:
     """Interface de inteligência de código sobre a Codebase-Memory MCP."""
@@ -11,7 +13,7 @@ class CodebaseMemoryAdapter:
         self.project_root = project_root
         self.snapshot_manager = SnapshotManager(project_root)
 
-    def query_ast(self, query: str, commit_sha: str) -> Dict[str, Any]:
+    def query_ast(self, query: str, commit_sha: str) -> dict[str, Any]:
         """Consulta a árvore AST vinculada ao commit SHA."""
         snapshot = self.snapshot_manager.get_snapshot(commit_sha)
         if snapshot:

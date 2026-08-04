@@ -1,4 +1,4 @@
 """Transactions package for contracts."""
-from .knowledge_transaction import KnowledgeTransaction, JournalState
+from .knowledge_transaction import JournalState, KnowledgeTransaction
 
-__all__ = ["KnowledgeTransaction", "JournalState"]
+__all__ = ["JournalState", "KnowledgeTransaction"]

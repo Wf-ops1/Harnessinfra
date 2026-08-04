@@ -1,17 +1,19 @@
 """Estratégia de Rollback Append-Only em Duas Fases (Código vs Efeitos em Produto)."""
 
+from contextlib import suppress
 from pathlib import Path
-from typing import Dict, Any, Optional
-from ai_engineering_harness.tools.adapters.git import GitAdapter
-from ai_engineering_harness.security.trust import TrustBoundaryEvaluator
-from ai_engineering_harness.observability.audit import AuditTrailManager
+from typing import Any
+
 from ai_engineering_harness.indexer.codebase_memory_adapter import CodebaseMemoryAdapter
+from ai_engineering_harness.observability.audit import AuditTrailManager
 from ai_engineering_harness.runtime.state_machine import (
-    ROLLBACK_REQUESTED,
+    EXECUTION_COMPENSATED,
     ROLLBACK_CODE_COMPLETED,
     ROLLBACK_EFFECTS_COMPLETED,
-    EXECUTION_COMPENSATED
+    ROLLBACK_REQUESTED,
 )
+from ai_engineering_harness.security.trust import TrustBoundaryEvaluator
+from ai_engineering_harness.tools.adapters.git import GitAdapter
 
 
 class RollbackManager:
@@ -29,8 +31,8 @@ class RollbackManager:
         commit_sha: str = "",
         is_destructive_hook: bool = False,
         user_approved: bool = False
-    ) -> Dict[str, Any]:
-        result = {"code_rollback": False, "product_rollback": False}
+    ) -> dict[str, Any]:
+        result: dict[str, Any] = {"code_rollback": False, "product_rollback": False}
         audit_mgr = AuditTrailManager(self.project_root, execution_id)
 
         # 1. Registrar solicitação de Rollback no diário de auditoria append-only
@@ -67,11 +69,9 @@ class RollbackManager:
                 return result
 
         # Reindexar memória estrutural sem apagar snapshots anteriores
-        try:
+        with suppress(Exception):
             indexer = CodebaseMemoryAdapter(self.project_root)
             indexer.query_ast("get_structure", commit_sha=commit_sha or "HEAD~1")
-        except Exception:
-            pass
 
         result["product_rollback"] = True
         result["product_message"] = "Hook de compensação executado com sucesso."

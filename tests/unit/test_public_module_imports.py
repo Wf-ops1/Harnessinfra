@@ -8,7 +8,6 @@ import traceback
 import unittest
 from pathlib import Path
 
-
 PACKAGE_NAME = "ai_engineering_harness"
 SRC_ROOT = Path(__file__).resolve().parents[2] / "src"
 PACKAGE_ROOT = SRC_ROOT / PACKAGE_NAME

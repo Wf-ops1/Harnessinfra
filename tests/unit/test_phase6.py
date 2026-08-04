@@ -2,11 +2,12 @@
 
 import json
 from pathlib import Path
-import pytest
-from ai_engineering_harness.runtime.state_machine import WorkflowStateMachine, WorkflowState
+
+from ai_engineering_harness.compiler.compiler import GraphCompiler
 from ai_engineering_harness.governance.approval import ApprovalManager
 from ai_engineering_harness.runtime.engine import RuntimeEngine
-from ai_engineering_harness.compiler.compiler import GraphCompiler
+from ai_engineering_harness.runtime.state_machine import WorkflowState, WorkflowStateMachine
+
 
 def test_workflow_state_machine_transitions(tmp_path: Path):
     fsm = WorkflowStateMachine(project_root=tmp_path, execution_id="exec-111")

@@ -1,10 +1,12 @@
 """Testes unitários para Fase 3 (Doctor & Governance Engine)."""
 
 import pytest
+
 from ai_engineering_harness.doctor.checker import DoctorChecker
 from ai_engineering_harness.doctor.probes import HealthProbe
-from ai_engineering_harness.governance.policy_engine import PolicyEngine
 from ai_engineering_harness.governance.evaluation import ContextSufficiencyEvaluator
+from ai_engineering_harness.governance.policy_engine import PolicyEngine
+
 
 def test_doctor_probe_6_stages():
     res = HealthProbe.probe_component("Serena MCP", {})

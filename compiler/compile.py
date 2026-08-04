@@ -9,6 +9,7 @@ Compila especificações declarativas de grafos (YAML) em especificações imut�
 import argparse
 import json
 import sys
+from contextlib import suppress
 from pathlib import Path
 
 # Garante que o diretório raiz esteja no sys.path para importações
@@ -18,16 +19,15 @@ if str(ROOT_DIR) not in sys.path:
 
 # Configura stdout para UTF-8 no Windows se necessário
 if hasattr(sys.stdout, "reconfigure"):
-    try:
+    with suppress(AttributeError, OSError, ValueError):
         sys.stdout.reconfigure(encoding="utf-8")
         sys.stderr.reconfigure(encoding="utf-8")
-    except Exception:
-        pass
 
 import yaml
-from compiler.validators.contract_validator import ContractValidator, ContractValidationError
+
+from compiler.validators.contract_validator import ContractValidationError, ContractValidator
 from compiler.validators.gate_injector import GateInjector
-from compiler.validators.policy_validator import PolicyValidator, PolicyValidationError
+from compiler.validators.policy_validator import PolicyValidationError, PolicyValidator
 
 
 def main() -> None:
@@ -107,7 +107,7 @@ def main() -> None:
     except (ContractValidationError, PolicyValidationError) as e:
         print(f"❌ Falha de Validação em Design-Time: {e}", file=sys.stderr)
         sys.exit(2)
-    except Exception as e:
+    except (AttributeError, KeyError, OSError, TypeError, ValueError, yaml.YAMLError) as e:
         print(f"💥 Erro inesperado durante a compilação: {e}", file=sys.stderr)
         sys.exit(3)
 

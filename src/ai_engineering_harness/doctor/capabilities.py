@@ -2,6 +2,7 @@
 
 from pydantic import BaseModel, ConfigDict
 
+
 class SystemCapabilities(BaseModel):
     model_config = ConfigDict(strict=True, frozen=True)
 

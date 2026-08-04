@@ -4,8 +4,8 @@ import json
 import os
 from enum import Enum
 from pathlib import Path
-from typing import Dict, Any, List
-from ai_engineering_harness.contracts.transactions import KnowledgeTransaction
+from typing import Any
+
 
 class TransactionState(str, Enum):
     STAGING = "STAGING"
@@ -45,7 +45,7 @@ class KnowledgeTransactionManager:
             except OSError:
                 pass
 
-    def execute_transaction(self, tx_id: str, new_kis: Dict[str, Any]) -> str:
+    def execute_transaction(self, tx_id: str, new_kis: dict[str, Any]) -> str:
         tx_staging = self.staging_dir / tx_id
         tx_staging.mkdir(exist_ok=True)
 

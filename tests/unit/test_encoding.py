@@ -9,7 +9,6 @@ import sys
 import unittest
 from pathlib import Path
 
-
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 TEXT_EXTENSIONS = {".py", ".md", ".yaml", ".yml", ".toml", ".json"}
 IGNORED_DIRECTORIES = {
@@ -106,8 +105,7 @@ class RepositoryEncodingTests(unittest.TestCase):
                         ],
                         cwd=REPOSITORY_ROOT,
                         env=environment,
-                        stdout=subprocess.PIPE,
-                        stderr=subprocess.PIPE,
+                        capture_output=True,
                         check=False,
                     )
                     stdout = result.stdout.decode(encoding, errors="strict")

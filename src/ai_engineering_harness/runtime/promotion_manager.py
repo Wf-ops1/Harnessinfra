@@ -2,7 +2,7 @@
 
 import subprocess
 from pathlib import Path
-from typing import Dict, Any, Optional
+
 from ai_engineering_harness.observability.audit import AuditTrailManager
 
 
@@ -12,7 +12,7 @@ class PromotionManager:
     def __init__(self, project_root: Path):
         self.project_root = project_root
 
-    def promote(self, execution_id: str, dry_run: bool = True, message: Optional[str] = None) -> str:
+    def promote(self, execution_id: str, dry_run: bool = True, message: str | None = None) -> str:
         audit_mgr = AuditTrailManager(self.project_root, execution_id)
         msg = message or f"feat: workflow promotion for {execution_id}"
 
@@ -27,11 +27,23 @@ class PromotionManager:
 
         try:
             subprocess.run(["git", "add", "."], cwd=self.project_root, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            subprocess.run(["git", "commit", "-m", msg], cwd=self.project_root, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            subprocess.run(
+                ["git", "commit", "-m", msg],
+                cwd=self.project_root,
+                capture_output=True,
+                check=False,
+                text=True,
+            )
 
-            rev_res = subprocess.run(["git", "rev-parse", "HEAD"], cwd=self.project_root, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            rev_res = subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                cwd=self.project_root,
+                capture_output=True,
+                check=False,
+                text=True,
+            )
             commit_sha = rev_res.stdout.strip() if rev_res.returncode == 0 else f"sha-local-{execution_id}"
-        except Exception:
+        except (OSError, subprocess.SubprocessError):
             commit_sha = f"sha-fallback-{execution_id}"
 
         audit_mgr.log_event("WORKFLOW_PROMOTED", {

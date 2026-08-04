@@ -1,13 +1,11 @@
 """Gerenciamento de trava (Lease Lock) e Fencing Tokens para concorrência de índice."""
 
-import time
-from typing import Optional
 
 class LeaseManager:
     """Garante concorrência segura com trava de leitor/escritor via fencing token."""
 
     def __init__(self):
-        self._current_lease: Optional[str] = None
+        self._current_lease: str | None = None
         self._token_counter: int = 0
 
     def acquire_lease(self, client_id: str) -> int:

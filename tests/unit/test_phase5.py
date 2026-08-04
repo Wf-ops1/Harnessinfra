@@ -2,10 +2,13 @@
 
 import json
 from pathlib import Path
+
 import pytest
+
 from ai_engineering_harness.compiler.compiler import GraphCompiler
-from ai_engineering_harness.verification.evaluator import VerificationEvaluator
 from ai_engineering_harness.verification.engine import VerificationEngine
+from ai_engineering_harness.verification.evaluator import VerificationEvaluator
+
 
 def test_compiler_governed_loops_success(tmp_path: Path):
     yaml_spec = tmp_path / "valid_graph.yaml"

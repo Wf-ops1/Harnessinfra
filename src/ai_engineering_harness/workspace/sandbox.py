@@ -4,6 +4,7 @@ import os
 import sys
 from pathlib import Path
 
+
 class SandboxProvider:
     """Retorna o caminho de armazenamento de worktrees externos adequado ao SO."""
 

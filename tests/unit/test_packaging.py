@@ -1,7 +1,9 @@
 """Testes unitários para verificação do empacotamento e recursos nativos (TASK-1.1)."""
 
 import importlib.resources
+
 from ai_engineering_harness import __version__
+
 
 def test_package_version():
     assert __version__ == "0.1.0"

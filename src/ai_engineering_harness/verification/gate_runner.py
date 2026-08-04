@@ -1,10 +1,11 @@
 """Runner poliglota de tipos abstratos de gate de verificação."""
 
 from pathlib import Path
-from typing import List, Dict, Any
+
+from ai_engineering_harness.tools.adapters.terminal import TerminalAdapter
 from ai_engineering_harness.verification.evaluator import VerificationEvaluator
 from ai_engineering_harness.verification.results import GateResult, VerificationSuiteResult
-from ai_engineering_harness.tools.adapters.terminal import TerminalAdapter
+
 
 class GateRunner:
     """Executa verificadores aplicáveis declarados no project.yaml."""
@@ -13,7 +14,7 @@ class GateRunner:
         self.language = language
         self.working_dir = working_dir
 
-    def run_applicable_gates(self, active_gates: List[str]) -> VerificationSuiteResult:
+    def run_applicable_gates(self, active_gates: list[str]) -> VerificationSuiteResult:
         results = []
         all_passed = True
 

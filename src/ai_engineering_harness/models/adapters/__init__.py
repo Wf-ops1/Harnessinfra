@@ -1,7 +1,7 @@
 """Adaptadores de provedores concretos."""
 
-from .openai import OpenAIAdapter
 from .anthropic import AnthropicAdapter
 from .local import LocalAdapter
+from .openai import OpenAIAdapter
 
-__all__ = ["OpenAIAdapter", "AnthropicAdapter", "LocalAdapter"]
+__all__ = ["AnthropicAdapter", "LocalAdapter", "OpenAIAdapter"]
