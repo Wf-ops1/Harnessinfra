@@ -147,8 +147,8 @@ para preparar o próprio dossiê é permitida; alteração de código da tarefa 
 
 **Objetivo:** transformar YAMLs declarativos em artefatos executáveis, validados e determinísticos.
 
-**Status da fase:** `in_progress` — F1.1–F1.4 concluídas; a próxima retomada deve preparar somente
-a auditoria e o gate de defensabilidade da F1.5, sem implementar antes de um novo checkpoint `READY`.
+**Status da fase:** `in_progress` — F1.1–F1.4 concluídas; F1.5 permanece `pending`, com auditoria
+e gate de defensabilidade `READY`, mas sua implementação ainda não foi iniciada.
 
 ### Coordenação e ambiente observado
 
@@ -157,10 +157,10 @@ a auditoria e o gate de defensabilidade da F1.5, sem implementar antes de um nov
 | **Executor ativo** | `Codex` — responsável por implementar, validar, manter checkpoints e criar commits locais |
 | **Auditor/revisor** | `Antigravity` — somente-leitura por padrão; só edita quando o usuário solicitar explicitamente ou transferir a execução |
 | **Workspace** | `C:\Users\walla\OneDrive\Desktop\ai-engineering-harness` |
-| **Git** | `available` — branch local `phase/f1-compiler-unification` criada em `07c8fc362a4bb791d727b0cb43129e8cabb6a26d`; `checkpoint/pre-f1.4-defensibility` aponta para esse baseline F1.3 concluído; nenhuma branch/tag da F1 foi publicada |
+| **Git** | `available` — branch local `phase/f1-compiler-unification`; `HEAD`/`checkpoint/f1.4-complete^{}` em `60c7718bfad7b6241943d815051604c02342b139`; `checkpoint/pre-f1.5-defensibility` ancora o mesmo baseline concluído; nenhuma branch/tag da F1 foi publicada |
 | **python_command** | `& 'C:\Users\walla\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe'` — Python `3.12.13` |
 | **uv_command** | `& '.\build\f0.6-tools\uv\bin\uv.exe'` — uv `0.11.32` restaurado de forma isolada/ignorada, sem PATH ou instalação global; `lock --check` e `sync --all-extras --locked` verdes |
-| **Dependências do projeto** | `.venv` gerida pelo uv 0.11.32 com Python 3.12.13 e `uv.lock`; 176 testes, mypy em 90 arquivos, Ruff, compileall, lock/sync, build e dois smokes da wheel verdes após F1.3 |
+| **Dependências do projeto** | `.venv` gerida pelo uv 0.11.32 com Python 3.12.13 e `uv.lock`; 201 testes + 6 subtests, mypy em 90 arquivos, Ruff, compileall e lock verdes no baseline F1.4; build e dois smokes da wheel verdes no fechamento da F1.4 |
 | **Regra de escrita** | apenas um agente escreve por vez |
 
 ---
@@ -1295,6 +1295,348 @@ defensibility:
 
 ---
 
+### F1.5 — Artefato determinístico e versionado
+
+| Campo | Detalhe |
+|---|---|
+| **Status** | `pending` — gate de defensabilidade `READY`; implementação ainda não iniciada |
+| **Objetivo** | Tornar o `CompiledGraphArtifact` canônico, verificável e atomicamente publicado, com versões exatas, digests semânticos, manifest de fontes e capabilities requeridas, sem antecipar execução ou enforcement |
+| **Arquivos potencialmente alteráveis** | Contrato do artefato, compilador oficial, loader do artefato, namespace da versão de schema, testes focados/consumidores diretos, documentação do wrapper e `TASK.md` |
+| **Dependências** | F1.1–F1.4 concluídas; SHA-256, JSON, tempfile, flush/fsync e replace atômico disponíveis na stdlib; nenhuma dependência nova prevista |
+
+#### Auditoria concreta da F1.5
+
+| Superfície | Estado comprovado | Lacuna frente ao plano | Fronteira congelada |
+|---|---|---|---|
+| Determinismo bruto | A mesma fonte compilada duas vezes produz bytes idênticos e não há timestamp no envelope | A estabilidade depende da ordem recebida; dois `GraphSpec` topologicamente equivalentes, com `nodes`/`terminal_states` reordenados, validam mas geram SHA-256 de arquivo distintos | Preservar byte-idêntico para o mesmo conjunto exato de fontes e criar digests semânticos sobre visões normalizadas; não adicionar timestamp volátil |
+| Envelope atual | `CompiledGraphArtifact` contém somente `artifact_schema_version`, `package_version`, `graph`, `resolved_contracts` e `resolved_policies` | Faltam `graph_digest`, `policy_digest`, índice explícito de contract digests, `source_manifest` e `required_capabilities` | Evolução incompatível deliberada do artifact schema; GraphSpec e registries existentes permanecem as fontes das visões resolvidas |
+| Schema/package versions | Compiler escreve as constantes atuais, mas os campos são apenas strings não vazias; o probe carregou `artifact_schema_version=999.0`, `package_version=999.0.0` e `graph_schema_version=999.0` | Nenhuma comparação exata ocorre antes da execução | Artifact schema passa de `1.0` para `2.0`; package/graph/policy schema devem casar exatamente com as constantes instaladas antes de qualquer transição runtime |
+| Graph digest | O grafo tipado completo é serializado em `artifact.graph` | Não há digest nem vínculo que detecte mudança válida porém não autorizada; alterar a role preservando forma foi aceito pelo loader | `graph_digest` será SHA-256 da visão canônica do GraphSpec resolvido |
+| Policy digest | `resolved_policies` contém a visão efetiva tipada, sem digest | Alterar `human_approval_required` na visão efetiva foi aceito | `policy_digest` será SHA-256 da sequência canônica completa de policies efetivas |
+| Contract digests | Cada `ResolvedContractSpec` já contém digest canônico e `CompiledGraphArtifact` chama `verify_integrity`; adulterar schema sem atualizar digest foi rejeitado | Não há índice explícito, ordenado e cruzado com as referências resolvidas | Preservar o digest F1.2 e adicionar `contract_digests` estritamente igual à visão resolvida, sem recalcular por algoritmo concorrente |
+| Source manifest | Compiler lê a spec e catálogos/overrides, mas não persiste identidade ou digest de nenhum arquivo usado | Não há proveniência verificável nem forma de saber quais fontes produziram o artefato | Manifest somente com IDs estáveis relativos/package e SHA-256 dos bytes lidos; nunca path absoluto, mtime, temporary path ou secret |
+| Required capabilities | O resolver F1.3 produziu `allowed_tools=[serena_mcp]` no probe, mas o envelope não possui campo de capabilities | Consumidor não pode declarar previamente o conjunto de capabilities necessárias | União ordenada e sem duplicata das capabilities efetivamente permitidas aos nodes; disponibilidade/adapters/enforcement permanecem F3/F5 |
+| Grafo resolvido | `graph`, `resolved_contracts` e `resolved_policies` são serializados lado a lado | Não há envelope autoconsistente que vincule grafo, policies, contracts, capabilities e digests | Manter o campo público `graph`; o conjunto desses campos e validadores passa a ser a representação resolvida, sem criar um segundo formato |
+| Escrita | `compiler.py` chama `Path.write_text` diretamente no destino final | Probe controlado truncou um artefato válido, levantou `GraphWriteError` e deixou `{"torn":` inválido no destino | Temp exclusivo no mesmo diretório, flush+fsync, `os.replace` e limpeza; falha anterior ao replace preserva integralmente o artefato anterior |
+| Consumidores | `harness compile` e wrapper são produtores delegados; `harness run` localiza/compila e passa o path; `RuntimeEngine.run_workflow` chama `MAFAdapter.load_and_validate` como primeira ação e descarta o retorno; testes fazem loads diretos | `MAFAdapter` executa apenas `model_validate_json`; não verifica versões, digests, canonicalidade ou capabilities | Alterar somente o loader; RuntimeEngine, CLI, wrapper e execução por arestas permanecem fora do escopo |
+
+#### Gate de defensabilidade da F1.5
+
+| Campo | Estado atual |
+|---|---|
+| **Gate** | `READY` — problema, baseline, contrato, escopo, aceite, compatibilidade, rollback e fronteiras estão completos; isso não inicia a implementação |
+| **Checkpoint anterior** | `checkpoint/pre-f1.5-defensibility` → `60c7718bfad7b6241943d815051604c02342b139`, o mesmo commit de `checkpoint/f1.4-complete^{}` |
+| **Checkpoint de liberação** | `checkpoint/f1.5-ready` — tag local no commit exclusivamente documental deste dossiê; não publicada |
+| **Próximo passo permitido** | Em nova execução, implementar somente o allowlist congelado; qualquer arquivo, efeito ou regra adicional reabre o gate antes da edição correspondente |
+
+```yaml
+defensibility:
+  task_id: "F1.5"
+  gate: "READY"
+  executor: "Codex"
+  authorized_at: "2026-08-06T17:41:23-03:00"
+  problem_statement: >-
+    O artefato F1.4 é tipado, mas não é autocontido nem defensável: ordens semanticamente
+    equivalentes não possuem identidade normalizada, graph/policy/source/capability metadata está
+    ausente, versões incompatíveis e alterações válidas de grafo/policy são aceitas pelo loader e
+    uma falha após truncar o destino destrói o último artefato válido.
+  evidence:
+    - command: >-
+        git status --porcelain=v2 --branch; git rev-parse HEAD;
+        git rev-parse checkpoint/f1.4-complete^{}; git show --no-patch checkpoint/f1.4-complete
+      observed: >-
+        branch phase/f1-compiler-unification; status limpo; HEAD e tag peeled iguais a
+        60c7718bfad7b6241943d815051604c02342b139; commit feat(compiler): unify F1.4 graph compilation
+      location: ".git local; nenhuma alteração de outro executor"
+    - command: >-
+        probe Python confinado que constrói dois GraphSpec válidos com nodes/terminais em ordem
+        inversa e serializa CompiledGraphArtifact pelo caminho atual
+      observed: >-
+        ambos validam; bytes_equal=false; SHA-256 7a34a99637b692ae10579fc690d78c4f7073f27c2919084fdef0c14247f4eb1f
+        versus 18198b04b47108b1573231230dfe04d13c44489b5214dfbc0f1f7412de8329b2
+      location: "build/f1.5-audit/model-probe; contratos/graph.py"
+    - command: >-
+        listar CompiledGraphArtifact.model_fields e carregar cópias com versões 999.x via
+        MAFAdapter.load_and_validate
+      observed: >-
+        somente cinco campos atuais; graph_digest, policy_digest, contract_digests, source_manifest
+        e required_capabilities ausentes; artifact/package/graph schema incompatíveis aceitos
+      location: >-
+        src/ai_engineering_harness/contracts/graph.py:230-248;
+        src/ai_engineering_harness/runtime/maf_adapter.py:8-17
+    - command: >-
+        resolver graph de agente com serena_mcp, dois contratos internos e tool_policy; adulterar
+        separadamente schema de contrato, role do graph e human_approval_required da policy
+      observed: >-
+        dois digests sha256 de contrato presentes e schema adulterado rejeitado; graph/policy
+        adulterados aceitos; capability efetiva serena_mcp presente somente dentro da policy
+      location: >-
+        build/f1.5-audit/integrity-probe; contracts/{registry.py,policy_registry.py,graph.py}
+    - command: >-
+        compilar artefato válido, monkeypatchar Path.write_text para truncar o destino e levantar
+        OSError, então chamar GraphCompiler.compile_graph novamente
+      observed: >-
+        GraphWriteError levantado; artefato anterior não preservado; destino contém somente
+        {"torn": e não é JSON válido; compilação repetida sem falha era byte-idêntica
+      location: "src/ai_engineering_harness/compiler/compiler.py:93-102; build/f1.5-audit/atomic-probe"
+    - command: >-
+        rg de CompiledGraphArtifact, model_validate_json, MAFAdapter, graph/policy/source/capability
+        digests e APIs de escrita em src compiler tests
+      observed: >-
+        único consumidor de produção é MAFAdapter chamado no início de RuntimeEngine.run_workflow;
+        zero implementação dos campos F1.5 ou escrita temp+replace no compilador
+      location: >-
+        src/ai_engineering_harness/{cli/main.py,runtime/{engine.py,maf_adapter.py},compiler/compiler.py}
+  git_baseline:
+    branch: "phase/f1-compiler-unification"
+    head: "60c7718bfad7b6241943d815051604c02342b139"
+    f1_4_checkpoint: "checkpoint/f1.4-complete^{} = 60c7718bfad7b6241943d815051604c02342b139"
+    rollback_checkpoint: "checkpoint/pre-f1.5-defensibility^{} = 60c7718bfad7b6241943d815051604c02342b139"
+    worktree: "limpa antes deste dossiê; somente build/f1.5-audit e caches ignorados nas provas"
+    other_executor_changes: "nenhuma"
+    remote_boundary: "nenhuma branch ou tag F1 publicada; nenhum estado remoto consultado ou alterado"
+  baseline_verification:
+    - command: "& '.\\build\\f0.6-tools\\uv\\bin\\uv.exe' lock --check"
+      observed: "exit 0; 41 pacotes resolvidos"
+    - command: >-
+        com LOCALAPPDATA/TEMP/TMP confinados em build/f1.5-audit,
+        & '.\\.venv\\Scripts\\python.exe' -m pytest -q -p no:cacheprovider
+        --basetemp build/f1.5-audit/confined-pytest
+      observed: >-
+        exit 0; 201 testes e 6 subtests passaram. A tentativa sem confinamento teve 199 pass e
+        somente dois PermissionError em AppData/Local bloqueado pelo sandbox; nenhum teste de produto falhou
+    - command: "& '.\\.venv\\Scripts\\python.exe' -m mypy src"
+      observed: "exit 0; sem issues em 90 arquivos"
+    - command: >-
+        & '.\\.venv\\Scripts\\python.exe' -m ruff check .;
+        & '.\\.venv\\Scripts\\python.exe' -m compileall -q src compiler tests; git diff --check
+      observed: "todos exit 0"
+  frozen_contract:
+    artifact_schema: >-
+      ARTIFACT_SCHEMA_VERSION muda de 1.0 para 2.0 porque os novos campos obrigatórios tornam o
+      envelope incompatível; GRAPH_SCHEMA_VERSION e POLICY_SCHEMA_VERSION permanecem 1.0 e
+      PACKAGE_VERSION permanece a metadata instalada 0.1.0 nesta tarefa
+    required_fields: >-
+      CompiledGraphArtifact 2.0 exige artifact_schema_version, package_version, graph_digest,
+      policy_digest, contract_digests, source_manifest, required_capabilities, graph,
+      resolved_contracts e resolved_policies; extra continua proibido e não há defaults vazios
+      para metadata de integridade obrigatória
+    digest_format: "sha256:<64 hex minúsculos>, calculado sobre JSON UTF-8 canônico com allow_nan=false"
+    canonical_json: >-
+      mappings por chave; separadores compactos para digest; sem timestamp; somente coleções
+      semanticamente não ordenadas são normalizadas — nodes/terminais por id, graph policies/contracts
+      por referência, tool_permissions por tool/effect, contracts por referência/nome e policies por referência
+    graph_digest: "SHA-256 do GraphSpec canônico completo, incluindo versões, arestas, retries e permissões"
+    policy_digest: >-
+      SHA-256 da sequência canônica completa de ResolvedPolicySpec, incluindo envelopes e effective_policy;
+      nenhuma policy bruta ou inativa é adicionada ao digest efetivo
+    contract_digests: >-
+      tupla ordenada de objetos requested_reference, canonical_name e digest; deve corresponder
+      exatamente, um-para-um, aos ResolvedContractSpec e reutilizar seus digests F1.2 já verificados
+    source_manifest: >-
+      tupla ordenada de source_kind, source_id e content_digest para todo arquivo efetivamente lido
+      ou validado na compilação: graph YAML, JSON Schema externo, policy/role/tool catalog selecionado
+      e prompt override validado; project:// usa path POSIX relativo e package:// usa identidade de resource;
+      paths absolutos, traversal, temp paths, mtime, timestamp e conteúdo secreto são proibidos
+    source_digest: >-
+      SHA-256 dos bytes UTF-8 efetivamente lidos; comentários/formatação podem alterar proveniência,
+      mas não graph/policy/contract semantic digests após normalização
+    internal_contract_sources: >-
+      contratos Pydantic internos não expõem paths Python no manifest; package_version, canonical_name,
+      schema resolvido e digest os identificam. Python externo continua desabilitado pelo compilador F1.4
+    required_capabilities: >-
+      tupla lexicograficamente ordenada e sem duplicata da união de allowed_tools das decisões efetivas
+      por node na tool policy; denies e catálogo não usado são excluídos; vazio é válido
+    resolved_graph: >-
+      o campo público graph permanece o GraphSpec canônico e completo; resolved_contracts,
+      resolved_policies, seus digests, manifest e capabilities formam o único artefato resolvido;
+      não haverá segundo schema, header ou sidecar
+    deterministic_serialization: >-
+      mesmos bytes de todas as fontes e mesma package version produzem exatamente os mesmos bytes
+      UTF-8 com newline final. Fontes semanticamente equivalentes preservam os digests semânticos,
+      embora o content_digest de proveniência possa registrar diferença textual
+    timestamp: >-
+      nenhum compiled_at/timestamp entra no artefato F1.5; timestamps operacionais pertencem à
+      execução/auditoria futura e nunca participarão dos digests semânticos
+    atomic_write: >-
+      criar temp exclusivo no mesmo output_dir, escrever todos os bytes, flush e os.fsync do arquivo,
+      fechar, os.replace para o destino e fsync do diretório quando suportado; limpar temp em falha;
+      antes do replace o artefato anterior deve permanecer byte-a-byte intacto
+    load_order:
+      - "1. ler JSON e validar o schema estrito do envelope"
+      - "2. comparar artifact/package/graph/policy schema versions exatamente"
+      - "3. verificar canonicalidade e recomputar graph/policy/contract digests e capabilities"
+      - "4. resolver IDs project/package, reler as fontes e recomputar cada content_digest; fonte ausente ou divergente falha"
+      - "5. retornar CompiledGraphArtifact; só então RuntimeEngine pode continuar"
+    compatibility_errors:
+      - "ArtifactValidationError — base tipada do loader"
+      - "ArtifactCompatibilityError — qualquer namespace de versão incompatível"
+      - "ArtifactIntegrityError — JSON/schema/canonicalidade/digest/manifest/capabilities inconsistentes"
+      - "FileNotFoundError — preservado para path de artefato ausente"
+  frozen_scope:
+    allowed:
+      - "src/ai_engineering_harness/contracts/graph.py — modelos/validators e normalização do envelope F1.5"
+      - "src/ai_engineering_harness/contracts/__init__.py — exports públicos exclusivamente F1.5"
+      - "src/ai_engineering_harness/compiler/compiler.py — manifest/capabilities/digests, serialização canônica e escrita atômica"
+      - "src/ai_engineering_harness/versioning.py — somente ARTIFACT_SCHEMA_VERSION 1.0 -> 2.0"
+      - "src/ai_engineering_harness/runtime/maf_adapter.py — compatibilidade/integridade exatas antes da execução"
+      - "compiler/README.md — documentar somente o envelope 2.0 e publicação atômica reais"
+      - "tests/unit/test_artifact_determinism.py — novas provas positivas/negativas F1.5"
+      - "tests/unit/test_graph_contracts.py, test_contract_registry.py e test_policy_registry.py — migrar construções diretas para o envelope 2.0"
+      - "tests/unit/test_compiler_unification.py, test_public_module_imports.py e test_versioning.py — regressões de integração/API/versão"
+      - "tests/ci/smoke_compiled_artifact.py — smoke isolado novo da wheel e rejeição de artefato adulterado"
+      - "TASK.md — transições, evidências, resultado e checkpoints F1.5"
+      - "build/f1.5-*; build/; dist/; C:/tmp — temporários ignorados/confinados de verificação"
+    excluded:
+      - "src/ai_engineering_harness/defaults/**/*.yaml e qualquer YAML/schema de produção"
+      - "contracts/registry.py e policy_registry.py — algoritmos/digests F1.2/F1.3 permanecem congelados"
+      - "src/ai_engineering_harness/cli/main.py, compiler/compile.py e GraphVisualizer — delegação F1.4 permanece"
+      - "src/ai_engineering_harness/runtime/engine.py, FSM, persistência e execução de arestas/nós — F2"
+      - "providers, tools/adapters, MCPs, worktree, indexador e knowledge — F3/F4"
+      - "governance, PolicyEngine, trust, secrets, budget e approval — enforcement F5"
+      - "pyproject.toml, uv.lock, package version, dependências ou runtime Python"
+      - "timestamp de execução, auditoria, doctor, recovery, promoção ou rollback operacional — F2/F6/F7"
+      - "push, PR, merge, tag remota ou alteração de branch protection"
+  compatibility_strategy:
+    artifact_1_0: >-
+      incompatibilidade deliberada e fail-closed: artefato 1.0 ou sem metadata F1.5 é rejeitado;
+      não há preenchimento de digest, upgrade automático, fallback ou migração silenciosa
+    package_and_schemas: >-
+      package_version deve ser exatamente PACKAGE_VERSION instalada; graph_schema_version exatamente 1.0;
+      todo resolved_policy policy_schema_version exatamente 1.0; qualquer diferença exige recompilação
+    compiler_api: >-
+      GraphCompiler(project_root).compile_graph(path, workflow_name=None) -> Path, CLI/wrapper e
+      .harness/state/compiled/<workflow>.json permanecem inalterados
+    public_models: >-
+      GraphSpec, ResolvedContractSpec e ResolvedPolicySpec preservam campos e comportamento;
+      somente a construção direta de CompiledGraphArtifact passa a exigir metadata 2.0 completa
+    loader: >-
+      MAFAdapter.load_and_validate mantém nome, argumento e retorno, mas passa a falhar tipadamente
+      para incompatibilidade ou adulteração antes de o RuntimeEngine produzir side effect
+    source_paths: >-
+      manifest é portátil entre clones porque não contém root absoluto; package resources usam ID estável
+    no_migration: "recompilar a spec é a única migração autorizada de 1.0 para 2.0 nesta fase"
+  phase_boundaries:
+    f2: >-
+      F1.5 valida e retorna o artefato; não segue entrypoint/arestas, não executa node, não persiste
+      transição/checkpoint e não implementa resume/crash recovery
+    f3: >-
+      required_capabilities é declaração compilada; não verifica disponibilidade, não conecta provider,
+      Serena/Codebase-Memory/MCP, não executa tool e não cria worktree
+    f5: >-
+      policy_digest e visão efetiva provam integridade, não autorização runtime; PolicyEngine, deny/approval,
+      trust, secrets e budget continuam obrigatórios antes de side effects na F5
+  frozen_acceptance:
+    - command: >-
+        & '.\\build\\f0.6-tools\\uv\\bin\\uv.exe' run python -m pytest
+        tests/unit/test_artifact_determinism.py tests/unit/test_graph_contracts.py
+        tests/unit/test_contract_registry.py tests/unit/test_policy_registry.py
+        tests/unit/test_compiler_unification.py tests/unit/test_public_module_imports.py
+        tests/unit/test_versioning.py -q
+      expected: >-
+        exit 0; envelope 2.0 completo, APIs anteriores, defaults/consumidores, canonicalidade,
+        versions, digests, manifest, capabilities e round-trip passam
+    - command: >-
+        compilar duas vezes o mesmo conjunto de fontes e também specs semanticamente equivalentes
+        com ordens diferentes de nodes, terminais, refs e tool_permissions
+      expected: >-
+        fontes idênticas produzem bytes e todos os digests idênticos; reordenação preserva
+        graph/policy/contract digests e somente proveniência textual legitimamente diferente pode divergir
+    - command: >-
+        adulterar separadamente graph, resolved_policy, contract schema/digest, contract_digests,
+        source manifest e required_capabilities no JSON
+      expected: >-
+        ArtifactIntegrityError em todos os casos antes do retorno; nenhuma alteração válida porém
+        não vinculada é aceita e nenhum digest é confiado sem recomputação
+    - command: >-
+        carregar artifact_schema_version 1.0/999.0, package_version divergente,
+        graph_schema_version divergente e policy_schema_version divergente
+      expected: >-
+        ArtifactCompatibilityError para cada caso antes da primeira transição/arquivo de execução;
+        artefato atual 2.0 carrega exatamente uma vez
+    - command: >-
+        manifest com absolute path, traversal, backslash, ID duplicado, digest inválido, source ausente
+        ou package/project ID não canônico
+      expected: "ArtifactIntegrityError ou GraphValidationError; nenhum path local absoluto é serializado"
+    - command: >-
+        graph com allow/deny e duas roles, policy efetiva e catálogo com capabilities não usadas
+      expected: >-
+        required_capabilities contém somente união sorted/unique dos allowed_tools efetivos;
+        deny e capability apenas declarada não aparecem; campo não afirma adapter disponível
+    - command: >-
+        injetar falha em create/write/flush/fsync/replace do temp com artefato anterior existente
+      expected: >-
+        GraphWriteError; antes do replace o artefato anterior permanece byte-idêntico e nenhum temp órfão;
+        em sucesso o destino contém somente JSON 2.0 integral e validável
+    - command: >-
+        rg -n 'compiled_at|timestamp' no JSON compilado e compilar os cinco defaults copiados por harness init
+      expected: >-
+        zero timestamp volátil no envelope; cinco artefatos 2.0 completos, sem warning/fallback,
+        todos aceitos pelo loader exato
+    - command: >-
+        git diff --name-only checkpoint/pre-f1.5-defensibility...HEAD;
+        git diff --exit-code checkpoint/pre-f1.5-defensibility -- pyproject.toml uv.lock
+        src/ai_engineering_harness/runtime/engine.py src/ai_engineering_harness/cli/main.py
+        compiler/compile.py src/ai_engineering_harness/defaults
+      expected: "somente allowlist F1.5 alterado; dependências, YAML, CLI/wrapper e runtime engine idênticos"
+    - command: >-
+        & '.\\build\\f0.6-tools\\uv\\bin\\uv.exe' lock --check;
+        & '.\\build\\f0.6-tools\\uv\\bin\\uv.exe' sync --all-extras --locked;
+        com LOCALAPPDATA/TEMP/TMP confinados, & '.\\.venv\\Scripts\\python.exe' -m pytest;
+        & '.\\.venv\\Scripts\\python.exe' -m mypy src;
+        & '.\\.venv\\Scripts\\python.exe' -m ruff check .;
+        & '.\\.venv\\Scripts\\python.exe' -m compileall -q src compiler tests; git diff --check
+      expected: "todos exit 0; 201+ testes e 6 subtests, sem skips/ignores e lock inalterado"
+    - command: >-
+        & '.\\build\\f0.6-tools\\uv\\bin\\uv.exe' run python -m build;
+        & '.\\build\\f0.6-tools\\uv\\bin\\uv.exe' run python tests/ci/smoke_wheel.py;
+        & '.\\build\\f0.6-tools\\uv\\bin\\uv.exe' run python tests/ci/smoke_compiled_artifact.py
+      expected: >-
+        wheel/sdist sem bytecode; instalação isolada fora do checkout; versões públicas coerentes;
+        compile/load 2.0 verde e artefatos incompatível/adulterado rejeitados
+  rollback:
+    triggers:
+      - "mesmas fontes produzirem bytes ou digests diferentes"
+      - "graph, policy, contract, manifest ou capabilities adulterados carregarem"
+      - "versão incompatível alcançar RuntimeEngine além do loader"
+      - "falha anterior ao replace truncar/substituir o último artefato válido ou deixar temp órfão"
+      - "manifest expor path absoluto, timestamp, temp path, secret ou omitir fonte efetivamente usada"
+      - "capability negada/não usada aparecer como requerida ou required ser confundida com disponível"
+      - "implementação exigir YAML, registry F1.2/F1.3, dependência, CLI/wrapper, RuntimeEngine ou fronteira F2/F3/F5"
+      - "artifact 1.0 ser aceito por fallback/migração ou critério congelado precisar ser enfraquecido"
+    procedure: >-
+      interromper e preservar logs/artefatos; antes de commit inverter somente hunks F1.5 por
+      apply_patch; depois de commit usar git revert nos commits exclusivos F1.5; nunca resetar,
+      descartar ou sobrescrever trabalho preexistente; preservar checkpoint/pre-f1.5-defensibility
+    verify: >-
+      git status --short; git diff checkpoint/pre-f1.5-defensibility -- nos paths do allowlist;
+      confirmar paths excluídos byte-idênticos; repetir baseline F1.4 confinado, lock, mypy, Ruff,
+      compileall e os testes F1.5 de versão/integridade/atomicidade
+  external_boundary: >-
+    nenhum push, PR, merge, tag remota ou mudança de proteção está autorizado nesta tarefa sem
+    pedido explícito adicional do usuário
+```
+
+#### Checklist de liberação da F1.5
+
+```text
+[x] Baseline Git limpo, F1.4 e checkpoint de rollback comprovados
+[x] Determinismo atual e divergência por ordem reproduzidos separadamente
+[x] Envelope, graph/policy/contract digests, manifest, capabilities e grafo resolvido auditados
+[x] Aceitação de versões e adulteração graph/policy reproduzida; integridade de contrato confirmada
+[x] Corrupção por escrita interrompida reproduzida sem tocar arquivo rastreado
+[x] Consumidores atuais e ordem do loader mapeados
+[x] Contrato 2.0, compatibilidade exata e erro tipado congelados
+[x] Escopo permitido/proibido e fronteiras F2/F3/F5 congelados
+[x] Critérios positivos, negativos, regressão integral, wheel e rollback congelados
+[x] Nenhum Python, YAML/schema de produção, teste de implementação, dependência ou runtime alterado
+```
+
+**Estado de parada obrigatório:** o gate F1.5 está `READY`, mas a tarefa continua `pending`. Nenhum
+arquivo de implementação da F1.5 foi alterado nesta retomada e a Fase 2 não foi iniciada.
+
+---
+
 ## 6.1. Histórico detalhado da Fase 0
 
 ---
@@ -2327,6 +2669,7 @@ de `main`.
 | 2026-08-04 | DEC-005 | Exigir `CI required` em `main`, com branch atualizada e regra aplicada a administradores | Fazer o aggregate fail-closed governar merges reais, sem bypass administrativo implícito | PR #2 comprovou estado bloqueado no vermelho e restauração para limpo após revert; PR #1 permanece aberto e verde |
 | 2026-08-04 | DEC-006 | Separar capability declarada de adapter operacional e aplicar default-deny/deny-wins na resolução F1.3 | Evitar que um nome presente em YAML seja confundido com ferramenta executável ou que policy/role seja ampliada pelo node | F1.3 produz visão efetiva tipada; F1.4 integra o compilador, F3 implementa adapters e F5 impõe a decisão antes de side effects |
 | 2026-08-04 | DEC-007 | Adotar `ai_engineering_harness.compiler.GraphCompiler` como único pipeline e remover injeção implícita do wrapper | Dois artefatos e GateInjector contradizem validação única e arestas explícitas F1.1 | Wrapper e CLI apenas delegam; output é `CompiledGraphArtifact`; expansão/digest ficam F1.5 e execução das policies fica F2/F5 |
+| 2026-08-06 | DEC-008 | Evoluir o artifact schema de `1.0` para `2.0` e exigir compatibilidade exata, digests semânticos, proveniência e publicação atômica na F1.5 | Os campos obrigatórios são incompatíveis com o envelope F1.4 e preencher metadata ausente no load ocultaria adulteração/obsolescência | Artefato 1.0 deve ser recompilado, nunca migrado silenciosamente; capabilities continuam declarativas até F3/F5 e runtime por arestas continua F2 |
 
 > Registre aqui toda decisão arquitetural que diverge do plano. Formato: data ISO, ID (ADR-XXX), descrição, motivo, arquivos impactados.
 
@@ -2352,13 +2695,13 @@ de `main`.
 ```
 Data:              2026-08-06
 Fase:              F1
-Tarefa:            F1.4 — unificar os compiladores
-Estado:            completed — implementação e todos os critérios congelados aprovados
-Arquivos alterados: compiler oficial/exports/visualizer, CLI, MAFAdapter, wrapper/README, remoção GateInjector, cinco defaults, seis consumers/testes e TASK.md
-Validações:         47 focados; 201 testes + 6 subtests; mypy 90 arquivos; Ruff, compileall, lock/sync, build e dois smokes da wheel verdes
-Checkpoint:         checkpoint/f1.4-ready em 24348e929241e7e06b931d62cda062c0f87d9b86; checkpoint/f1.4-complete no commit da implementação
-Observação:         branch local phase/f1-compiler-unification; nenhuma branch/tag F1 publicada; F1.5/F2/F5 não implementadas
-Resultado:          único YAML→CompiledGraphArtifact, paths confinados, CLI/wrapper idênticos, run sem fallback e cinco defaults estritos
+Tarefa:            F1.5 — preparar auditoria e gate do artefato determinístico/versionado
+Estado:            pending — gate READY; implementação ainda não iniciada
+Arquivos alterados: somente TASK.md; provas confinadas/ignoradas em build/f1.5-audit e C:/tmp
+Validações:         201 testes + 6 subtests confinados; mypy 90 arquivos; Ruff, compileall, lock e diff check verdes; probes de ordem, versão, integridade e atomicidade executados
+Checkpoint:         checkpoint/pre-f1.5-defensibility no checkpoint/f1.4-complete; checkpoint/f1.5-ready no commit documental deste dossiê
+Observação:         branch local phase/f1-compiler-unification; nenhuma branch/tag F1 publicada; F1.5/F2/F3/F5 não implementadas nesta retomada
+Resultado:          contrato 2.0, escopo, compatibilidade, aceites, rollback e fronteiras F2/F3/F5 congelados; gate READY sem código
 ```
 
 ---
@@ -2366,13 +2709,13 @@ Resultado:          único YAML→CompiledGraphArtifact, paths confinados, CLI/w
 ## 11. Próxima Ação Exata
 
 ```text
-PREPARAR AUDITORIA E GATE F1.5 — SEM IMPLEMENTAR CÓDIGO:
-1. Confirmar branch phase/f1-compiler-unification, worktree limpo e checkpoint/f1.4-complete no commit da implementação.
-2. Reler integralmente o dossiê F1.5 no plano operacional e auditar artefato, serialização, versões, sources e consumidores atuais.
-3. Reproduzir concretamente as lacunas de determinismo, digests, manifest, capabilities, atomicidade e compatibilidade de versão.
-4. Congelar no TASK.md contrato, escopo permitido/proibido, aceites positivos/negativos, compatibilidade e rollback da F1.5.
-5. Criar checkpoint local de defensabilidade e gate READY somente se todas as evidências estiverem completas.
-6. Nesta retomada, não alterar Python, YAML de produção, schemas, testes de implementação, dependências ou runtime.
+IMPLEMENTAR SOMENTE A F1.5 CONGELADA — NÃO AVANÇAR PARA F2:
+1. Confirmar branch phase/f1-compiler-unification, worktree limpo e checkpoint/f1.5-ready no commit documental do gate.
+2. Reler integralmente o dossiê F1.5 acima; não ampliar allowlist, critérios, versões ou fronteiras sem recongelar o gate.
+3. Implementar o envelope 2.0, normalização, digests, manifest, required_capabilities, escrita atômica e loader exato apenas nos arquivos permitidos.
+4. Executar todos os aceites positivos/negativos, regressão integral confinada, build e smokes congelados.
+5. Se qualquer trigger de rollback ocorrer, interromper, preservar evidências e aplicar o procedimento não destrutivo registrado.
+6. Não implementar execução por arestas/FSM/persistência (F2), adapters/capability discovery (F3) ou enforcement de policy/trust/approval (F5).
 7. Não executar push, PR, merge, tag remota ou mudança de proteção.
 ```
 
