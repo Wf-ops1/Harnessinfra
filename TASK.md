@@ -139,6 +139,104 @@ defensibility:
 Se qualquer item estiver desmarcado, a tarefa permanece `pending` ou `blocked`. Alteração documental
 para preparar o próprio dossiê é permitida; alteração de código da tarefa não é.
 
+## 4.2. Ciclo Git obrigatório por tarefa — DEC-009
+
+**Estado:** `ACTIVE` a partir da F2.1. Esta é a regra persistente para qualquer executor futuro e deve
+ser lida junto da seção `Ciclo Git obrigatório por tarefa` do plano principal.
+
+```text
+main sincronizada + CI verde
+  → branch task/<id>-<descricao-curta>
+  → auditoria e gate READY
+  → implementação exclusiva da tarefa
+  → testes/quality gates/build/smoke/escopo
+  → checkpoint e TASK atualizados
+  → push + um PR autorizado para main
+  → CI required verde + merge commit autorizado
+  → comprovar merge e CI pós-merge em main
+  → somente então criar a branch da próxima tarefa
+```
+
+Regras obrigatórias:
+
+1. `main` é a única linha de integração oficial; deve permanecer protegida, testada e sem
+   desenvolvimento direto.
+2. Cada tarefa `F2.x` e posterior usa uma branch exclusiva criada da `main` já atualizada. Uma branch
+   pode ter commits de gate, implementação e fechamento da mesma tarefa, mas não acumula a tarefa
+   seguinte.
+3. A tarefa seguinte não começa sobre a branch anterior. Primeiro o PR anterior deve estar mesclado e
+   o CI pós-merge da `main` deve estar verde.
+4. Um PR corresponde a uma tarefa. Preferir merge commit para preservar os commits e permitir revert
+   isolado do merge; squash/rebase só ocorre por decisão explícita registrada.
+5. `TASK.md` registra somente fatos remotos observados. PR, CI, merge, SHA ou proteção nunca são
+   antecipados como concluídos.
+6. Push, PR, merge, exclusão de branch/tag remota e mudança de proteção continuam exigindo autorização
+   explícita do usuário; force-push e bypass administrativo são proibidos no fluxo normal.
+7. Após merge, a branch remota pode ser removida com autorização. Excluí-la não remove os commits já
+   incorporados à `main`.
+8. Mudança documental transversal usa branch `docs/<descricao-curta>` e PR próprio. Documentação que
+   prepara ou conclui uma tarefa acompanha a branch dessa tarefa.
+9. Checkpoints locais auxiliam rollback/retomada, mas não substituem commits, PR, CI ou evidência em
+   `TASK.md`.
+10. Se `main`, upstream, CI, proteção, PR anterior ou worktree divergirem do checkpoint, parar e alinhar
+    o estado antes de editar código.
+
+**Exceção histórica:** F1.1–F1.5 foram concluídas linearmente antes da DEC-009 e estão reunidas em
+`phase/f1-compiler-unification`. A F1 será promovida por um único PR. Nenhuma implementação da F2 pode
+começar antes de esse PR estar incorporado e o CI pós-merge da `main` estar verde. O commit documental
+GOV-GIT-001 que adota a própria regra acompanha a branch da F1 e não cria precedente futuro.
+
+### Registro de adoção da DEC-009
+
+```yaml
+defensibility:
+  task_id: "GOV-GIT-001"
+  gate: "READY"
+  executor: "Codex"
+  authorized_at: "2026-08-06T19:13:04-03:00"
+  problem_statement: >-
+    O protocolo defensável estava documentado, mas a unidade de branch/PR/merge entre tarefas não;
+    um executor futuro poderia voltar a acumular tarefas ou depender do chat para decidir como integrar.
+  evidence:
+    - command: >-
+        rg -n "branch|pull request|PR|merge|checkpoint|force-push" .agents/AGENTS.md TASK.md
+        docs/plano_implementacao_harness_operacional.md docs/handoff_fase_1.md
+      observed: >-
+        checkpoints, proteção e autorização remota existiam, mas nenhuma regra global exigia branch e
+        PR exclusivos por tarefa, merge anterior e CI pós-merge antes da tarefa seguinte
+    - command: >-
+        git status --porcelain=v2 --branch; git rev-parse HEAD; git rev-parse @{upstream};
+        git rev-parse checkpoint/f1.5-complete^{}
+      observed: >-
+        branch phase/f1-compiler-unification limpa e sincronizada; HEAD/upstream/checkpoint F1.5 em
+        15e38516e759c308d1d7a759ff03d0537dbcd867 antes desta mudança documental
+  frozen_scope:
+    allowed:
+      - ".agents/AGENTS.md — regra obrigatória para qualquer executor"
+      - "docs/plano_implementacao_harness_operacional.md — contrato principal do ciclo Git"
+      - "TASK.md — protocolo de retomada, DEC-009, evidência e próxima ação"
+    excluded:
+      - "qualquer Python, YAML/schema de produção, dependência, runtime ou teste"
+      - "criar branch F2.1, iniciar F2, abrir PR, mergear, alterar main/proteção ou publicar tag"
+      - "reescrever branches/commits/checkpoints da F1 ou fazer force-push"
+  frozen_acceptance:
+    - command: "git diff --check; validação UTF-8/Markdown e busca cruzada das regras"
+      expected: "exit 0; plano, AGENTS e TASK descrevem o mesmo ciclo sem conflito"
+    - command: "git diff --name-only; git diff --exit-code -- src tests pyproject.toml uv.lock"
+      expected: "somente os três documentos permitidos; zero mudança de produto/dependência/teste"
+  rollback:
+    triggers:
+      - "regra permitir desenvolvimento direto em main, tarefa seguinte antes do merge ou bypass de CI"
+      - "documentos divergirem sobre branch, PR, autorização, merge ou exceção histórica da F1"
+      - "qualquer arquivo fora do escopo documental mudar"
+    procedure: >-
+      antes do commit, inverter somente os hunks documentais com apply_patch; depois do commit, usar
+      git revert do commit exclusivo GOV-GIT-001; nunca resetar ou reescrever a F1
+    verify: >-
+      git status --short; git diff checkpoint/f1.5-complete -- .agents/AGENTS.md TASK.md
+      docs/plano_implementacao_harness_operacional.md; confirmar src/tests/lock byte-idênticos
+```
+
 ---
 
 ## 5. Fase Atual
@@ -2704,6 +2802,7 @@ de `main`.
 | 2026-08-04 | DEC-006 | Separar capability declarada de adapter operacional e aplicar default-deny/deny-wins na resolução F1.3 | Evitar que um nome presente em YAML seja confundido com ferramenta executável ou que policy/role seja ampliada pelo node | F1.3 produz visão efetiva tipada; F1.4 integra o compilador, F3 implementa adapters e F5 impõe a decisão antes de side effects |
 | 2026-08-04 | DEC-007 | Adotar `ai_engineering_harness.compiler.GraphCompiler` como único pipeline e remover injeção implícita do wrapper | Dois artefatos e GateInjector contradizem validação única e arestas explícitas F1.1 | Wrapper e CLI apenas delegam; output é `CompiledGraphArtifact`; expansão/digest ficam F1.5 e execução das policies fica F2/F5 |
 | 2026-08-06 | DEC-008 | Evoluir o artifact schema de `1.0` para `2.0` e exigir compatibilidade exata, digests semânticos, proveniência e publicação atômica na F1.5 | Os campos obrigatórios são incompatíveis com o envelope F1.4 e preencher metadata ausente no load ocultaria adulteração/obsolescência | Artefato 1.0 deve ser recompilado, nunca migrado silenciosamente; capabilities continuam declarativas até F3/F5 e runtime por arestas continua F2 |
+| 2026-08-06 | DEC-009 | Integrar uma tarefa por branch e PR a partir da F2.1, sempre sobre `main` pós-merge verde | PRs menores aceleram diagnóstico/revert e impedem que tarefas futuras se acumulem fora da linha oficial | `task/<id>-<descricao-curta>` nasce de `main`; um PR/merge commit por tarefa; próxima tarefa só após merge e CI pós-merge; F1 é exceção histórica promovida em um PR |
 
 > Registre aqui toda decisão arquitetural que diverge do plano. Formato: data ISO, ID (ADR-XXX), descrição, motivo, arquivos impactados.
 
@@ -2729,13 +2828,13 @@ de `main`.
 ```
 Data:              2026-08-06
 Fase:              F1
-Tarefa:            F1.5 — artefato determinístico e versionado; fechamento integral da Fase 1
-Estado:            completed — gate READY → COMPLETED; Fase 1 concluída; Fase 2 não iniciada
-Arquivos alterados: 13 paths do allowlist F1.5 e TASK.md; nenhum YAML/schema de produção, registry congelado, dependência, CLI/wrapper ou RuntimeEngine
-Validações:         151 testes focados; 229 testes + 6 subtests integrais; mypy 90; Ruff, compileall, diff/escopo, lock/sync, build e dois smokes isolados verdes
-Checkpoint:         checkpoint/pre-f1.5-defensibility → checkpoint/f1.5-ready → checkpoint/f1.5-complete (local, no commit deste fechamento)
-Observação:         branch phase/f1-compiler-unification publicada no GitHub por pedido do usuário; checkpoints permanecem somente locais; nenhum PR/merge/proteção alterado
-Resultado:          artifact schema 2.0 canônico, digests/manifest/capabilities defensáveis, publicação atômica e loader exato concluídos sem antecipar F2/F3/F5
+Tarefa:            GOV-GIT-001 — formalizar ciclo Git/execução por tarefa (DEC-009)
+Estado:            completed documental — regra ativa para F2.1+; Fase 1 permanece concluída; Fase 2 não iniciada
+Arquivos alterados: .agents/AGENTS.md, docs/plano_implementacao_harness_operacional.md e TASK.md; zero produto/teste/dependência
+Validações:         8 testes documentais + 6 subtests; UTF-8/Markdown, regras cruzadas, git diff --check e auditoria de escopo verdes
+Checkpoint:         checkpoint/f1.5-complete permanece o marco da implementação; commit documental GOV-GIT-001 subsequente na mesma branch antes do PR da F1
+Observação:         phase/f1-compiler-unification publicada e sincronizada antes desta documentação; nenhum PR/merge/tag remota/proteção executado
+Resultado:          uma branch + um PR por tarefa, main pós-merge verde como única base futura e exceção histórica da F1 persistidos fora do chat
 ```
 
 ---
@@ -2743,12 +2842,13 @@ Resultado:          artifact schema 2.0 canônico, digests/manifest/capabilities
 ## 11. Próxima Ação Exata
 
 ```text
-PARAR APÓS A FASE 1 — NÃO INICIAR IMPLEMENTAÇÃO DA F2:
-1. Confirmar branch phase/f1-compiler-unification limpa e checkpoint/f1.5-complete no commit final da Fase 1.
-2. Não alterar código, YAML, schemas, dependências, runtime ou testes em nome da F2 sem nova retomada.
-3. Quando o usuário autorizar a continuação, ler integralmente a Fase 2 do plano e preparar somente seu primeiro dossiê/gate de defensabilidade.
-4. Não reutilizar automaticamente o escopo, aceite ou autoridade da F1.5 na F2.
-5. Não executar PR, merge, tag remota ou mudança de proteção sem pedido explícito adicional.
+PROMOVER A F1 SOB A DEC-009 — NÃO INICIAR IMPLEMENTAÇÃO DA F2:
+1. Confirmar phase/f1-compiler-unification limpa/sincronizada, checkpoint/f1.5-complete ancestral e commit documental GOV-GIT-001 no HEAD.
+2. Somente com autorização explícita, abrir um único PR da branch da F1 para main; não enviar tags nem alterar proteção.
+3. Exigir branch atualizada e CI required verde; revisar que o diff contém F1.1–F1.5 e a documentação DEC-009, sem fases futuras.
+4. Somente com autorização explícita adicional, usar merge commit; não usar squash, rebase, force-push ou bypass.
+5. Após merge, confirmar main...origin/main, merge SHA, PR e CI pós-merge verde e registrar a promoção observada no TASK.md.
+6. Criar task/f2.1-execution-record somente da main promovida; preparar apenas o dossiê/gate F2.1 antes de código.
 ```
 
 ---
