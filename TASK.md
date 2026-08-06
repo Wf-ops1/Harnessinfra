@@ -147,8 +147,8 @@ para preparar o próprio dossiê é permitida; alteração de código da tarefa 
 
 **Objetivo:** transformar YAMLs declarativos em artefatos executáveis, validados e determinísticos.
 
-**Status da fase:** `in_progress` — F1.1–F1.3 concluídas; a auditoria da F1.4 está congelada em gate
-`READY`, mas sua implementação só pode começar em uma retomada posterior que confirme o checkpoint.
+**Status da fase:** `in_progress` — F1.1–F1.4 concluídas; a próxima retomada deve preparar somente
+a auditoria e o gate de defensabilidade da F1.5, sem implementar antes de um novo checkpoint `READY`.
 
 ### Coordenação e ambiente observado
 
@@ -985,7 +985,7 @@ defensibility:
 
 | Campo | Detalhe |
 |---|---|
-| **Status** | `pending` — gate `READY`; nenhuma implementação F1.4 foi iniciada |
+| **Status** | `completed` — gate `READY → IN_PROGRESS → COMPLETED`; todos os critérios congelados aprovados |
 | **Objetivo** | Fazer o package compiler ser o único caminho de YAML para `CompiledGraphArtifact`, conectar CLI/wrapper aos validators F1.1–F1.3 e eliminar fallback/formatos/destinos duplicados |
 | **Arquivos potencialmente alteráveis** | Compiler oficial e exports, CLI compile/run, wrapper/README legado, adapter/visualizer do artefato, cinco grafos default, consumidores de teste e `TASK.md` |
 | **Dependências** | F1.1–F1.3 concluídas; Pydantic, PyYAML e registries disponíveis; nenhuma dependência nova prevista |
@@ -1010,10 +1010,10 @@ defensibility:
 
 | Campo | Estado atual |
 |---|---|
-| **Gate** | `READY` — problema, contrato único, migração default, escopo, aceite e rollback congelados; código ainda não autorizado nesta retomada |
+| **Gate** | `READY → IN_PROGRESS → COMPLETED` — implementação permaneceu no allowlist e todos os critérios passaram |
 | **Checkpoint anterior** | `checkpoint/pre-f1.4-defensibility` → `07c8fc362a4bb791d727b0cb43129e8cabb6a26d` |
-| **Checkpoint de liberação** | `checkpoint/f1.4-ready` será criado no commit exclusivamente documental deste dossiê |
-| **Próximo passo permitido** | Em nova retomada, confirmar checkpoint/limpeza e implementar somente o allowlist; descoberta material reabre o gate |
+| **Checkpoint de liberação** | `checkpoint/f1.4-ready` → `24348e929241e7e06b931d62cda062c0f87d9b86`; confirmado antes da primeira edição |
+| **Próximo passo permitido** | Preparar somente a auditoria e o gate F1.5; determinismo/digests/atomicidade continuam sem autorização de implementação |
 
 ```yaml
 defensibility:
@@ -1260,6 +1260,38 @@ defensibility:
 [x] Critérios positivos, negativos, integral e wheel congelados
 [x] Nenhum código, YAML default ou teste F1.4 implementado nesta preparação
 ```
+
+#### Resultado e handoff da F1.4
+
+| Verificação final | Resultado |
+|---|---|
+| Pipeline e consumidores focados | exit 0; 47 testes passaram, incluindo 25 provas novas de unificação e confinamento |
+| Suíte integral confinada | exit 0; 201 testes + 6 subtests passaram |
+| `mypy src` | exit 0; sem issues em 90 arquivos |
+| `ruff check .`, `compileall` e `git diff --check` | todos exit 0 |
+| Compilador único | uma classe e um `compile_graph` no package; wrapper/CLI delegam; `GateInjector`, fallback e destino `.maf.json` removidos |
+| Defaults packaged | cinco grafos inicializados e compilados como `CompiledGraphArtifact`, com contratos e policies resolvidos e sem warning/fallback |
+| Falha segura | source/path/symlink, GraphSpec, contrato, policy, role, tool, workflow e escrita inválidos falham antes de criar ou alterar output |
+| Lock e ambiente | `uv lock --check` e `uv sync --all-extras --locked` exit 0; 41 pacotes resolvidos e 40 verificados; dependências/lock inalterados |
+| Build e smoke padrão | wheel/sdist `0.1.0` geradas sem bytecode; metadata, pacote e CLI aprovados fora do checkout |
+| Smoke público F1.4 | wheel isolada importou `GraphCompiler`, quatro erros e `CompiledGraphArtifact`; `harness init` + cinco compilações passaram em projeto temporário |
+| Escopo congelado | 20 paths versionados do allowlist; contratos F1.1–F1.3, dependências, runtime fora do adapter e superfícies F1.5/F2/F5 intocados |
+
+| Pergunta obrigatória | Resposta |
+|---|---|
+| **Qual comportamento anterior foi substituído?** | Dois compiladores permissivos geravam schemas e destinos diferentes; CLI aceitava inválidos e `run` fabricava um workflow ausente. Agora existe um pipeline tipado único e fail-closed. |
+| **Qual é o novo contrato público?** | `GraphCompiler(project_root).compile_graph(path, workflow_name=None) -> Path` valida source, `GraphSpec`, contratos e policies e grava somente `.harness/state/compiled/<graph.name>.json`; CLI e wrapper delegam à mesma API. |
+| **Quais erros tipados podem ocorrer?** | `GraphSourceError`, `GraphValidationError` e `GraphWriteError`, derivados de `GraphCompilerError`; CLI converte esses erros em exit não zero. |
+| **Quais side effects são produzidos?** | Leitura confinada do YAML e overrides declarativos; somente após validação integral são criados o diretório canônico e um JSON. Build/testes usam apenas temporários ignorados. |
+| **Onde o estado é persistido?** | Artefato tipado em `.harness/state/compiled/`, defaults no pacote, regressões nos testes e evidências/checkpoints neste painel e no Git local. |
+| **Como a operação é retomada após crash?** | Retomar de `checkpoint/f1.4-complete`, confirmar worktree/branch e preparar o dossiê F1.5 antes de qualquer mudança de determinismo ou versão do artefato. |
+| **Qual política autoriza a ação?** | Dossiê F1.4 `READY`, `checkpoint/f1.4-ready` e DEC-007; nenhuma ampliação material foi necessária. |
+| **Como secrets são protegidos?** | A compilação não acessa credenciais; Python externo permanece desabilitado e nenhum YAML cru, path absoluto ou secret é serializado na visão resolvida. |
+| **Quais eventos são emitidos?** | A compilação não emite eventos; o fluxo runtime existente permanece fora da execução por arestas, reservada à F2. |
+| **Quais testes provam sucesso?** | Artefato tipado, bytes idênticos CLI/wrapper, cinco defaults, overrides exatos, visualizer, MAFAdapter, consumidores, suíte integral e dois smokes externos. |
+| **Quais testes provam falha segura?** | Metadata/type/edge/terminal/retry, contrato/policy/role/tool, YAML/path/workflow, symlink de source/output, override estrito, write failure e workflow ausente retornam erro sem falso sucesso. |
+| **A wheel instalada externamente foi testada?** | Sim; dois smokes uv isolados importaram exclusivamente de `site-packages`; o adicional compilou os cinco defaults distribuídos. |
+| **A documentação foi atualizada?** | Sim; wrapper documentado como compatibilidade delegada e este painel registra contrato, provas, limites e retomada F1.5. |
 
 ---
 
@@ -2318,15 +2350,15 @@ de `main`.
 ## 10. Último Checkpoint
 
 ```
-Data:              2026-08-04
+Data:              2026-08-06
 Fase:              F1
-Tarefa:            F1.4 — auditoria e gate de unificação dos compiladores
-Estado:            pending — gate READY; implementação deliberadamente não iniciada nesta retomada
-Arquivos alterados: somente TASK.md; probes e artefatos de auditoria sob build/f1.4-audit estão ignorados
-Validações:         bypass/fallback/divergência reproduzidos; 176 testes; mypy 90 arquivos; Ruff, compileall, lock e diff-check verdes
-Checkpoint:         checkpoint/pre-f1.4-defensibility em 07c8fc362a4bb791d727b0cb43129e8cabb6a26d; checkpoint/f1.4-ready no commit documental
-Observação:         branch local phase/f1-compiler-unification; nenhuma branch/tag F1 publicada; nenhum código/YAML/teste F1.4 alterado
-Resultado:          pipeline, paths, artefato, errors, migração dos cinco defaults, aceites e fronteiras F1.5/F2/F5 congelados
+Tarefa:            F1.4 — unificar os compiladores
+Estado:            completed — implementação e todos os critérios congelados aprovados
+Arquivos alterados: compiler oficial/exports/visualizer, CLI, MAFAdapter, wrapper/README, remoção GateInjector, cinco defaults, seis consumers/testes e TASK.md
+Validações:         47 focados; 201 testes + 6 subtests; mypy 90 arquivos; Ruff, compileall, lock/sync, build e dois smokes da wheel verdes
+Checkpoint:         checkpoint/f1.4-ready em 24348e929241e7e06b931d62cda062c0f87d9b86; checkpoint/f1.4-complete no commit da implementação
+Observação:         branch local phase/f1-compiler-unification; nenhuma branch/tag F1 publicada; F1.5/F2/F5 não implementadas
+Resultado:          único YAML→CompiledGraphArtifact, paths confinados, CLI/wrapper idênticos, run sem fallback e cinco defaults estritos
 ```
 
 ---
@@ -2334,14 +2366,14 @@ Resultado:          pipeline, paths, artefato, errors, migração dos cinco defa
 ## 11. Próxima Ação Exata
 
 ```text
-IMPLEMENTAR F1.4 — SOMENTE O ESCOPO CONGELADO NO GATE READY:
-1. Confirmar branch phase/f1-compiler-unification, worktree limpo e checkpoint/f1.4-ready no commit documental.
-2. Reler integralmente o dossiê F1.4 e manter um único executor; não editar código antes dessa confirmação.
-3. Implementar package compiler único, wrapper/CLI delegados, MAFAdapter/visualizer tipados e remover fallback/GateInjector.
-4. Migrar exatamente os cinco grafos default e fixtures consumidoras conforme o contrato congelado.
-5. Executar todos os aceites de validators, paths, CLI/wrapper idênticos, defaults, integral, build e smokes da wheel.
-6. Se qualquer contrato F1.1–F1.3, dependência, F1.5 ou execução F2/F5 for necessário, parar e recongelar o gate.
-7. Registrar resultado e checkpoint/f1.4-complete somente após todos os critérios passarem; nenhuma operação remota.
+PREPARAR AUDITORIA E GATE F1.5 — SEM IMPLEMENTAR CÓDIGO:
+1. Confirmar branch phase/f1-compiler-unification, worktree limpo e checkpoint/f1.4-complete no commit da implementação.
+2. Reler integralmente o dossiê F1.5 no plano operacional e auditar artefato, serialização, versões, sources e consumidores atuais.
+3. Reproduzir concretamente as lacunas de determinismo, digests, manifest, capabilities, atomicidade e compatibilidade de versão.
+4. Congelar no TASK.md contrato, escopo permitido/proibido, aceites positivos/negativos, compatibilidade e rollback da F1.5.
+5. Criar checkpoint local de defensabilidade e gate READY somente se todas as evidências estiverem completas.
+6. Nesta retomada, não alterar Python, YAML de produção, schemas, testes de implementação, dependências ou runtime.
+7. Não executar push, PR, merge, tag remota ou mudança de proteção.
 ```
 
 ---
@@ -2408,4 +2440,4 @@ Atualizar status neste TASK.md ao concluir cada tarefa.
 
 ---
 
-*Atualizado em: 2026-08-04 | Fonte de verdade: docs/plano_implementacao_harness_operacional.md*
+*Atualizado em: 2026-08-06 | Fonte de verdade: docs/plano_implementacao_harness_operacional.md*

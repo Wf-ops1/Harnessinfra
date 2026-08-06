@@ -1,8 +1,10 @@
-# graphs/specs/refactoring.yaml
+# .harness/graphs/specs/refactoring.yaml
 graph:
   name: refactoring
   graph_schema_version: "1.0"
   definition_version: "3.2.0"
+  entrypoint: refactor_impact_analysis
+  status: stable
   description: "Grafo de refatoração estrutural mantendo contratos intactos (Modo 3: Limpeza e Refatoração)"
 
 policies:
@@ -11,12 +13,14 @@ policies:
   - policies/sandbox_policy.yaml
 
 contracts:
-  - contracts/nodes/architecture_analysis.py
-  - contracts/nodes/code_generation.py
-  - contracts/nodes/test_generation.py
+  - contracts/nodes/architecture_analysis.py#ArchitectureAnalysisInput
+  - contracts/nodes/architecture_analysis.py#ArchitectureAnalysisOutput
+  - contracts/nodes/code_generation.py#CodeGenerationInput
+  - contracts/nodes/code_generation.py#CodeGenerationOutput
 
 nodes:
   - id: refactor_impact_analysis
+    type: agent
     role: architecture_analyst
     input_contract: contracts/nodes/architecture_analysis.py#ArchitectureAnalysisInput
     output_contract: contracts/nodes/architecture_analysis.py#ArchitectureAnalysisOutput
@@ -24,6 +28,7 @@ nodes:
     on_failure: escalate_to_human
 
   - id: execute_refactor
+    type: agent
     role: code_agent
     input_contract: contracts/nodes/code_generation.py#CodeGenerationInput
     output_contract: contracts/nodes/code_generation.py#CodeGenerationOutput
@@ -31,7 +36,16 @@ nodes:
     on_failure: revert_and_escalate
 
   - id: verify_no_regression
+    type: deterministic
     executor: deterministic_policy
     policy_ref: policies/verification_policy.yaml
     on_success: END
     on_failure: revert_and_escalate
+
+terminal_states:
+  - id: END
+    outcome: success
+  - id: escalate_to_human
+    outcome: failure
+  - id: revert_and_escalate
+    outcome: failure

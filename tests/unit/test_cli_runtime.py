@@ -11,27 +11,70 @@ from ai_engineering_harness.compiler.visualizer import GraphVisualizer
 def test_graph_visualizer(tmp_path: Path):
     spec_file = tmp_path / "test_graph.yaml"
     spec_file.write_text("""
-name: test-workflow
+graph:
+  name: test-workflow
+  graph_schema_version: "1.0"
+  definition_version: "1.0.0"
+  entrypoint: step_1
+  status: stable
 nodes:
   - id: step_1
-    agent: Amelia
-    action: Code Implementation
+    type: agent
+    role: Amelia
+    input_contract: Input
+    output_contract: Output
+    on_success: step_2
+    on_failure: failed
   - id: step_2
-    agent: Winston
-    action: Review Architecture
+    type: agent
+    role: Winston
+    input_contract: Input
+    output_contract: Output
+    on_success: completed
+    on_failure: failed
+terminal_states:
+  - id: completed
+    outcome: success
+  - id: failed
+    outcome: failure
+policies: []
+contracts: []
 """, encoding="utf-8")
 
     mermaid_output = GraphVisualizer.render_mermaid(spec_file)
     assert "flowchart TD" in mermaid_output
-    assert "Amelia: Code Implementation" in mermaid_output
-    assert "Winston: Review Architecture" in mermaid_output
+    assert "step_1 (Amelia)" in mermaid_output
+    assert "step_2 (Winston)" in mermaid_output
+    assert "node_0 -->|success| node_1" in mermaid_output
+    assert "node_0 -->|failure| terminal_1" in mermaid_output
 
 def test_cli_compile_with_render(tmp_path: Path):
     runner = CliRunner()
-    spec_file = tmp_path / "sample.yaml"
-    spec_file.write_text("name: sample\nnodes: []", encoding="utf-8")
 
-    with runner.isolated_filesystem():
+    with runner.isolated_filesystem(temp_dir=tmp_path):
+        spec_file = Path("sample.yaml")
+        spec_file.write_text("""
+graph:
+  name: sample
+  graph_schema_version: "1.0"
+  definition_version: "1.0.0"
+  entrypoint: verify
+  status: stable
+nodes:
+  - id: verify
+    type: deterministic
+    executor: deterministic_gate
+    gate_name: sample
+    on_success: completed
+    on_failure: failed
+terminal_states:
+  - id: completed
+    outcome: success
+  - id: failed
+    outcome: failure
+policies: []
+contracts: []
+""", encoding="utf-8")
         res = runner.invoke(main, ["compile", str(spec_file), "--workflow", "sample", "--render"])
         assert res.exit_code == 0
         assert "Grafo compilado com sucesso" in res.output

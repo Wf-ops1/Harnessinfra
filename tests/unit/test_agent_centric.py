@@ -21,6 +21,36 @@ from ai_engineering_harness.runtime.state_machine import (
 from ai_engineering_harness.tools.router import ToolRouter
 
 
+def _write_runtime_graph(project_root: Path, workflow_name: str) -> Path:
+    graph_path = project_root / "spec.yaml"
+    graph_path.write_text(
+        f"""
+graph:
+  name: {workflow_name}
+  graph_schema_version: "1.0"
+  definition_version: "1.0.0"
+  entrypoint: step1
+  status: stable
+nodes:
+  - id: step1
+    type: deterministic
+    executor: deterministic_gate
+    gate_name: test
+    on_success: completed
+    on_failure: failed
+terminal_states:
+  - id: completed
+    outcome: success
+  - id: failed
+    outcome: failure
+policies: []
+contracts: []
+""",
+        encoding="utf-8",
+    )
+    return graph_path
+
+
 def test_context_assembly_produces_context_json(tmp_path: Path):
     assembler = ContextAssembler(project_root=tmp_path)
     pkg = assembler.assemble(execution_id="exec-ctx-1", intent="Add logging")
@@ -90,8 +120,7 @@ def test_fsm_rejects_invalid_transitions(tmp_path: Path):
 
 
 def test_post_verification_full_state_sequence(tmp_path: Path):
-    yaml_spec = tmp_path / "spec.yaml"
-    yaml_spec.write_text("nodes: {step1: {action: 'test'}}", encoding="utf-8")
+    yaml_spec = _write_runtime_graph(tmp_path, "seq_workflow")
     compiler = GraphCompiler(project_root=tmp_path)
     compiled_maf = compiler.compile_graph(yaml_spec, "seq_workflow")
     

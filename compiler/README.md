@@ -1,21 +1,19 @@
-# Graph Compiler (`compiler/`)
+# Graph Compiler compatibility wrapper
 
-O **Graph Compiler** é o árbitro de design-time do Harness.
-
-Ele valida a teia de dependências entre especificações de grafos (`graphs/specs/*.yaml`), contratos tipados (`contracts/**/*.py`) e políticas (`policies/*.yaml`), e emite as definições imutáveis do MAF em `graphs/compiled/*.maf.json`.
+`compiler/compile.py` é apenas um wrapper de compatibilidade. A única implementação pertence a
+`ai_engineering_harness.compiler.GraphCompiler` e aplica os contratos tipados, o registry seguro de
+contratos e o registry estrito de políticas antes de produzir qualquer arquivo.
 
 ---
 
 ## Como Executar
 
-Na raiz do repositório `ai-engineering-harness`:
+Na raiz do projeto inicializado:
 
 ```bash
-python compiler/compile.py --graph graphs/specs/new-feature.yaml
+python <caminho-do-harness>/compiler/compile.py --graph .harness/graphs/specs/new-feature.yaml
 ```
 
-### Saída Esperada:
-1. Validação dos schemas Pydantic de entrada e saída por nó.
-2. Validação da consistência das permissões de ferramentas por nó.
-3. Injeção determinística de verification gates de `policies/verification_policy.yaml`.
-4. Geração do arquivo JSON imutável em `graphs/compiled/new-feature.maf.json`.
+O único destino é `.harness/state/compiled/<workflow>.json`, no formato
+`CompiledGraphArtifact`. O wrapper não lê YAML diretamente, não injeta nós e não possui pipeline de
+compilação próprio.

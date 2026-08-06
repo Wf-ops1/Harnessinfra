@@ -1,8 +1,10 @@
-# graphs/specs/new-feature.yaml
+# .harness/graphs/specs/new-feature.yaml
 graph:
   name: new-feature
   graph_schema_version: "1.0"
   definition_version: "3.2.0"
+  entrypoint: context_retrieval
+  status: stable
   description: "Grafo completo de entrega de nova funcionalidade (Modo 1: Canhão de Nova Feature)"
 
 policies:
@@ -14,15 +16,20 @@ policies:
   - policies/knowledge_sync.yaml
 
 contracts:
-  - contracts/nodes/context_sufficiency.py
-  - contracts/nodes/architecture_analysis.py
-  - contracts/nodes/code_generation.py
-  - contracts/nodes/test_generation.py
-  - contracts/events/knowledge_sync.py
-  - contracts/transactions/knowledge_transaction.py
+  - contracts/nodes/context_sufficiency.py#RetrievalRequest
+  - contracts/nodes/context_sufficiency.py#ContextSufficiencyReport
+  - contracts/nodes/architecture_analysis.py#ArchitectureAnalysisInput
+  - contracts/nodes/architecture_analysis.py#ArchitectureAnalysisOutput
+  - contracts/nodes/code_generation.py#CodeGenerationInput
+  - contracts/nodes/code_generation.py#CodeGenerationOutput
+  - contracts/nodes/test_generation.py#TestGenerationInput
+  - contracts/nodes/test_generation.py#TestGenerationOutput
+  - contracts/transactions/knowledge_transaction.py#KnowledgeTransaction
+  - contracts/events/knowledge_sync.py#KnowledgeSyncCompleted
 
 nodes:
   - id: context_retrieval
+    type: agent
     role: requirement_analyst
     input_contract: contracts/nodes/context_sufficiency.py#RetrievalRequest
     output_contract: contracts/nodes/context_sufficiency.py#ContextSufficiencyReport
@@ -30,6 +37,7 @@ nodes:
     on_failure: escalate_to_human
 
   - id: architecture_analysis
+    type: agent
     role: architecture_analyst
     input_contract: contracts/nodes/architecture_analysis.py#ArchitectureAnalysisInput
     output_contract: contracts/nodes/architecture_analysis.py#ArchitectureAnalysisOutput
@@ -37,28 +45,49 @@ nodes:
     on_failure: escalate_to_human
 
   - id: code_generation
+    type: agent
     role: code_agent
     input_contract: contracts/nodes/code_generation.py#CodeGenerationInput
     output_contract: contracts/nodes/code_generation.py#CodeGenerationOutput
     on_success: test_generation
-    on_failure: retry_code_generation
+    on_failure: code_generation
+    retry_policy:
+      max_iterations: 2
+      exit_condition: all_required_gates_passed
 
   - id: test_generation
+    type: agent
     role: test_agent
     input_contract: contracts/nodes/test_generation.py#TestGenerationInput
     output_contract: contracts/nodes/test_generation.py#TestGenerationOutput
     on_success: verification_gates
-    on_failure: retry_code_generation
+    on_failure: code_generation
+    retry_policy:
+      max_iterations: 2
+      exit_condition: all_required_gates_passed
 
   - id: verification_gates
+    type: deterministic
     executor: deterministic_policy
     policy_ref: policies/verification_policy.yaml
     on_success: knowledge_sync_update
-    on_failure: retry_code_generation
+    on_failure: code_generation
+    retry_policy:
+      max_iterations: 2
+      exit_condition: all_required_gates_passed
 
   - id: knowledge_sync_update
+    type: agent
     role: knowledge_updater
     input_contract: contracts/transactions/knowledge_transaction.py#KnowledgeTransaction
     output_contract: contracts/events/knowledge_sync.py#KnowledgeSyncCompleted
     on_success: END
     on_failure: revert_and_fail
+
+terminal_states:
+  - id: END
+    outcome: success
+  - id: escalate_to_human
+    outcome: failure
+  - id: revert_and_fail
+    outcome: failure
