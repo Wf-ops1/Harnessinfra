@@ -147,8 +147,8 @@ para preparar o próprio dossiê é permitida; alteração de código da tarefa 
 
 **Objetivo:** transformar YAMLs declarativos em artefatos executáveis, validados e determinísticos.
 
-**Status da fase:** `in_progress` — F1.1–F1.4 concluídas; F1.5 permanece `pending`, com auditoria
-e gate de defensabilidade `READY`, mas sua implementação ainda não foi iniciada.
+**Status da fase:** `completed` — F1.1–F1.5 concluídas; todos os gates e critérios de saída da
+Fase 1 estão verdes. A Fase 2 não foi iniciada.
 
 ### Coordenação e ambiente observado
 
@@ -157,10 +157,10 @@ e gate de defensabilidade `READY`, mas sua implementação ainda não foi inicia
 | **Executor ativo** | `Codex` — responsável por implementar, validar, manter checkpoints e criar commits locais |
 | **Auditor/revisor** | `Antigravity` — somente-leitura por padrão; só edita quando o usuário solicitar explicitamente ou transferir a execução |
 | **Workspace** | `C:\Users\walla\OneDrive\Desktop\ai-engineering-harness` |
-| **Git** | `available` — branch local `phase/f1-compiler-unification`; `HEAD`/`checkpoint/f1.4-complete^{}` em `60c7718bfad7b6241943d815051604c02342b139`; `checkpoint/pre-f1.5-defensibility` ancora o mesmo baseline concluído; nenhuma branch/tag da F1 foi publicada |
+| **Git** | `available` — branch `phase/f1-compiler-unification`; `checkpoint/f1.4-complete^{}` em `60c7718bfad7b6241943d815051604c02342b139`; `checkpoint/f1.5-ready` ancora o gate e `checkpoint/f1.5-complete` ancora o fechamento local; branch publicada no GitHub por solicitação do usuário, sem tag remota |
 | **python_command** | `& 'C:\Users\walla\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe'` — Python `3.12.13` |
 | **uv_command** | `& '.\build\f0.6-tools\uv\bin\uv.exe'` — uv `0.11.32` restaurado de forma isolada/ignorada, sem PATH ou instalação global; `lock --check` e `sync --all-extras --locked` verdes |
-| **Dependências do projeto** | `.venv` gerida pelo uv 0.11.32 com Python 3.12.13 e `uv.lock`; 201 testes + 6 subtests, mypy em 90 arquivos, Ruff, compileall e lock verdes no baseline F1.4; build e dois smokes da wheel verdes no fechamento da F1.4 |
+| **Dependências do projeto** | `.venv` gerida pelo uv 0.11.32 com Python 3.12.13 e `uv.lock`; 229 testes + 6 subtests, mypy em 90 arquivos, Ruff, compileall, lock/sync, build e dois smokes isolados verdes no fechamento da F1.5 |
 | **Regra de escrita** | apenas um agente escreve por vez |
 
 ---
@@ -1299,7 +1299,7 @@ defensibility:
 
 | Campo | Detalhe |
 |---|---|
-| **Status** | `pending` — gate de defensabilidade `READY`; implementação ainda não iniciada |
+| **Status** | `completed` — gate `READY → COMPLETED`; implementação 2.0 e todos os critérios congelados aprovados |
 | **Objetivo** | Tornar o `CompiledGraphArtifact` canônico, verificável e atomicamente publicado, com versões exatas, digests semânticos, manifest de fontes e capabilities requeridas, sem antecipar execução ou enforcement |
 | **Arquivos potencialmente alteráveis** | Contrato do artefato, compilador oficial, loader do artefato, namespace da versão de schema, testes focados/consumidores diretos, documentação do wrapper e `TASK.md` |
 | **Dependências** | F1.1–F1.4 concluídas; SHA-256, JSON, tempfile, flush/fsync e replace atômico disponíveis na stdlib; nenhuma dependência nova prevista |
@@ -1324,10 +1324,10 @@ defensibility:
 
 | Campo | Estado atual |
 |---|---|
-| **Gate** | `READY` — problema, baseline, contrato, escopo, aceite, compatibilidade, rollback e fronteiras estão completos; isso não inicia a implementação |
+| **Gate** | `READY → COMPLETED` — problema, baseline, contrato, escopo, aceite, compatibilidade, rollback e fronteiras foram preservados e todos os critérios passaram |
 | **Checkpoint anterior** | `checkpoint/pre-f1.5-defensibility` → `60c7718bfad7b6241943d815051604c02342b139`, o mesmo commit de `checkpoint/f1.4-complete^{}` |
 | **Checkpoint de liberação** | `checkpoint/f1.5-ready` — tag local no commit exclusivamente documental deste dossiê; não publicada |
-| **Próximo passo permitido** | Em nova execução, implementar somente o allowlist congelado; qualquer arquivo, efeito ou regra adicional reabre o gate antes da edição correspondente |
+| **Próximo passo permitido** | Parar ao concluir o checkpoint; F2 exige dossiê e gate próprios em nova retomada antes de qualquer implementação |
 
 ```yaml
 defensibility:
@@ -1632,8 +1632,42 @@ defensibility:
 [x] Nenhum Python, YAML/schema de produção, teste de implementação, dependência ou runtime alterado
 ```
 
-**Estado de parada obrigatório:** o gate F1.5 está `READY`, mas a tarefa continua `pending`. Nenhum
-arquivo de implementação da F1.5 foi alterado nesta retomada e a Fase 2 não foi iniciada.
+#### Resultado e handoff da F1.5
+
+| Verificação final | Resultado |
+|---|---|
+| Aceitação focada | exit 0; 151 testes passaram para envelope/API, determinismo, versões, digests, manifest, capabilities, escrita atômica e consumers |
+| Suíte integral confinada | exit 0; 229 testes + 6 subtests passaram, sem skips ou ignores |
+| `mypy src` | exit 0; sem issues em 90 arquivos |
+| `ruff check .`, `compileall` e `git diff --check` | todos exit 0 |
+| Determinismo e normalização | fontes idênticas geram bytes idênticos; reordenação semântica preserva graph/policy/contract digests; somente o digest textual de proveniência pode mudar |
+| Envelope 2.0 | dez campos obrigatórios, sem defaults de integridade, timestamp ou path absoluto; graph/policy/contract digests e capabilities são recomputados |
+| Manifest de fontes | graph, JSON Schema externo e catálogos/prompt efetivamente selecionados usam IDs `project://`/`package://` e SHA-256 dos bytes UTF-8 |
+| Escrita atômica | temp exclusivo no mesmo diretório, write/flush/fsync/close/replace e fsync de diretório quando suportado; falhas em create/write/flush/fsync/replace preservam bytes anteriores e removem temp |
+| Loader fail-closed | versões artifact/package/graph/policy exatas, JSON canônico, envelope, digests, capabilities e todas as fontes verificados antes da primeira transição runtime |
+| Cinco defaults | `harness init` compilou bug-fix, incident, migration, new-feature e refactoring; todos foram aceitos pelo loader exato 2.0 |
+| Lock e ambiente | `uv lock --check` e `uv sync --all-extras --locked` exit 0; 41 pacotes resolvidos e 40 verificados; `pyproject.toml`/`uv.lock` inalterados |
+| Build e smokes | wheel/sdist 0.1.0 geradas; smoke padrão e smoke F1.5 instalaram fora do checkout, compilaram/carregaram 2.0 e rejeitaram versão/adulteração |
+| Escopo congelado | somente 13 paths de implementação/teste/documentação do allowlist e `TASK.md`; YAMLs, registries F1.2/F1.3, CLI/wrapper, RuntimeEngine, dependências e fronteiras F2/F3/F5 byte-idênticos |
+
+| Pergunta obrigatória | Resposta |
+|---|---|
+| **Qual comportamento anterior foi substituído?** | O envelope 1.0 aditivo, gravado diretamente e aceito por mera validação Pydantic, foi substituído por um artefato 2.0 canônico, vinculado por digests/proveniência e publicado atomicamente. |
+| **Qual é o novo contrato público?** | `CompiledGraphArtifact` exige as dez visões congeladas; `GraphCompiler.compile_graph(...) -> Path` preserva API/destino; `MAFAdapter.load_and_validate(path) -> CompiledGraphArtifact` só retorna após compatibilidade e integridade completas. |
+| **Quais erros tipados podem ocorrer?** | O compilador preserva `GraphSourceError`, `GraphValidationError` e `GraphWriteError`; o loader preserva `FileNotFoundError` e adiciona `ArtifactValidationError`, `ArtifactCompatibilityError` e `ArtifactIntegrityError`. |
+| **Quais side effects são produzidos?** | Leitura confinada das fontes selecionadas e publicação atômica de um único JSON em `.harness/state/compiled/`; nenhum node, tool, provider, policy runtime ou evento é executado. |
+| **Onde o estado é persistido?** | No artefato 2.0 canônico, incluindo grafo/contratos/policies resolvidos, digests, manifest e capabilities; evidências e checkpoint ficam no Git/TASK. |
+| **Como a operação é retomada após crash?** | Artefato anterior permanece íntegro antes do replace; retomar de `checkpoint/f1.5-complete`, verificar branch/status e abrir novo dossiê antes de F2. |
+| **Qual política autoriza a ação?** | Dossiê F1.5 `READY`, `checkpoint/f1.5-ready`, contrato congelado e DEC-008; nenhuma ampliação material ocorreu. |
+| **Como secrets são protegidos?** | O manifest contém somente IDs relativos/package e digests, nunca conteúdo, path absoluto, mtime, temp path ou credencial; Python externo permanece desabilitado. |
+| **Quais eventos são emitidos?** | Nenhum; timestamps e eventos operacionais pertencem às fases runtime/observabilidade futuras. |
+| **Quais testes provam sucesso?** | Bytes repetidos, reordenação semântica, cinco defaults, round-trip tipado, capabilities efetivas, loader exato, suíte integral e dois smokes externos da wheel. |
+| **Quais testes provam falha segura?** | Adulterações separadas de graph/policy/contracts/index/manifest/capabilities, versões divergentes, IDs inseguros/ausentes/duplicados, JSON não canônico e cinco pontos de falha atômica. |
+| **A wheel instalada externamente foi testada?** | Sim; os dois smokes uv isolados importaram de `site-packages`; o smoke F1.5 compilou/carregou 2.0 e rejeitou adulteração e package version divergente. |
+| **A documentação foi atualizada?** | Sim; `compiler/README.md` descreve apenas envelope 2.0, publicação atômica e limites reais, e este painel fecha a Fase 1. |
+
+**Estado de parada obrigatório:** a F1.5 e a Fase 1 estão `completed`. A implementação da Fase 2
+não foi iniciada; qualquer continuação exige novo dossiê de defensabilidade.
 
 ---
 
@@ -2695,13 +2729,13 @@ de `main`.
 ```
 Data:              2026-08-06
 Fase:              F1
-Tarefa:            F1.5 — preparar auditoria e gate do artefato determinístico/versionado
-Estado:            pending — gate READY; implementação ainda não iniciada
-Arquivos alterados: somente TASK.md; provas confinadas/ignoradas em build/f1.5-audit e C:/tmp
-Validações:         201 testes + 6 subtests confinados; mypy 90 arquivos; Ruff, compileall, lock e diff check verdes; probes de ordem, versão, integridade e atomicidade executados
-Checkpoint:         checkpoint/pre-f1.5-defensibility no checkpoint/f1.4-complete; checkpoint/f1.5-ready no commit documental deste dossiê
-Observação:         branch local phase/f1-compiler-unification; nenhuma branch/tag F1 publicada; F1.5/F2/F3/F5 não implementadas nesta retomada
-Resultado:          contrato 2.0, escopo, compatibilidade, aceites, rollback e fronteiras F2/F3/F5 congelados; gate READY sem código
+Tarefa:            F1.5 — artefato determinístico e versionado; fechamento integral da Fase 1
+Estado:            completed — gate READY → COMPLETED; Fase 1 concluída; Fase 2 não iniciada
+Arquivos alterados: 13 paths do allowlist F1.5 e TASK.md; nenhum YAML/schema de produção, registry congelado, dependência, CLI/wrapper ou RuntimeEngine
+Validações:         151 testes focados; 229 testes + 6 subtests integrais; mypy 90; Ruff, compileall, diff/escopo, lock/sync, build e dois smokes isolados verdes
+Checkpoint:         checkpoint/pre-f1.5-defensibility → checkpoint/f1.5-ready → checkpoint/f1.5-complete (local, no commit deste fechamento)
+Observação:         branch phase/f1-compiler-unification publicada no GitHub por pedido do usuário; checkpoints permanecem somente locais; nenhum PR/merge/proteção alterado
+Resultado:          artifact schema 2.0 canônico, digests/manifest/capabilities defensáveis, publicação atômica e loader exato concluídos sem antecipar F2/F3/F5
 ```
 
 ---
@@ -2709,14 +2743,12 @@ Resultado:          contrato 2.0, escopo, compatibilidade, aceites, rollback e f
 ## 11. Próxima Ação Exata
 
 ```text
-IMPLEMENTAR SOMENTE A F1.5 CONGELADA — NÃO AVANÇAR PARA F2:
-1. Confirmar branch phase/f1-compiler-unification, worktree limpo e checkpoint/f1.5-ready no commit documental do gate.
-2. Reler integralmente o dossiê F1.5 acima; não ampliar allowlist, critérios, versões ou fronteiras sem recongelar o gate.
-3. Implementar o envelope 2.0, normalização, digests, manifest, required_capabilities, escrita atômica e loader exato apenas nos arquivos permitidos.
-4. Executar todos os aceites positivos/negativos, regressão integral confinada, build e smokes congelados.
-5. Se qualquer trigger de rollback ocorrer, interromper, preservar evidências e aplicar o procedimento não destrutivo registrado.
-6. Não implementar execução por arestas/FSM/persistência (F2), adapters/capability discovery (F3) ou enforcement de policy/trust/approval (F5).
-7. Não executar push, PR, merge, tag remota ou mudança de proteção.
+PARAR APÓS A FASE 1 — NÃO INICIAR IMPLEMENTAÇÃO DA F2:
+1. Confirmar branch phase/f1-compiler-unification limpa e checkpoint/f1.5-complete no commit final da Fase 1.
+2. Não alterar código, YAML, schemas, dependências, runtime ou testes em nome da F2 sem nova retomada.
+3. Quando o usuário autorizar a continuação, ler integralmente a Fase 2 do plano e preparar somente seu primeiro dossiê/gate de defensabilidade.
+4. Não reutilizar automaticamente o escopo, aceite ou autoridade da F1.5 na F2.
+5. Não executar PR, merge, tag remota ou mudança de proteção sem pedido explícito adicional.
 ```
 
 ---

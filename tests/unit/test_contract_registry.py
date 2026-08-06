@@ -21,6 +21,7 @@ from ai_engineering_harness.contracts import (
     InvalidContractReferenceError,
     InvalidContractSchemaError,
     ResolvedContractSpec,
+    SourceManifestEntry,
     UntrustedPythonContractError,
 )
 from ai_engineering_harness.contracts.nodes.context_sufficiency import RetrievalRequest
@@ -409,16 +410,24 @@ def test_compiled_artifact_round_trip_contains_resolved_schema_and_digest() -> N
         graph.nodes[0].output_contract,
         *graph.contracts,
     ]
-    artifact = CompiledGraphArtifact(
-        artifact_schema_version=ARTIFACT_SCHEMA_VERSION,
-        package_version=PACKAGE_VERSION,
+    artifact = CompiledGraphArtifact.build(
         graph=graph,
         resolved_contracts=registry.resolve_many(references),
+        resolved_policies=(),
+        source_manifest=(
+            SourceManifestEntry(
+                source_kind="graph",
+                source_id="project://graph.yaml",
+                content_digest="sha256:" + "0" * 64,
+            ),
+        ),
     )
 
-    restored = CompiledGraphArtifact.model_validate_json(artifact.model_dump_json())
+    restored = CompiledGraphArtifact.model_validate_json(artifact.canonical_json())
 
     assert restored == artifact
+    assert restored.artifact_schema_version == ARTIFACT_SCHEMA_VERSION
+    assert restored.package_version == PACKAGE_VERSION
     assert len(restored.resolved_contracts) == 1
     assert restored.resolved_contracts[0].contract_schema["type"] == "object"
     assert restored.resolved_contracts[0].digest.startswith("sha256:")

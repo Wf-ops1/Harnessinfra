@@ -22,6 +22,7 @@ from ai_engineering_harness.contracts import (
     PolicyRegistryError,
     ResolvedPolicySpec,
     RoleNotFoundError,
+    SourceManifestEntry,
     ToolNotFoundError,
     UnauthorizedToolError,
 )
@@ -315,37 +316,62 @@ def test_effective_policy_is_detached_from_subsequent_mutation() -> None:
 
 
 def test_compiled_artifact_round_trip_preserves_additive_policy_view() -> None:
-    graph = _valid_graph()
     contract_reference = "ai_engineering_harness.contracts.nodes.context_sufficiency.RetrievalRequest"
-    artifact = CompiledGraphArtifact(
-        artifact_schema_version=ARTIFACT_SCHEMA_VERSION,
-        package_version=PACKAGE_VERSION,
+    graph_data = _valid_graph_data()
+    graph_data["nodes"][0]["input_contract"] = contract_reference
+    graph_data["nodes"][0]["output_contract"] = contract_reference
+    graph = GraphSpec.model_validate(graph_data)
+    artifact = CompiledGraphArtifact.build(
         graph=graph,
         resolved_contracts=ContractRegistry().resolve_many([contract_reference]),
         resolved_policies=PolicyRegistry().resolve_graph(graph),
+        source_manifest=(
+            SourceManifestEntry(
+                source_kind="graph",
+                source_id="project://graph.yaml",
+                content_digest="sha256:" + "0" * 64,
+            ),
+        ),
     )
 
-    restored = CompiledGraphArtifact.model_validate_json(artifact.model_dump_json())
+    restored = CompiledGraphArtifact.model_validate_json(artifact.canonical_json())
 
     assert restored == artifact
+    assert restored.artifact_schema_version == ARTIFACT_SCHEMA_VERSION
+    assert restored.package_version == PACKAGE_VERSION
     assert restored.resolved_contracts[0].digest.startswith("sha256:")
     assert isinstance(restored.resolved_policies, tuple)
     assert restored.resolved_policies[0].requested_reference == "policies/tool_policy.yaml"
 
 
-def test_compiled_artifact_preserves_old_construction_and_rejects_duplicate_views() -> None:
-    artifact = CompiledGraphArtifact(
-        artifact_schema_version=ARTIFACT_SCHEMA_VERSION,
-        package_version=PACKAGE_VERSION,
-        graph=_valid_graph(),
-    )
-    assert artifact.resolved_policies == ()
-
-    resolved = PolicyRegistry().resolve("policies/tool_policy.yaml")
-    with pytest.raises(ValidationError, match="must be unique"):
-        CompiledGraphArtifact(
-            artifact_schema_version=ARTIFACT_SCHEMA_VERSION,
-            package_version=PACKAGE_VERSION,
-            graph=_valid_graph(),
-            resolved_policies=(resolved, resolved),
+def test_compiled_artifact_rejects_legacy_envelope_and_duplicate_views() -> None:
+    with pytest.raises(ValidationError, match="Field required"):
+        CompiledGraphArtifact.model_validate(
+            {
+                "artifact_schema_version": ARTIFACT_SCHEMA_VERSION,
+                "package_version": PACKAGE_VERSION,
+                "graph": _valid_graph().model_dump(mode="json"),
+            }
         )
+
+    contract_reference = "ai_engineering_harness.contracts.nodes.context_sufficiency.RetrievalRequest"
+    graph_data = _valid_graph_data()
+    graph_data["nodes"][0]["input_contract"] = contract_reference
+    graph_data["nodes"][0]["output_contract"] = contract_reference
+    graph = GraphSpec.model_validate(graph_data)
+    artifact = CompiledGraphArtifact.build(
+        graph=graph,
+        resolved_contracts=ContractRegistry().resolve_many([contract_reference]),
+        resolved_policies=PolicyRegistry().resolve_graph(graph),
+        source_manifest=(
+            SourceManifestEntry(
+                source_kind="graph",
+                source_id="project://graph.yaml",
+                content_digest="sha256:" + "0" * 64,
+            ),
+        ),
+    )
+    duplicate = artifact.model_dump(mode="json")
+    duplicate["resolved_policies"].append(duplicate["resolved_policies"][-1])
+    with pytest.raises(ValidationError, match="must be unique"):
+        CompiledGraphArtifact.model_validate(duplicate)

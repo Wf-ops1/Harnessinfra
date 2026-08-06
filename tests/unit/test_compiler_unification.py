@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from collections.abc import Callable
@@ -12,7 +13,6 @@ from typing import Any
 import pytest
 import yaml
 from click.testing import CliRunner
-from pydantic import ValidationError
 
 from ai_engineering_harness.cli.main import main
 from ai_engineering_harness.compiler import (
@@ -22,7 +22,7 @@ from ai_engineering_harness.compiler import (
     GraphWriteError,
 )
 from ai_engineering_harness.contracts import CompiledGraphArtifact
-from ai_engineering_harness.runtime.maf_adapter import MAFAdapter
+from ai_engineering_harness.runtime.maf_adapter import ArtifactIntegrityError, MAFAdapter
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_GRAPHS = REPOSITORY_ROOT / "src" / "ai_engineering_harness" / "defaults" / "graphs"
@@ -77,7 +77,12 @@ def test_canonical_compiler_emits_only_typed_artifact_after_validation(tmp_path:
     assert artifact.resolved_policies == ()
     assert set(json.loads(output.read_text(encoding="utf-8"))) == {
         "artifact_schema_version",
+        "contract_digests",
+        "graph_digest",
         "package_version",
+        "policy_digest",
+        "required_capabilities",
+        "source_manifest",
         "graph",
         "resolved_contracts",
         "resolved_policies",
@@ -173,9 +178,11 @@ def test_harness_init_defaults_all_compile_with_project_overrides(
     for graph_name in graph_names:
         source = tmp_path / ".harness" / "graphs" / "specs" / f"{graph_name}.yaml"
         output = compiler.compile_graph(source, graph_name)
-        artifact = CompiledGraphArtifact.model_validate_json(output.read_text(encoding="utf-8"))
+        artifact = MAFAdapter.load_and_validate(output)
         assert artifact.graph.graph.name == graph_name
         assert artifact.resolved_policies
+        assert artifact.artifact_schema_version == "2.0"
+        assert artifact.source_manifest
 
     assert sorted(path.stem for path in compiler.output_dir.glob("*.json")) == graph_names
     assert not (tmp_path / "graphs").exists()
@@ -321,17 +328,21 @@ def test_write_failure_is_typed_after_successful_validation(
 ) -> None:
     source = _write_graph(tmp_path, _valid_graph())
     compiler = GraphCompiler(tmp_path)
-    original_write_text = Path.write_text
+    output = compiler.compile_graph(source)
+    previous = output.read_bytes()
+    document = _valid_graph()
+    document["graph"]["definition_version"] = "2.0.0"
+    source.write_text(yaml.safe_dump(document, sort_keys=False), encoding="utf-8")
 
-    def fail_artifact_write(path: Path, *args: object, **kwargs: object) -> int:
-        if path == compiler.compiled_path("sample"):
-            raise OSError("controlled write failure")
-        return original_write_text(path, *args, **kwargs)
+    def fail_artifact_replace(source_path: object, target_path: object) -> None:
+        del source_path, target_path
+        raise OSError("controlled replace failure")
 
-    monkeypatch.setattr(Path, "write_text", fail_artifact_write)
-    with pytest.raises(GraphWriteError, match="controlled write failure"):
+    monkeypatch.setattr(os, "replace", fail_artifact_replace)
+    with pytest.raises(GraphWriteError, match="controlled replace failure"):
         compiler.compile_graph(source)
-    assert not compiler.compiled_path("sample").exists()
+    assert output.read_bytes() == previous
+    assert not tuple(compiler.output_dir.glob("*.tmp"))
 
 
 def test_output_directory_symlink_escape_is_rejected_before_write(
@@ -369,7 +380,7 @@ def test_maf_adapter_returns_typed_artifact_and_rejects_tampering(tmp_path: Path
     tampered = json.loads(output.read_text(encoding="utf-8"))
     del tampered["package_version"]
     output.write_text(json.dumps(tampered), encoding="utf-8")
-    with pytest.raises(ValidationError):
+    with pytest.raises(ArtifactIntegrityError):
         MAFAdapter.load_and_validate(output)
 
 

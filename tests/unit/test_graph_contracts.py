@@ -18,6 +18,7 @@ from ai_engineering_harness.contracts import (
     HumanApprovalNodeSpec,
     NodeSpec,
     RetryPolicySpec,
+    SourceManifestEntry,
     TerminalStateSpec,
     ToolPermissionSpec,
 )
@@ -38,7 +39,19 @@ PUBLIC_GRAPH_SYMBOLS = {
     "RetryPolicySpec",
     "ToolPermissionSpec",
     "CompiledGraphArtifact",
+    "ContractDigestSpec",
+    "SourceManifestEntry",
 }
+
+
+def _source_manifest() -> tuple[SourceManifestEntry, ...]:
+    return (
+        SourceManifestEntry(
+            source_kind="graph",
+            source_id="project://graph.yaml",
+            content_digest="sha256:" + "0" * 64,
+        ),
+    )
 
 
 def _valid_graph_data() -> dict[str, Any]:
@@ -156,15 +169,32 @@ def test_schema_version_alias_serializes_to_canonical_namespace() -> None:
 
 
 def test_compiled_artifact_round_trip() -> None:
-    artifact = CompiledGraphArtifact(
-        artifact_schema_version=ARTIFACT_SCHEMA_VERSION,
-        package_version=PACKAGE_VERSION,
-        graph=GraphSpec.model_validate(_valid_graph_data()),
+    graph_data = _valid_graph_data()
+    graph_data["policies"] = []
+    graph_data["contracts"] = []
+    graph_data["nodes"] = [
+        {
+            "id": "verify",
+            "type": "deterministic",
+            "executor": "deterministic_gate",
+            "gate_name": "verified",
+            "on_success": "completed",
+            "on_failure": "failed",
+        }
+    ]
+    graph_data["graph"]["entrypoint"] = "verify"
+    artifact = CompiledGraphArtifact.build(
+        graph=GraphSpec.model_validate(graph_data),
+        resolved_contracts=(),
+        resolved_policies=(),
+        source_manifest=_source_manifest(),
     )
 
-    restored = CompiledGraphArtifact.model_validate_json(artifact.model_dump_json())
+    restored = CompiledGraphArtifact.model_validate_json(artifact.canonical_json())
 
     assert restored == artifact
+    assert restored.artifact_schema_version == ARTIFACT_SCHEMA_VERSION
+    assert restored.package_version == PACKAGE_VERSION
     assert restored.graph.graph.graph_schema_version == GRAPH_SCHEMA_VERSION
     assert restored.resolved_contracts == ()
     assert restored.resolved_policies == ()
