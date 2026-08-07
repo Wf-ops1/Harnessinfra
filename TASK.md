@@ -246,10 +246,10 @@ defensibility:
 **Objetivo:** executar cada nó do artefato compilado, persistir todas as transições e permitir
 retomada após interrupção.
 
-**Status da fase:** `in_progress` — a F1 e a F2.1 foram promovidas por merge commits para `main`
-e os respectivos CIs pós-merge estão verdes. A F2.2-R1 está concluída e integralmente verificada
-no repositório local após corrigir a falha real de type check do Ubuntu/Python 3.11; sua promoção
-remota permanece pendente e a F2.3 não foi iniciada.
+**Status da fase:** `in_progress` — a F1, a F2.1 e a F2.2 foram promovidas por merge commits para
+`main`, e os respectivos CIs pós-merge estão verdes. A F2.3 foi concluída e integralmente verificada
+na branch exclusiva sobre `main == origin/main == b8307ca`; sua promoção permanece pendente e a F2.4
+não foi iniciada.
 
 ### Coordenação e ambiente observado
 
@@ -258,7 +258,7 @@ remota permanece pendente e a F2.3 não foi iniciada.
 | **Executor ativo** | `Codex` — responsável por implementar, validar, manter checkpoints e criar commits locais |
 | **Auditor/revisor** | `Antigravity` — somente-leitura por padrão; só edita quando o usuário solicitar explicitamente ou transferir a execução |
 | **Workspace** | `C:\Users\walla\OneDrive\Desktop\ai-engineering-harness` |
-| **Git** | `available` — branch `task/f2.2-state-storage` concluída localmente sobre o gate `417598b` e a restauração `22e2ebf`; origin permanece no rollback documentado `76f2bec51a169ef92b5e03c5ab7e66fa4d4d9995`; `main == origin/main == 34d00a5cadb3ca0b5690420b8ffb5026e207af93`; PR #8 aberto; checkpoints R1 permanecem somente locais |
+| **Git** | `available` — branch ativa `task/f2.3-graph-executor`, criada limpa de `main == origin/main == b8307ca334e843bd00101872ac59669986008e75`; PR #8 mesclado; branches F2.2 local/remota preservadas; checkpoints permanecem somente locais |
 | **python_command** | `& 'C:\Users\walla\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe'` — Python `3.12.13` |
 | **uv_command** | `& '.\build\f0.6-tools\uv\bin\uv.exe'` — uv `0.11.32` restaurado de forma isolada/ignorada, sem PATH ou instalação global; `lock --check` e `sync --all-extras --locked` verdes |
 | **Dependências do projeto** | `.venv` gerida pelo uv 0.11.32 com Python 3.12.13 e `uv.lock`; nenhuma dependência foi adicionada; baseline pós-rollback passa mypy em targets `linux` e `win32`; run 31146423972 do rollback concluiu 11/11 verde |
@@ -290,6 +290,21 @@ remota permanece pendente e a F2.3 não foi iniciada.
 | CI pós-merge | [run 31142218012](https://github.com/Wf-ops1/Harnessinfra/actions/runs/31142218012), evento `push` em `main`, commit `34d00a5`, todos os 10 jobs de matriz e `CI required` em `completed/success` |
 | Alinhamento local | `git switch main`; `git merge --ff-only origin/main`; `main == origin/main == 34d00a5`; worktree limpa antes da criação da branch F2.2 |
 | Checkpoints locais | `checkpoint/f2.1-ready^{}` em `bc558998fe9be2a1c221f7bbba9e3d6a5360a271`; `checkpoint/f2.1-complete^{}` em `944a52ae4094563af61e59507889fb732e3a556b` |
+
+---
+
+### Promoção observada da F2.2
+
+| Evidência | Resultado observado |
+|---|---|
+| PR da tarefa | [#8](https://github.com/Wf-ops1/Harnessinfra/pull/8), mesclado e fechado em 2026-08-07 |
+| Commit implementado | `e7a9a650be221c071ffcbe83c436680dc1264aaa`; ancestral confirmado de `origin/main` |
+| Merge commit | `b8307ca334e843bd00101872ac59669986008e75`, com pais `34d00a5cadb3ca0b5690420b8ffb5026e207af93` e `e7a9a650be221c071ffcbe83c436680dc1264aaa`; merge commit real |
+| CI do PR | [run 31148024686](https://github.com/Wf-ops1/Harnessinfra/actions/runs/31148024686), evento `pull_request`, 11/11 checks concluídos e verdes, incluindo `CI required=success` |
+| CI pós-merge | [run 31148484495](https://github.com/Wf-ops1/Harnessinfra/actions/runs/31148484495), evento `push` em `main`, commit `b8307ca`, 10 jobs de matriz + `CI required`, todos `completed/success` |
+| Alinhamento local | `git switch main`; atualização fast-forward; `main == origin/main == b8307ca`; worktree limpa antes da criação da branch F2.3 |
+| Checkpoints locais | `checkpoint/f2.2-r1-ready^{}` em `417598b0210bc3d25d8889b4a932ec30dbf0cdfb`; `checkpoint/f2.2-r1-complete^{}` em `e7a9a650be221c071ffcbe83c436680dc1264aaa`; tags não publicadas |
+| Preservação | `task/f2.2-state-storage` permanece local e remota; nenhuma branch ou tag remota foi excluída/criada |
 
 ---
 
@@ -512,15 +527,15 @@ reaberta pela F2.2, salvo regressão reproduzível.
 
 | Campo | Detalhe |
 |---|---|
-| **Status** | `completed locally; F2.2-R1 verified; promotion pending` |
+| **Status** | `completed e promovida` — correção F2.2-R1, PR #8 e CI pós-merge integralmente verdes |
 | **Objetivo** | Criar um provider de estado em arquivo com contrato estável, concorrência entre processos, CAS por revisão, journal encadeado e recuperação fail-closed, sem executar grafo nem adotar o provider no runtime atual |
 | **Branch exclusiva** | `task/f2.2-state-storage`, criada de `main == origin/main == 34d00a5` pós-merge verde |
 | **Checkpoint de rollback** | `checkpoint/pre-f2.2-defensibility^{}` → `34d00a5cadb3ca0b5690420b8ffb5026e207af93` |
 | **Checkpoint do gate** | `checkpoint/f2.2-ready` identifica o commit documental deste gate, anterior a qualquer edição de Python ou teste de implementação |
 | **Checkpoint da tentativa** | `checkpoint/f2.2-complete^{}` → `1e6bd09e88454099141d6812db3a72f638858017`; preservado somente como evidência da implementação que falhou no CI |
-| **Checkpoint corretivo** | `checkpoint/f2.2-r1-ready^{}` → `417598b0210bc3d25d8889b4a932ec30dbf0cdfb`; `checkpoint/f2.2-r1-complete` identificará o commit local de fechamento verificado |
-| **Promoção interrompida** | [PR #8](https://github.com/Wf-ops1/Harnessinfra/pull/8); [run 31145918693](https://github.com/Wf-ops1/Harnessinfra/actions/runs/31145918693) falhou na tentativa; [run 31146423972](https://github.com/Wf-ops1/Harnessinfra/actions/runs/31146423972) comprovou o rollback com 11/11 checks verdes |
-| **Estado de implementação** | A inversão não destrutiva do revert restaurou a F2.2 em `22e2ebf0417e75fd3d895691d3b7e1551b3301ef`; a única correção R1 está em `persistence/locks.py`, sem alteração de teste, dependência, CI ou consumidor |
+| **Checkpoint corretivo** | `checkpoint/f2.2-r1-ready^{}` → `417598b0210bc3d25d8889b4a932ec30dbf0cdfb`; `checkpoint/f2.2-r1-complete^{}` → `e7a9a650be221c071ffcbe83c436680dc1264aaa` |
+| **Promoção** | [PR #8](https://github.com/Wf-ops1/Harnessinfra/pull/8) mesclado em `b8307ca`; run do PR `31148024686` e run pós-merge `31148484495` com 11/11 checks verdes cada |
+| **Estado de implementação** | A implementação corrigida em `e7a9a65` integra `main`; provider, locks, CAS, fencing, journal e recovery permanecem sem adoção por consumidores legados até as tarefas próprias |
 
 #### Auditoria concreta da F2.2
 
@@ -902,7 +917,7 @@ defensibility:
 [x] Implementação original restaurada por inversão não destrutiva em 22e2ebf
 [x] Dispatch sys.platform e imports privados aplicados somente em persistence/locks.py
 [x] Critérios originais e adicionais executados integralmente sem flexibilização
-[x] F2.2-R1 concluída localmente; promoção remota e F2.3 permanecem pendentes
+[x] F2.2-R1 concluída localmente; naquele gate a promoção remota e a F2.3 permaneciam pendentes
 ```
 
 #### Resultado verificado da F2.2-R1
@@ -918,8 +933,324 @@ defensibility:
 | Escopo | Diff desde `checkpoint/f2.2-r1-ready` contém exatamente TASK.md e os sete arquivos Python/teste do allowlist original; seis arquivos restaurados são byte-idênticos a `checkpoint/f2.2-complete`; somente `locks.py` contém a correção R1 |
 | Fronteiras | `.github`, compiler, runtime, CLI, observability, defaults, `contracts/execution.py`, `pyproject.toml` e `uv.lock` permanecem byte-idênticos; F2.3–F2.6/F3/F5/F6 não foram antecipados |
 
-**Estado de parada obrigatório:** F2.2-R1 concluída localmente. Criar o commit/checkpoint local de
-fechamento e parar antes de push, atualização do PR #8, merge ou início da F2.3.
+**Fechamento posterior observado:** `checkpoint/f2.2-r1-complete^{}` aponta para `e7a9a65`; o PR #8
+foi mesclado em `b8307ca`, o CI pós-merge ficou verde e a branch F2.3 foi criada somente depois dessas
+comprovações. O estado de parada histórico acima foi respeitado.
+
+---
+
+### F2.3 — Implementar executor de grafo
+
+| Campo | Detalhe |
+|---|---|
+| **Status** | `completed locally; gate READY → COMPLETED; promotion pending` |
+| **Objetivo** | Tornar o artefato compilado a autoridade de travessia: carregar o nó corrente, validar contratos, selecionar executor explícito, persistir eventos de nó, escolher a aresta declarada e publicar o próximo `ExecutionRecord` por CAS |
+| **Branch exclusiva** | `task/f2.3-graph-executor`, criada de `main == origin/main == b8307ca334e843bd00101872ac59669986008e75` após CI pós-merge verde da F2.2 |
+| **Checkpoint de rollback** | `checkpoint/pre-f2.3-defensibility^{}` → `b8307ca334e843bd00101872ac59669986008e75` |
+| **Checkpoint do gate** | `checkpoint/f2.3-ready` identifica o commit exclusivamente documental deste dossiê, anterior à primeira edição de Python ou teste F2.3 |
+| **Executor** | `Codex`, único escritor; nenhum outro executor deixou alteração no baseline |
+| **Dependências** | Nenhuma nova; usar Pydantic/jsonschema e primitivas F1/F2 já bloqueadas em `uv.lock` |
+
+#### Auditoria concreta da F2.3
+
+| Superfície | Evidência observada | Lacuna comprovada | Decisão do gate |
+|---|---|---|---|
+| Executor canônico | `rg` não encontra `GraphExecutor` nem os cinco node executors em `src`/`tests` | Não existe componente que percorra `GraphSpec.nodes`, arestas ou terminais | Criar executor independente, tipado e dirigido somente pelo `CompiledGraphArtifact` |
+| `RuntimeEngine` | `run_workflow()` valida o MAF, descarta o retorno e executa sequência fixa de contexto, plano, Amelia, verificação, aprovação, promoção, indexação e knowledge sync | Dois grafos diferentes não determinam o fluxo; o código pode marcar sucesso sem executar seus nós | Remover a sequência fixa; manter apenas fachada de carregamento/delegação fail-closed para `GraphExecutor` |
+| Estado F2.2 | `StateStorageProvider` já oferece load, append, CAS e lock explícito com fencing; nenhum arquivo em `runtime/` o consome | Execução atual não tem exclusão cross-process, revisão ou journal canônico | Manter um lock explícito durante uma chamada inteira e reutilizar o mesmo handle em load/append/CAS |
+| Artefato F1.5 | `CompiledGraphArtifact` contém `GraphSpec`, contratos resolvidos/digests, policies e capabilities; `MAFAdapter` valida canonicalidade, versões, manifesto e integridade | O runtime atual ignora entrypoint, nodes, contracts e terminal states | Executar somente artefato validado e confirmar identidade completa contra o record antes de qualquer efeito |
+| Contratos de nó | `AgentNodeSpec` possui input/output contract; nós determinísticos e humanos não possuem referências de contrato | Nenhuma validação runtime de payload ocorre hoje | Validar JSON object e JSON Schema resolvido nos nós agent; não inventar contratos para variantes que não os declaram |
+| Seleção | O union público possui `agent`, `deterministic` e `human_approval`; terminal é `TerminalStateSpec`; knowledge sync é hoje um agent com role `knowledge_updater` | Não existe dispatch exaustivo nem tipo `knowledge_sync`/`terminal` no schema | Dispatch exato pelas variantes existentes; especializar `knowledge_updater`; resolver somente terminais declarados, sem mudar schema |
+| Backends existentes | adapters locais/model providers retornam respostas fabricadas e tool/approval/knowledge consumers pertencem a fases posteriores | Reutilizá-los permitiria falso sucesso ou anteciparia F3/F2.5 | Node executors são adapters para backends explicitamente injetados; backend ausente falha tipadamente |
+| FSM/replay/retry | `WorkflowStateMachine` escreve `workflow-state.json`; F2.4 define transições/replay e F2.6 define retry | F2.3 não possui autoridade para decidir transição, reconstrução pós-crash ou nova tentativa | Não alterar `current_state`, approval/failure nem FSM; revisita/ciclo falha explicitamente antes de novo efeito |
+
+Comandos reproduzíveis no baseline limpo:
+
+```text
+rg -n "class GraphExecutor|class (Agent|Deterministic|HumanApproval|KnowledgeSync|Terminal)NodeExecutor" src tests
+exit 1; nenhum símbolo encontrado
+
+rg -n "MAFAdapter.load_and_validate|ContextAssembler|Planner|AgentExecutor|VerificationEngine|PromotionManager|KnowledgeSynchronizer" src/ai_engineering_harness/runtime/engine.py
+exit 0; loader seguido por sequência fixa independente de graph.entrypoint/nodes/edges/terminal_states
+
+rg -n "StateStorageProvider|append_event|compare_and_set_execution|acquire_execution_lock" src/ai_engineering_harness/runtime
+exit 1; runtime não usa o provider F2.2
+```
+
+Baseline local anterior ao gate: branch limpa em `b8307ca`; `73 passed` na regressão focada;
+`357 passed, 6 subtests passed` na suíte integral; mypy sem issues em 95 arquivos; Ruff, compileall e
+`uv lock --check` verdes. A tag `checkpoint/pre-f2.3-defensibility` foi criada e conferida pelo objeto
+anotado/peel no mesmo commit.
+
+#### Contrato exato congelado da F2.3
+
+1. `GraphExecutor` será o orquestrador público. Receberá `StateStorageProvider`, registry imutável dos
+   executores, timeout de lock finito e factories injetáveis de relógio/IDs. Sua operação pública
+   executará um `CompiledGraphArtifact`, um `execution_id` já criado e um payload inicial JSON object,
+   retornando `GraphExecutionResult` imutável.
+2. F2.3 não cria nem faz upsert de `ExecutionRecord`. Sob um único `ExecutionLock` explícito, carrega o
+   record existente e exige `workflow_name == artifact.graph.graph.name` e `artifact_digest` igual ao
+   SHA-256 dos bytes UTF-8 de `artifact.canonical_json()`. Divergência falha antes de evento/backend/CAS.
+3. `current_node_id` deve apontar para um nó ou terminal declarado no artefato. Nó/terminal desconhecido,
+   executor ausente, tipo não coberto, payload inicial inválido ou contrato ausente falha tipadamente e
+   sem mutação. Um terminal explícito pode ser carregado e encerrado sem executar efeito adicional.
+4. O dispatch será total e sem fallback por nome: `AgentNodeSpec` → `AgentNodeExecutor`;
+   `AgentNodeSpec(role="knowledge_updater")` → `KnowledgeSyncNodeExecutor`;
+   `DeterministicNodeSpec` → `DeterministicNodeExecutor`; `HumanApprovalNodeSpec` →
+   `HumanApprovalNodeExecutor`; `TerminalStateSpec` → `TerminalNodeExecutor`. Não adicionar novo
+   discriminator ao `GraphSpec` nesta tarefa.
+5. `NodeExecutor`, `NodeExecutionContext`, `NodeExecutionResult`, `NodeExecutionFailure` e
+   `GraphExecutionResult` serão contratos públicos, estritos/imutáveis e JSON-safe. Cada resultado de nó
+   declara sucesso/falha e um output object destacado do chamador; falha contém código público,
+   `retryable` e mensagem segura, sem stdout/stderr ou segredo no journal.
+6. Os quatro executores com efeito são adapters de um backend/callable explicitamente injetado. Não
+   instanciam `ModelRouter`, `AgentExecutor`, `ToolRouter`, `ApprovalManager`, `KnowledgeSynchronizer`,
+   shell ou provider falso. Backend ausente/resultado malformado gera erro público tipado; doubles são
+   permitidos somente nos testes. `TerminalNodeExecutor` apenas materializa outcome de terminal explícito.
+7. O payload de entrada de cada nó é o output JSON object do nó anterior; no primeiro nó é o payload
+   inicial. Para agent nodes, input e output de sucesso são validados com o `ResolvedContractSpec`
+   selecionado por `requested_reference`, usando o JSON Schema embutido no artefato. Nós sem referências
+   no schema validam somente o envelope JSON object; F2.3 não inventa referências.
+8. Ordem por nó: validar input; resolver e comprovar disponibilidade do executor; calcular
+   `attempt = attempt_by_node[node_id] + 1`; persistir `NODE_STARTED`; executar uma vez; validar output;
+   persistir exatamente um `NODE_COMPLETED` ou `NODE_FAILED`; resolver `on_success`/`on_failure`; publicar
+   por CAS uma única nova revisão com `current_node_id` no target e a tentativa atualizada.
+9. Os três eventos F2.3 usam o envelope canônico F2.2 e registram somente metadados necessários:
+   `node_id`, `node_type`, `attempt` e `fencing_token`; conclusão/falha adiciona `next_id`, e falha adiciona
+   `error_code`/`retryable`. Payload de negócio, exception repr, stdout/stderr e dados arbitrários não são
+   journalados. IDs/timestamps vêm das factories injetadas.
+10. Evento e snapshot permanecem duas publicações duráveis independentes sob o mesmo lock: `NODE_STARTED`
+    precede qualquer backend; outcome precede o CAS. Falha de append impede o próximo passo; falha de CAS
+    após evento é propagada e preserva o journal à frente para replay F2.4. F2.3 não a mascara nem tenta
+    compensar/reexecutar silenciosamente.
+11. Resultado `success` segue somente `on_success`; resultado/erro operacional normal ou output inválido
+    persiste `NODE_FAILED` e segue somente `on_failure`. O loop termina apenas em `TerminalStateSpec`; não
+    existe terminal implícito, sequência hardcoded ou conversão automática para estado FSM.
+12. Uma revisita a nó na mesma chamada é recusada por erro explícito antes da segunda execução. Interpretar
+    `retry_policy`, `max_iterations`, `exit_condition`, backoff e attempt context é integralmente F2.6.
+    Reconstruir input/outcome depois de `NODE_STARTED` sem par é F2.4; `resume` é F2.5.
+13. O lock cobre toda a chamada para impedir dois workers conformes de duplicarem efeitos. Ao adquirir o
+    lock, o executor usa o fencing token persistente em eventos/resultados. Um segundo worker que carregar
+    record já terminal não reexecuta nó. A garantia não abrange escritor que viole o provider F2.2.
+14. `RuntimeEngine` deixa de conter a sequência fixa e se torna fachada estreita: valida o MAF e delega a
+    uma instância explicitamente fornecida de `GraphExecutor`. Mantém os argumentos legados apenas para
+    compatibilidade de chamada, mas configuração/initial input ausente e `approval_required=True` falham
+    explicitamente antes de estado legado. CLI não é ligada ao novo runtime na F2.3.
+15. `WorkflowStateMachine`, `workflow-state.json`, `AuditTrailManager`, approval files e demais consumers
+    legados permanecem byte-idênticos e não são fontes de verdade da F2.3. O executor atualiza somente
+    `revision`, `updated_at`, `current_node_id` e `attempt_by_node`; não altera `current_state`, approvals,
+    failure, commits, worktree ou identidades imutáveis.
+
+#### Allowlist congelado da F2.3
+
+- `TASK.md` — gate, evidências, transição e handoff;
+- `src/ai_engineering_harness/runtime/graph_executor.py` — contratos, erros e orquestrador novos;
+- `src/ai_engineering_harness/runtime/node_executors.py` — Protocol/registry e cinco executores mínimos;
+- `src/ai_engineering_harness/runtime/engine.py` — remover sequência fixa e delegar fail-closed;
+- `src/ai_engineering_harness/runtime/__init__.py` — exports públicos F2.3;
+- `tests/unit/test_graph_executor.py` — dispatch, contratos, eventos, CAS, erros e concorrência;
+- `tests/e2e/test_graph_execution.py` — grafo linear de três nós e branches explícitos;
+- `tests/unit/test_agent_centric.py` — ajustar somente expectativas da sequência runtime removida;
+- `tests/unit/test_phase6.py` — ajustar somente expectativa de aprovação sintética removida;
+- `tests/unit/test_cli_runtime.py` — provar somente que CLI ainda não ligada falha fechada, sem falso sucesso;
+- `tests/e2e/test_full_lifecycle.py` — substituir somente o trecho de runtime sintético pela integração F2.3.
+
+Todo arquivo fora dessa lista é proibido. Em particular, permanecem byte-idênticos: `.github/`,
+`pyproject.toml`, `uv.lock`, compiler, contratos/schemas de produção, persistence F2.1/F2.2,
+`runtime/state_machine.py`, CLI source, observability/audit, governance/approval, models/tools/indexer,
+defaults, worktree, documentação principal e scripts de CI.
+
+#### Fronteiras e efeitos explicitamente proibidos
+
+- nenhuma transição FSM, legalidade de estado, alteração de `current_state`, replay ou reconstrução F2.4;
+- nenhum `resume`, `approve`, `cancel`, status/inspect ou criação de execução pelo CLI F2.5;
+- nenhum retry, backoff, budget, exit condition ou reexecução de ciclo F2.6;
+- nenhum provider/model call/tool loop/comando shell real ou fake F3; nenhum worktree real;
+- nenhuma captura/redaction/log de stdout/stderr, observabilidade F5, approval digest ou knowledge sync real;
+- nenhuma migração/leitura/escrita de `workflow-state.json`, `event-journal.jsonl` legado ou approval files;
+- nenhuma mudança de `GraphSpec`, `ExecutionRecord`, `ExecutionEvent`, schemas, artefato, policies/defaults,
+  dependência, lockfile, CI/YAML, versão, empacotamento ou proteção remota;
+- nenhum push, PR, merge, tag remota, exclusão de branch ou mudança de proteção sem autorização explícita.
+
+#### Critérios de aceite positivos, negativos e comandos congelados
+
+```yaml
+defensibility:
+  task_id: "F2.3"
+  gate: "READY"
+  executor: "Codex"
+  authorized_at: "2026-08-07T11:32:03-03:00"
+  implementation_started: true
+  implementation_completed: true
+  completed_at: "2026-08-07T12:08:36-03:00"
+  problem_statement: >-
+    não existe GraphExecutor/node executors e RuntimeEngine ignora o artefato validado para executar
+    uma sequência fixa que pode produzir sucesso sintético
+  evidence:
+    - command: >-
+        rg -n "class GraphExecutor|class (Agent|Deterministic|HumanApproval|KnowledgeSync|Terminal)NodeExecutor"
+        src tests
+      observed: "exit 1; os seis símbolos obrigatórios não existem"
+      location: "src/ai_engineering_harness/runtime"
+    - command: >-
+        rg -n "MAFAdapter.load_and_validate|ContextAssembler|Planner|AgentExecutor|VerificationEngine|PromotionManager|KnowledgeSynchronizer"
+        src/ai_engineering_harness/runtime/engine.py
+      observed: "exit 0; artefato descartado e fluxo procedural fixo confirmado"
+      location: "src/ai_engineering_harness/runtime/engine.py"
+    - command: >-
+        rg -n "StateStorageProvider|append_event|compare_and_set_execution|acquire_execution_lock"
+        src/ai_engineering_harness/runtime
+      observed: "exit 1; runtime ainda não consome persistência F2.2"
+      location: "src/ai_engineering_harness/runtime"
+  baseline:
+    branch: "task/f2.3-graph-executor"
+    head: "b8307ca334e843bd00101872ac59669986008e75"
+    status: "clean; main == origin/main; nenhuma mudança preexistente ou de outro executor"
+    checkpoint: "checkpoint/pre-f2.3-defensibility^{} = b8307ca334e843bd00101872ac59669986008e75"
+    promotion: "PR #8 merge b8307ca; PR run 31148024686 e post-merge run 31148484495, ambos 11/11 verdes"
+    local_validation: "73 focais; 357 testes + 6 subtests; mypy 95 arquivos; Ruff/compileall/lock verdes"
+  frozen_scope:
+    allowed:
+      - "TASK.md"
+      - "runtime/graph_executor.py e runtime/node_executors.py novos"
+      - "runtime/engine.py e runtime/__init__.py"
+      - "test_graph_executor.py e test_graph_execution.py novos"
+      - "ajustes estritos nos quatro testes legados listados no allowlist"
+    excluded:
+      - "FSM/transições/replay F2.4; CLI source/resume/approve/cancel F2.5; retry F2.6"
+      - "model/tool/provider/worktree F3; observabilidade/governança/knowledge real F5/F6"
+      - "persistence, contratos/schemas, compiler, defaults, dependências, lockfile, CI/YAML"
+  positive_acceptance:
+    - command: >-
+        & '.\\build\\f0.6-tools\\uv\\bin\\uv.exe' run python -m pytest
+        tests/unit/test_graph_executor.py -q -k
+        "linear or dispatch or input_contract or output_contract or event or cas or terminal or fencing"
+      expected: >-
+        dispatch exato dos cinco executores; schema validado; STARTED/outcome ordenados; aresta explícita;
+        uma revisão por nó e terminal somente explícito
+    - command: >-
+        & '.\\build\\f0.6-tools\\uv\\bin\\uv.exe' run python -m pytest
+        tests/e2e/test_graph_execution.py -q
+      expected: >-
+        grafo linear de três nós e branches success/failure executam na ordem do artefato, persistem
+        journal/CAS e produzem GraphExecutionResult correto
+    - command: >-
+        & '.\\build\\f0.6-tools\\uv\\bin\\uv.exe' run python -m pytest
+        tests/unit/test_graph_executor.py -q -k "concurrent or lock or fencing or terminal_worker"
+      expected: >-
+        dois workers conformes não duplicam side effect; lock cobre a chamada; token é propagado e
+        segundo worker observa terminal sem reexecutar
+  negative_acceptance:
+    - command: >-
+        & '.\\build\\f0.6-tools\\uv\\bin\\uv.exe' run python -m pytest
+        tests/unit/test_graph_executor.py -q -k
+        "invalid_input or invalid_output or unknown or unavailable or mismatch or malformed or cycle or append_failure or cas_failure"
+      expected: >-
+        erros públicos tipados; nenhuma mutação antes de validação/dispatch; output/backend falho segue
+        somente on_failure; append/CAS não são mascarados; revisita não executa segunda vez
+    - command: >-
+        & '.\\build\\f0.6-tools\\uv\\bin\\uv.exe' run python -m pytest
+        tests/unit/test_cli_runtime.py -q -k "run_status_inspect_lifecycle"
+      expected: >-
+        CLI não configurada não produz COMPLETED, workflow-state, audit ou efeito sintético; integração
+        operacional continua reservada à F2.5
+  regression_and_quality:
+    - command: >-
+        & '.\\build\\f0.6-tools\\uv\\bin\\uv.exe' run python -m pytest
+        tests/unit/test_execution_record.py tests/unit/test_state_storage.py tests/unit/test_contracts.py
+        tests/unit/test_artifact_determinism.py tests/unit/test_compiler_unification.py
+        tests/unit/test_public_module_imports.py
+        tests/unit/test_agent_centric.py tests/unit/test_phase6.py tests/e2e/test_full_lifecycle.py -q
+      expected: "F1/F2.1/F2.2 e partes legadas fora do runtime sintético permanecem verdes"
+    - command: >-
+        & '.\\build\\f0.6-tools\\uv\\bin\\uv.exe' run python -m pytest tests/unit tests/e2e -q;
+        & '.\\build\\f0.6-tools\\uv\\bin\\uv.exe' run python -m mypy src;
+        & '.\\build\\f0.6-tools\\uv\\bin\\uv.exe' run python -m ruff check .;
+        & '.\\build\\f0.6-tools\\uv\\bin\\uv.exe' run python -m compileall -q src compiler tests
+      expected: "todos exit 0, sem skip/xfail/ignore novo e sem reduzir cobertura preexistente"
+    - command: >-
+        & '.\\build\\f0.6-tools\\uv\\bin\\uv.exe' lock --check;
+        & '.\\build\\f0.6-tools\\uv\\bin\\uv.exe' sync --all-extras --locked;
+        & '.\\build\\f0.6-tools\\uv\\bin\\uv.exe' run python -m build;
+        & '.\\build\\f0.6-tools\\uv\\bin\\uv.exe' run python tests/ci/smoke_wheel.py
+      expected: "lock imutável, distribuição e import/CLI smoke da wheel verdes"
+    - command: >-
+        git diff --check; git diff --name-only checkpoint/f2.3-ready;
+        git diff --exit-code checkpoint/f2.3-ready -- .github pyproject.toml uv.lock compiler
+        src/ai_engineering_harness/cli src/ai_engineering_harness/persistence
+        src/ai_engineering_harness/contracts src/ai_engineering_harness/defaults
+        src/ai_engineering_harness/runtime/state_machine.py src/ai_engineering_harness/observability
+        src/ai_engineering_harness/governance src/ai_engineering_harness/models
+        src/ai_engineering_harness/tools src/ai_engineering_harness/indexer
+      expected: "somente allowlist F2.3; todas as fronteiras proibidas byte-idênticas"
+  rollback:
+    triggers:
+      - "qualquer falso sucesso, terminal implícito, dispatch por nome/fallback ou sequência fixa remanescente"
+      - "dois workers executarem o mesmo nó, lock não cobrir backend ou fencing ausente/incorreto"
+      - "evento fora de ordem/perdido, mais de um CAS por nó ou storage error mascarado"
+      - "replay/retry/FSM/approval/CLI source/F3+ ser necessário para satisfazer F2.3"
+      - "mudança exigir dependência, schema, persistence, compiler, default, CI/YAML ou arquivo fora do allowlist"
+      - "qualquer prova focal, regressão, qualidade, build/smoke ou escopo falhar"
+    procedure: >-
+      parar e preservar arquivos/saídas; antes de commit inverter somente hunks F2.3 via apply_patch;
+      depois de commit usar git revert nos commits exclusivos da tarefa; nunca reset, clean, checkout
+      destrutivo, sobrescrita ou descarte de trabalho preexistente
+    verify: >-
+      confirmar HEAD/checkpoints/status; diff zero contra checkpoint/f2.3-ready depois de preservar o
+      dossiê ou contra checkpoint/pre-f2.3-defensibility para rollback integral; repetir baseline focal,
+      suíte integral, mypy, Ruff, compileall e lock --check
+```
+
+#### Checklist de liberação do gate F2.3
+
+```text
+[x] Problema comprovado por busca e inspeção do RuntimeEngine/provider/artefato
+[x] Baseline Git limpo, merge/CI F2.2, ausência de alterações alheias e checkpoint registrados
+[x] Contrato de entrada, dispatch, eventos, arestas, CAS, lock/fencing e terminal congelado
+[x] Erros e caminhos fail-closed congelados, sem backend simulado
+[x] Allowlist exato e fronteiras F2.4–F2.6/F3/F5/F6 explícitas
+[x] Critérios positivos, negativos, concorrentes, regressão, distribuição e escopo congelados
+[x] Rollback não destrutivo com gatilhos objetivos e verificação executável
+[x] Executor único e horário de autorização registrados
+[x] Somente TASK.md alterado na preparação; nenhum Python/teste F2.3 editado
+[x] Commit documental `ea6cec8` e checkpoint/f2.3-ready conferidos antes da implementação
+```
+
+#### Resultado verificado da F2.3
+
+| Evidência | Resultado observado |
+|---|---|
+| Executor canônico | `GraphExecutor` percorre somente `current_node_id`, `on_success`/`on_failure` e `TerminalStateSpec` do artefato; `RuntimeEngine` valida o MAF e apenas delega |
+| Dispatch | Registry imutável seleciona `AgentNodeExecutor`, `DeterministicNodeExecutor`, `HumanApprovalNodeExecutor`, `KnowledgeSyncNodeExecutor` para role `knowledge_updater` e `TerminalNodeExecutor` sem fallback |
+| Backends | Quatro executores com efeito exigem backend explícito; indisponibilidade falha antes de `NODE_STARTED`; nenhum model/tool/approval/knowledge adapter simulado é instanciado |
+| Contratos | Input/output de agent nodes usam o JSON Schema resolvido por referência exata; payloads/context/results são estritos, destacados e JSON-native finitos |
+| Persistência | Uma chamada mantém um lock F2.2; cada nó grava `NODE_STARTED`, um outcome, uma única revisão CAS e propaga fencing token; falha de append/CAS não é mascarada |
+| Arestas/terminal | Sucesso/falha seguem somente a aresta declarada; output inválido vira `NODE_FAILED`; encerramento ocorre somente em terminal explícito; revisita falha antes da segunda execução |
+| Concorrência | Dois processos sobre o mesmo execution ID produziram um único side effect; um worker executou `gate`, o outro observou o terminal, com tokens distintos e revisão final 1 |
+| Provas focais | `16 passed` unitários e `2 passed` E2E; filtros congelados: positivo `8 passed`, concorrente `3 passed`, negativo `9 passed`, CLI fail-closed `1 passed` |
+| Regressão e suíte | regressão congelada `199 passed`; suíte integral `375 passed, 6 subtests passed` |
+| Qualidade | mypy sem issues em 97 arquivos; Ruff e compileall verdes; nenhum ignore/skip/xfail/mock novo |
+| Distribuição | `uv lock --check` e sync locked verdes; wheel/sdist 0.1.0 construídas; smoke externo confirmou metadata/package/CLI; probe isolado importou 7/7 símbolos F2.3 |
+| Smoke ambiental | primeira chamada parou antes da instalação com `FileNotFoundError` porque o script invoca `uv` pelo PATH; sem editar arquivo, o uv empacotado foi adicionado somente ao PATH do processo e o mesmo smoke passou |
+| Escopo | exatamente os 11 paths do allowlist; `.github`, dependências/lock, compiler, CLI source, persistence, contratos/schemas, defaults, FSM, observability, governance, models/tools/indexer byte-idênticos |
+| Fronteiras | nenhuma criação/resume de execução, FSM/replay F2.4, CLI F2.5, retry F2.6, provider/tool/model/worktree F3 ou efeito real F5/F6 foi antecipado |
+
+#### Checklist de conclusão F2.3
+
+```text
+[x] GraphExecutor e cinco executores mínimos implementados e exportados
+[x] RuntimeEngine não contém sequência fixa nem produz sucesso sintético
+[x] Contratos de input/output, dispatch, eventos, arestas, CAS e terminal explícito provados
+[x] Lock por chamada, fencing e dois workers sem side effect duplicado provados
+[x] Erros negativos, append/CAS fail-closed e ciclo sem retry silencioso provados
+[x] E2E executa três nós compilados na ordem e branch de falha explícita
+[x] Regressão, suíte integral, mypy, Ruff, compileall, lock/sync, build e smoke verdes
+[x] Allowlist exato e todas as fronteiras proibidas byte-idênticas
+[x] F2.4–F2.6/F3/F5/F6 não iniciadas
+```
+
+**Estado de parada obrigatório:** F2.3 concluída localmente. Criar o commit/checkpoint local
+`checkpoint/f2.3-complete` e parar antes de push, PR, merge ou qualquer implementação F2.4.
 
 ---
 
@@ -3488,13 +3819,13 @@ de `main`.
 ```
 Data:              2026-08-07
 Fase:              F2
-Tarefa:            F2.2-R1 — recongelar correção cross-platform da abstração de persistência
-Estado:            completed locally; promotion pending; F2.3 não iniciada
-Arquivos alterados: TASK.md; persistence/{base.py,locks.py,atomic_file.py,__init__.py}; contracts/events/{execution_event.py,__init__.py}; tests/unit/test_state_storage.py
-Validações:         focais 58 e filtros 21/8/18/32; regressão 78; suíte 357 + 6 subtests; mypy host/linux/win32 em 95 arquivos; Ruff/compileall; lock/sync; build; smoke; 8/8 imports; escopo verde
-Checkpoint:         `checkpoint/f2.2-r1-ready^{}` = 417598b; `checkpoint/f2.2-r1-complete` identificará o commit local deste fechamento; ready 5728472 e complete-evidence 1e6bd09 preservados
-Observação:         PR #8 e origin ainda apontam para o rollback documentado; nenhuma operação remota, dependência, CI/YAML, runtime/CLI, schema de produção ou F2.3 foi executada
-Resultado:          implementação restaurada em 22e2ebf; sys.platform + imports locais de syscalls + OSError(ENOSYS) corrigem o CI sem ignore/Any/cast/fallback
+Tarefa:            F2.3 — implementar executor canônico de grafo
+Estado:            completed locally; promotion pending; F2.4 não iniciada
+Arquivos alterados: TASK.md; runtime/{graph_executor.py,node_executors.py,engine.py,__init__.py}; tests/unit/{test_graph_executor.py,test_agent_centric.py,test_phase6.py,test_cli_runtime.py}; tests/e2e/{test_graph_execution.py,test_full_lifecycle.py}
+Validações:         focais 16+2; filtros 8/3/9 e CLI 1; regressão 199; suíte 375 + 6 subtests; mypy 97; Ruff/compileall; lock/sync; build/smoke; 7/7 imports; escopo 11/11
+Checkpoint:         `checkpoint/f2.3-ready^{}` = ea6cec8; `checkpoint/f2.3-complete` identificará o commit local deste fechamento
+Observação:         smoke exigiu somente PATH de processo para o uv empacotado, condição já documentada; nenhuma dependência, CI/YAML, schema, persistence, CLI source, FSM ou operação remota foi alterada
+Resultado:          grafo/arestas/terminais governam execução sob lock+fencing, eventos e CAS; backends ausentes falham tipadamente; runtime fixo/sintético removido
 ```
 
 ---
@@ -3502,18 +3833,18 @@ Resultado:          implementação restaurada em 22e2ebf; sys.platform + import
 ## 11. Próxima Ação Exata
 
 ```text
-PROMOVER SOMENTE A F2.2-R1 — NÃO INICIAR F2.3:
-1. Confirmar que `checkpoint/f2.2-r1-complete` aponta para o commit local de fechamento, a worktree
-   está limpa e a branch difere de origin somente pelos commits R1 documentados.
-2. Parar e obter autorização explícita antes de qualquer push da branch ou tag, atualização do PR #8,
-   merge, alteração de proteção ou operação remota destrutiva.
-3. Se o push da branch for autorizado, publicar somente `task/f2.2-state-storage`, acompanhar todos os
-   jobs do PR #8 e exigir `CI required=success` sem reduzir matriz, checks ou regras.
-4. Se qualquer gate remoto falhar, aplicar o rollback R1 documentado e não flexibilizar lock, CAS,
-   fencing, recovery, integridade, mypy ou testes.
+PROMOVER SOMENTE A F2.3 — NÃO INICIAR F2.4:
+1. Confirmar que `checkpoint/f2.3-complete^{}` aponta para o commit local de fechamento, a worktree
+   está limpa e a branch contém somente o gate e a implementação F2.3 sobre `b8307ca`.
+2. Parar e obter autorização explícita antes de qualquer push da branch/tag, abertura de PR, merge,
+   exclusão remota ou alteração de proteção.
+3. Se o push da branch for autorizado, publicar somente `task/f2.3-graph-executor`, abrir um único PR
+   para `main`, acompanhar todos os jobs e exigir `CI required=success` sem reduzir matriz/checks.
+4. Se qualquer gate remoto falhar, aplicar o rollback F2.3 documentado; não flexibilizar dispatch,
+   lock/fencing, eventos, CAS, contratos, terminal explícito, concorrência ou fail-closed.
 5. Mesmo com o PR verde, merge exige autorização explícita separada. Depois do merge autorizado,
    confirmar ancestralidade, sincronizar `main == origin/main` e exigir CI pós-merge integralmente verde.
-6. Somente então preparar branch/gate exclusivo da F2.3. Não implementar F2.3 nesta branch ou etapa.
+6. Somente então preparar branch/gate exclusivo da F2.4. Não implementar FSM/replay nesta branch.
 ```
 
 ---

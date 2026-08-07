@@ -3,9 +3,14 @@
 import json
 from pathlib import Path
 
+import pytest
+
 from ai_engineering_harness.compiler.compiler import GraphCompiler
 from ai_engineering_harness.governance.approval import ApprovalManager
-from ai_engineering_harness.runtime.engine import RuntimeEngine
+from ai_engineering_harness.runtime.engine import (
+    RuntimeEngine,
+    RuntimeGraphConfigurationError,
+)
 from ai_engineering_harness.runtime.state_machine import WorkflowState, WorkflowStateMachine
 
 
@@ -68,6 +73,8 @@ def test_runtime_engine_with_approval(tmp_path: Path):
     compiled_maf = compiler.compile_graph(yaml_spec, "test_flow")
 
     engine = RuntimeEngine(project_root=tmp_path, execution_id="exec-333", allowed_providers=["local"])
-    final_state = engine.run_workflow(compiled_maf, approval_required=True)
+    with pytest.raises(RuntimeGraphConfigurationError, match="F2.4/F2.5"):
+        engine.run_workflow(compiled_maf, approval_required=True)
 
-    assert final_state == WorkflowState.AWAITING_APPROVAL
+    execution_dir = tmp_path / ".harness" / "state" / "executions" / "exec-333"
+    assert not execution_dir.exists()

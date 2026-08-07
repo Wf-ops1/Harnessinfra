@@ -1,6 +1,69 @@
-"""Módulo Runtime: FSM, Executor de Agentes e Adapter MAF."""
+"""Public runtime contracts for compiled graph execution and legacy FSM access."""
 
-from .engine import RuntimeEngine
+from .engine import RuntimeEngine, RuntimeGraphConfigurationError
+from .graph_executor import (
+    ArtifactExecutionMismatchError,
+    GraphClockError,
+    GraphCycleExecutionError,
+    GraphEventConstructionError,
+    GraphExecutionError,
+    GraphExecutionResult,
+    GraphExecutor,
+    NodeContractNotFoundError,
+    NodeInputValidationError,
+    NodeOutputValidationError,
+    UnknownCurrentNodeError,
+)
+from .node_executors import (
+    AgentNodeExecutor,
+    DeterministicNodeExecutor,
+    HumanApprovalNodeExecutor,
+    KnowledgeSyncNodeExecutor,
+    NodeBackendError,
+    NodeExecutionBackend,
+    NodeExecutionContext,
+    NodeExecutionFailure,
+    NodeExecutionResult,
+    NodeExecutor,
+    NodeExecutorError,
+    NodeExecutorRegistry,
+    NodeExecutorResultError,
+    NodeExecutorUnavailableError,
+    TerminalNodeExecutor,
+    UnsupportedNodeTypeError,
+)
 from .state_machine import WorkflowState, WorkflowStateMachine
 
-__all__ = ["RuntimeEngine", "WorkflowState", "WorkflowStateMachine"]
+__all__ = [
+    "AgentNodeExecutor",
+    "ArtifactExecutionMismatchError",
+    "DeterministicNodeExecutor",
+    "GraphClockError",
+    "GraphCycleExecutionError",
+    "GraphEventConstructionError",
+    "GraphExecutionError",
+    "GraphExecutionResult",
+    "GraphExecutor",
+    "HumanApprovalNodeExecutor",
+    "KnowledgeSyncNodeExecutor",
+    "NodeBackendError",
+    "NodeContractNotFoundError",
+    "NodeExecutionBackend",
+    "NodeExecutionContext",
+    "NodeExecutionFailure",
+    "NodeExecutionResult",
+    "NodeExecutor",
+    "NodeExecutorError",
+    "NodeExecutorRegistry",
+    "NodeExecutorResultError",
+    "NodeExecutorUnavailableError",
+    "NodeInputValidationError",
+    "NodeOutputValidationError",
+    "RuntimeEngine",
+    "RuntimeGraphConfigurationError",
+    "TerminalNodeExecutor",
+    "UnknownCurrentNodeError",
+    "UnsupportedNodeTypeError",
+    "WorkflowState",
+    "WorkflowStateMachine",
+]

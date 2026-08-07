@@ -11,7 +11,10 @@ from ai_engineering_harness.models.router import ModelRouter
 from ai_engineering_harness.observability.audit import AuditTrailManager
 from ai_engineering_harness.runtime.agent_executor import AgentExecutor
 from ai_engineering_harness.runtime.context_assembler import ContextAssembler, InsufficientContextError
-from ai_engineering_harness.runtime.engine import RuntimeEngine
+from ai_engineering_harness.runtime.engine import (
+    RuntimeEngine,
+    RuntimeGraphConfigurationError,
+)
 from ai_engineering_harness.runtime.planner import PlanDocument, Planner
 from ai_engineering_harness.runtime.state_machine import (
     InvalidStateTransitionError,
@@ -106,9 +109,11 @@ def test_tool_router_blocks_unauthorized_tool(tmp_path: Path):
         executor.execute_tool("terminal_run", {"command": "dir", "cwd": "."})
 
 
-def test_repair_loop_respects_max_iterations(tmp_path: Path):
+def test_runtime_requires_explicit_graph_executor(tmp_path: Path):
     engine = RuntimeEngine(project_root=tmp_path, execution_id="exec-loop-1", allowed_providers=["local"])
-    assert engine._get_max_retries() >= 1
+    with pytest.raises(RuntimeGraphConfigurationError, match="GraphExecutor"):
+        engine.run_workflow(tmp_path / "missing.json", initial_input={})
+    assert not (tmp_path / ".harness").exists()
 
 
 def test_fsm_rejects_invalid_transitions(tmp_path: Path):
@@ -119,17 +124,17 @@ def test_fsm_rejects_invalid_transitions(tmp_path: Path):
         fsm.transition_to(WorkflowState.COMPLETED)
 
 
-def test_post_verification_full_state_sequence(tmp_path: Path):
+def test_runtime_no_longer_runs_fixed_post_verification_sequence(tmp_path: Path):
     yaml_spec = _write_runtime_graph(tmp_path, "seq_workflow")
     compiler = GraphCompiler(project_root=tmp_path)
     compiled_maf = compiler.compile_graph(yaml_spec, "seq_workflow")
     
     engine = RuntimeEngine(project_root=tmp_path, execution_id="exec-seq-1", allowed_providers=["local"])
-    final_state = engine.run_workflow(compiled_maf, approval_required=False)
-    assert final_state == WorkflowState.COMPLETED
+    with pytest.raises(RuntimeGraphConfigurationError, match="GraphExecutor"):
+        engine.run_workflow(compiled_maf, approval_required=False, initial_input={})
 
     evidence_file = tmp_path / ".harness" / "state" / "executions" / "exec-seq-1" / "evidence.json"
-    assert evidence_file.is_file()
+    assert not evidence_file.exists()
 
 
 def test_rollback_does_not_alter_audit_journal(tmp_path: Path):
