@@ -6,7 +6,7 @@
 ## 1. Fontes de verdade
 
 1. Este painel: fase, coordenação, tarefa ativa, bloqueios e próxima ação.
-2. [Dossiê ativo](docs/tasks/active/DOC-TASK-LEDGER.md): evidência, escopo, aceite e rollback da tarefa.
+2. Dossiê ativo em `docs/tasks/active/`, quando apontado pela seção 5; neste momento não há nenhum.
 3. [Plano principal](docs/plano_implementacao_harness_operacional.md): requisitos e dependências das fases.
 4. [Regras dos agentes](.agents/AGENTS.md): protocolo obrigatório de execução e Git.
 5. [Índice histórico](docs/tasks/README.md): dossiês concluídos, PRs, merges e runs.
@@ -31,13 +31,13 @@ devem ser corrigidos para refletir a decisão. Nunca depender somente do histór
 | Campo | Estado observado |
 |---|---|
 | **Fase concluída** | Fase 2 — F2.1–F2.6 implementadas e promovidas |
-| **Próxima fase** | Fase 3 — ainda não iniciada; ordem de dependências deve ser auditada antes do primeiro gate |
-| **Tarefa ativa** | `DOC-TASK-LEDGER` — refatoração documental anterior à Fase 3 |
-| **Gate** | `READY`; recongelamento de encoding `checkpoint/docs-task-ledger-r2-ready` em `8db6120` |
-| **Executor ativo** | `Codex`, único escritor |
+| **Próxima fase** | Fase 3 — ainda não iniciada; auditar dependências e selecionar uma única primeira tarefa |
+| **Tarefa ativa** | nenhuma tarefa ativa; somente o fechamento documental desta promoção está em trânsito |
+| **Gate** | nenhum gate de implementação aberto; F3 permanece sem autorização de código |
+| **Executor ativo** | `Codex`, somente como escritor do fechamento documental |
 | **Workspace** | `C:\Users\walla\OneDrive\Desktop\ai-engineering-harness` |
-| **Branch** | `docs/refactor-task-ledger`, criada de `d48151b752aa373756c46bfee58932fa5abf4bf5` |
-| **Git baseline** | `main == origin/main == d48151b752aa373756c46bfee58932fa5abf4bf5`; worktree limpa antes do gate |
+| **Branch** | `docs/close-task-ledger-refactor`, criada de `fafbf627804f1a2a23d988c06dd123a3eee01348` |
+| **Git baseline** | `main == origin/main == fafbf627804f1a2a23d988c06dd123a3eee01348`; CI pós-merge verde |
 | **Python** | `C:\Users\walla\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe` — 3.12.13 |
 | **uv** | `.\build\f0.6-tools\uv\bin\uv.exe` — 0.11.32; nenhuma dependência nova nesta tarefa |
 
@@ -49,19 +49,20 @@ devem ser corrigidos para refletir a decisão. Nunca depender somente do histór
 | CI F2.6 | PR run `31214724386` e pós-merge `31215162155`, 11/11 verdes |
 | Fechamento F2 | PR #15; merge `d48151b752aa373756c46bfee58932fa5abf4bf5` |
 | CI do fechamento | PR run `31215674969`; pós-merge run `31215944126`, evento `push` em `main`, 11/11 verdes |
-| Linha oficial | `main == origin/main == d48151b752aa373756c46bfee58932fa5abf4bf5` antes desta branch |
+| Refatoração do ledger | PR #16; checks run `31218206768`, 11/11 verdes antes do merge |
+| Promoção do ledger | merge `fafbf627804f1a2a23d988c06dd123a3eee01348`; pós-merge `31218399437`, 11/11 verdes |
+| Linha oficial | `main == origin/main == fafbf627804f1a2a23d988c06dd123a3eee01348` antes desta branch |
 
 ## 5. Tarefa ativa
 
-Leia integralmente: [DOC-TASK-LEDGER](docs/tasks/active/DOC-TASK-LEDGER.md).
+Nenhuma tarefa ativa. O dossiê `DOC-TASK-LEDGER` foi promovido e está arquivado em
+[`docs/tasks/completed/DOC-TASK-LEDGER.md`](docs/tasks/completed/DOC-TASK-LEDGER.md).
 
 | Campo | Valor |
 |---|---|
-| **Objetivo** | Separar painel corrente e dossiês históricos sem perda de evidência |
-| **Escopo** | `TASK.md`, `.agents/AGENTS.md`, `docs/tasks/**` e testes documentais/estruturais congelados |
-| **Proibido** | Produto, CI, dependências, plano principal, README e qualquer implementação F3 |
-| **Estado local** | `COMPLETED LOCALMENTE`; 450 testes + 6 subtestes e todos os gates de qualidade/escopo verdes |
-| **Estado remoto** | branch/PR ainda não publicados; nenhum fato remoto antecipado |
+| **Última tarefa** | `DOC-TASK-LEDGER` — `COMPLETED E PROMOVIDA` |
+| **Fechamento atual** | registrar evidência observada e esvaziar `active/`; nenhuma mudança de produto |
+| **Próxima autorização possível** | auditar Fase 3 e congelar um novo dossiê `READY` em nova branch, após este fechamento |
 
 ## 6. Bloqueios atuais
 
@@ -70,16 +71,19 @@ Nenhum bloqueio ativo.
 ## 7. Próxima ação exata
 
 ```text
-CONCLUIR SOMENTE DOC-TASK-LEDGER:
-1. Publicar somente esta branch e abrir um PR documental para main; não publicar tags.
-2. Aguardar todos os checks pré-merge verdes; somente então executar merge commit autorizado.
-3. Confirmar CI pós-merge verde em main e fechar o registro antes de iniciar qualquer tarefa F3.
+FECHAR SOMENTE DOC-TASK-LEDGER:
+1. Validar painel sem tarefa ativa, dossiê arquivado, índice, encoding, links e integridade histórica.
+2. Publicar somente esta branch de fechamento e abrir PR documental; não publicar nem apagar tags.
+3. Aguardar todos os checks pré-merge verdes; somente então executar merge commit autorizado.
+4. Confirmar CI pós-merge verde em main, sincronizar o checkout e parar.
+5. Na próxima execução autorizada, auditar a ordem da Fase 3 — incluindo F3.6 antes de F3.1–F3.3 —
+   e congelar uma única primeira tarefa antes de qualquer código.
 ```
 
 ## 8. Retomada após perda de contexto
 
 1. Leia este arquivo integralmente.
-2. Leia o dossiê ativo indicado na seção 5.
+2. Leia o dossiê ativo indicado na seção 5, quando houver.
 3. Leia a fase relevante no plano principal.
 4. Confirme `.git`, branch, `git status --short --branch`, `git log -10` e upstream.
 5. Confirme no GitHub o último merge e a CI pós-merge do SHA registrado.

@@ -41,6 +41,7 @@ em [`TASK.md`](../../TASK.md); requisitos normativos permanecem no
 | F2 | F2.5 | [Retomada](completed/F2.5.md) | PR #11 / merge `2aa324b` / pós-merge `31209619778` |
 | F2 | DOC-F2-STATUS | [Alinhamento público](completed/DOC-F2-STATUS.md) | PR #12 / merge `f23d74d` / pós-merge `31210521957` |
 | F2 | F2.6 | [Retry com contexto](completed/F2.6.md) | PR #14 / merge `2dac824` / pós-merge `31215162155` |
+| Governança | DOC-TASK-LEDGER | [Painel e arquivo](completed/DOC-TASK-LEDGER.md) | PR #16 / merge `fafbf62` / pós-merge `31218399437` |
 
 Fechamentos documentais adicionais preservados no Git: PR #13 / merge `3596df3` / run
 `31211290100` e PR #15 / merge `d48151b` / run `31215944126`.
