@@ -271,7 +271,7 @@ não foi iniciada.
 | **Objetivo** | Separar o painel operacional corrente dos dossiês históricos, preservando evidência auditável por tarefa e reduzindo o conjunto obrigatório de leitura |
 | **Branch** | `docs/refactor-task-ledger`, criada de `main == origin/main == d48151b752aa373756c46bfee58932fa5abf4bf5` com CI pós-merge `31215944126` verde |
 | **Dossiê ativo** | [`docs/tasks/active/DOC-TASK-LEDGER.md`](docs/tasks/active/DOC-TASK-LEDGER.md) |
-| **Próxima ação** | Criar o checkpoint `checkpoint/docs-task-ledger-ready` e somente então executar a migração mecânica congelada no dossiê |
+| **Próxima ação** | Recongelamento R1 registra o hash LF canônico; criar `checkpoint/docs-task-ledger-r1-ready` antes de repetir a migração mecânica |
 
 ---
 

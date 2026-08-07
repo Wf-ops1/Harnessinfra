@@ -21,8 +21,10 @@ leitura repetida de quase cinco mil linhas para descobrir poucos campos operacio
 | Teste documental | `test_documentation.py` usa `docs.glob("*.md")` e não validaria arquivos Markdown em `docs/tasks/**` |
 
 O snapshot fonte desta migração é `TASK.md` no commit
-`d48151b752aa373756c46bfee58932fa5abf4bf5`, SHA-256
-`0c7c68db691a93358b9a892916fe0b74601630a0b9caa7c9d6bf4e8808fa18ae`.
+`d48151b752aa373756c46bfee58932fa5abf4bf5`. O checkout Windows com CRLF possui SHA-256
+`0c7c68db691a93358b9a892916fe0b74601630a0b9caa7c9d6bf4e8808fa18ae`; o blob canônico entregue por
+`git show d48151b:TASK.md`, normalizado em LF e usado pelo migrador, possui SHA-256
+`f0f1a18751c0e730f7e6c4b6335192e0a655e06bba88e6996f9419270112d309`.
 
 ## Baseline comprovado
 
@@ -60,6 +62,13 @@ baseline:
 10. Os testes documentais passarão a examinar Markdown recursivamente e um teste estrutural impedirá
     regressão para painel monolítico, dossiê ativo ambíguo, IDs duplicados ou payload histórico adulterado.
 11. Não será criada fonte de verdade gerada, banco, YAML de estado ou dependência nova.
+
+### Recongelamento R1 — representação canônica do snapshot
+
+O primeiro disparo do migrador encerrou antes de qualquer escrita porque o hash inicial havia sido
+calculado sobre o checkout CRLF, enquanto a extração usa o blob Git LF. O escopo, o commit fonte e o
+conteúdo não mudam. O critério passa a validar o hash LF `f0f1a187…`; o hash CRLF permanece registrado
+como evidência do baseline Windows. Nenhum critério foi removido ou enfraquecido.
 
 ## Escopo congelado
 
@@ -155,4 +164,3 @@ documentais/encoding do baseline.
 [x] aceite de integridade, estrutura, documentação, regressão, qualidade e escopo definido
 [x] rollback não destrutivo e gatilhos objetivos registrados
 ```
-
