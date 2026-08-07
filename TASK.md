@@ -353,7 +353,7 @@ com os respectivos CIs pós-merge integralmente verdes. A F2.6 não foi iniciada
 
 | Campo | Detalhe |
 |---|---|
-| **Status** | `in_progress` — gate documental `READY`; nenhuma mudança de código autorizada |
+| **Status** | `completed localmente` — gate documental `READY → COMPLETED`; promoção remota pendente |
 | **Objetivo** | Corrigir a matriz pública que ainda descreve o compilador e o runtime como estavam antes das entregas F1/F2, preservando os limites reais de F2.6–F7 |
 | **Branch exclusiva** | `docs/readme-f2-status`, criada de `main == origin/main == 2aa324b` após CI pós-merge verde da F2.5 |
 | **Executor** | `Codex`, único escritor, sob autorização explícita do usuário `execute` |
@@ -404,6 +404,18 @@ defensibility:
       git revert do commit exclusivo; nunca resetar ou descartar trabalho preexistente
     verify: "git status, diff de escopo, testes documentais/encoding e git diff --check"
 ```
+
+#### Resultado verificado de DOC-F2-STATUS
+
+| Evidência | Resultado observado |
+|---|---|
+| README | Introdução e matriz reconhecem compilador único, artefato 2.0, execução por arestas, storage concorrente, FSM event-sourced e lifecycle retomável F2.5 |
+| Limites preservados | Retry F2.6, providers/tools/worktree F3, contexto/verificação F4, governança F5, observabilidade/recovery F6 e release F7 continuam incompletos ou planejados |
+| Testes documentais | `8 passed, 6 subtests passed` em `test_documentation.py` e `test_encoding.py` |
+| Busca negativa | Zero ocorrência dos três claims obsoletos congelados; `rg` exit 1 como esperado |
+| Encoding e estrutura | README/TASK decodificam em UTF-8 estrito; links, newline, fences e matriz aprovados |
+| Escopo | Somente `README.md` e `TASK.md` diferem de `2aa324b`; `src`, `compiler`, `tests`, `.github`, dependências e lockfile permanecem byte-idênticos |
+| Qualidade do diff | `git diff --check` exit 0; nenhuma implementação F2.6 ou capacidade operacional nova foi adicionada |
 
 ---
 
@@ -4559,11 +4571,12 @@ de `main`.
 Data:              2026-08-07
 Fase:              F2
 Tarefa:            DOC-F2-STATUS — alinhamento documental pós-F2.5
-Estado:            IN_PROGRESS; gate READY; nenhuma mudança de código ou F2.6 autorizada
+Estado:            COMPLETED localmente; promoção remota autorizada nesta execução; F2.6 não iniciada
 Baseline:          main/origin/main 2aa324b; PR #11 mesclado; run pós-merge 31209619778, 11/11 verde
-Escopo:            somente README.md e TASK.md
-Próximo checkpoint: commit documental e `checkpoint/docs-f2-status-complete` locais após validação
-Resultado esperado: matriz pública alinhada à F1/F2.1–F2.5 sem promover capacidades F2.6–F7
+Escopo:            somente README.md e TASK.md; zero mudança de produto/dependência/CI
+Validações:        8 testes + 6 subtests; UTF-8, links/Markdown, busca negativa, diff check e fronteiras verdes
+Checkpoint:         `checkpoint/docs-f2-status-ready^{}` = 283a33e; complete identificará o commit final
+Resultado:          matriz pública alinhada à F1/F2.1–F2.5 sem promover capacidades F2.6–F7
 ```
 
 ---
@@ -4571,13 +4584,13 @@ Resultado esperado: matriz pública alinhada à F1/F2.1–F2.5 sem promover capa
 ## 11. Próxima Ação Exata
 
 ```text
-EXECUTAR SOMENTE DOC-F2-STATUS; NÃO INICIAR F2.6:
-1. Atualizar a introdução e a matriz de capacidade do README para refletir F1/F2.1–F2.5 promovidas.
-2. Preservar explicitamente como pendentes/simulados retry F2.6, providers/tools/worktree F3,
-   contexto/verificação F4, governança F5, observabilidade/recovery F6 e release F7.
-3. Executar testes documentais/encoding, buscas negativas, diff check e auditoria do allowlist.
-4. Commitar/checkpointar a tarefa documental, publicar um único PR autorizado, exigir CI verde e
-   confirmar o CI pós-merge antes de preparar qualquer gate F2.6.
+PROMOVER SOMENTE DOC-F2-STATUS; NÃO INICIAR F2.6:
+1. Criar o commit final e `checkpoint/docs-f2-status-complete` somente locais.
+2. Publicar `docs/readme-f2-status`, abrir um único PR para `main`, exigir `CI required=success` e
+   mesclar por merge commit sob a autorização explícita vigente.
+3. Confirmar `main == origin/main` e CI pós-merge integralmente verde; preservar branches e tags locais.
+4. Depois desse gate, parar. Qualquer F2.6 exige auditoria/dossiê próprios em nova branch criada da
+   `main` sincronizada; nenhuma implementação futura está incluída nesta tarefa documental.
 ```
 
 ---
