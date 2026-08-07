@@ -26,6 +26,7 @@ from ai_engineering_harness.contracts import (
 from ai_engineering_harness.contracts.execution import ExecutionId
 
 _NonEmptyStr = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+_DigestStr = Annotated[str, StringConstraints(pattern=r"^sha256:[0-9a-f]{64}$")]
 
 
 class NodeExecutorError(Exception):
@@ -47,15 +48,138 @@ class UnsupportedNodeTypeError(NodeExecutorError):
 class NodeBackendError(NodeExecutorError):
     """A configured backend failed in a form safe to route through ``on_failure``."""
 
-    def __init__(self, code: str, message: str, *, retryable: bool) -> None:
+    def __init__(
+        self,
+        code: str,
+        message: str,
+        *,
+        retryable: bool,
+        retry_evidence: RetryEvidence | None = None,
+    ) -> None:
         super().__init__(message)
+        if retryable and retry_evidence is None:
+            raise ValueError("a retryable backend error requires retry evidence")
+        if not retryable and retry_evidence is not None:
+            raise ValueError("a non-retryable backend error cannot contain retry evidence")
         self.code = code
         self.message = message
         self.retryable = retryable
+        self.retry_evidence = retry_evidence
 
 
 class _StrictFrozenModel(BaseModel):
     model_config = ConfigDict(strict=True, frozen=True, extra="forbid")
+
+
+class FailedToolCall(_StrictFrozenModel):
+    """Redaction-safe identity of one failed tool invocation."""
+
+    tool_name: _NonEmptyStr
+    call_id: _NonEmptyStr | None = None
+    arguments_digest: _DigestStr | None = None
+    error_code: _NonEmptyStr | None = None
+
+
+class RetryBudget(_StrictFrozenModel):
+    """Remaining retry budget supplied by the active backend policy boundary."""
+
+    remaining_tokens: int = Field(ge=0)
+    remaining_cost_usd: float = Field(ge=0)
+
+    @field_validator("remaining_cost_usd")
+    @classmethod
+    def require_finite_cost(cls, value: float) -> float:
+        if not math.isfinite(value):
+            raise ValueError("remaining retry cost must be finite")
+        return value
+
+
+class RetryEvidence(_StrictFrozenModel):
+    """Raw failure evidence accepted only at the injected backend boundary."""
+
+    model_error: _NonEmptyStr | None = None
+    failed_tool_call: FailedToolCall | None = None
+    stdout: str = ""
+    stderr: str = ""
+    failed_gates: tuple[_NonEmptyStr, ...] = ()
+    current_diff: str = ""
+    remaining_budget: RetryBudget
+    correction_instruction: _NonEmptyStr
+
+    @field_validator("failed_gates", mode="before")
+    @classmethod
+    def freeze_failed_gates(cls, value: object) -> object:
+        return tuple(value) if isinstance(value, list) else value
+
+    @field_validator("failed_gates")
+    @classmethod
+    def require_unique_failed_gates(
+        cls,
+        value: tuple[str, ...],
+    ) -> tuple[str, ...]:
+        if len(set(value)) != len(value):
+            raise ValueError("failed gates must be unique")
+        return value
+
+    @model_validator(mode="after")
+    def require_actionable_failure_evidence(self) -> RetryEvidence:
+        if not any(
+            (
+                self.model_error,
+                self.failed_tool_call,
+                self.stdout.strip(),
+                self.stderr.strip(),
+                self.failed_gates,
+                self.current_diff.strip(),
+            )
+        ):
+            raise ValueError("retry evidence must contain an actionable failure signal")
+        return self
+
+
+class RetryContext(_StrictFrozenModel):
+    """Redacted evidence delivered to one concrete retry invocation."""
+
+    origin_node_id: _NonEmptyStr
+    current_attempt: int = Field(ge=1)
+    model_error: _NonEmptyStr | None = None
+    failed_tool_call: FailedToolCall | None = None
+    redacted_stdout: str
+    redacted_stderr: str
+    failed_gates: tuple[_NonEmptyStr, ...]
+    current_diff: str
+    remaining_budget: RetryBudget
+    correction_instruction: _NonEmptyStr
+
+    @field_validator("failed_gates", mode="before")
+    @classmethod
+    def freeze_failed_gates(cls, value: object) -> object:
+        return tuple(value) if isinstance(value, list) else value
+
+    @field_validator("failed_gates")
+    @classmethod
+    def require_unique_failed_gates(
+        cls,
+        value: tuple[str, ...],
+    ) -> tuple[str, ...]:
+        if len(set(value)) != len(value):
+            raise ValueError("failed gates must be unique")
+        return value
+
+    @model_validator(mode="after")
+    def require_actionable_failure_evidence(self) -> RetryContext:
+        if not any(
+            (
+                self.model_error,
+                self.failed_tool_call,
+                self.redacted_stdout.strip(),
+                self.redacted_stderr.strip(),
+                self.failed_gates,
+                self.current_diff.strip(),
+            )
+        ):
+            raise ValueError("retry context must contain an actionable failure signal")
+        return self
 
 
 class NodeExecutionFailure(_StrictFrozenModel):
@@ -64,6 +188,15 @@ class NodeExecutionFailure(_StrictFrozenModel):
     code: _NonEmptyStr
     message: _NonEmptyStr
     retryable: bool
+    retry_evidence: RetryEvidence | None = None
+
+    @model_validator(mode="after")
+    def require_matching_retry_evidence(self) -> NodeExecutionFailure:
+        if self.retryable and self.retry_evidence is None:
+            raise ValueError("a retryable failure requires retry evidence")
+        if not self.retryable and self.retry_evidence is not None:
+            raise ValueError("a non-retryable failure cannot contain retry evidence")
+        return self
 
 
 class NodeExecutionContext(_StrictFrozenModel):
@@ -75,6 +208,7 @@ class NodeExecutionContext(_StrictFrozenModel):
     attempt: int = Field(ge=0)
     input_payload: dict[str, object]
     fencing_token: int = Field(gt=0)
+    retry_context: RetryContext | None = None
 
     @field_validator("artifact", mode="before")
     @classmethod
@@ -121,6 +255,7 @@ class NodeExecutionResult(_StrictFrozenModel):
         code: str,
         message: str,
         retryable: bool,
+        retry_evidence: RetryEvidence | None = None,
     ) -> NodeExecutionResult:
         return cls(
             succeeded=False,
@@ -129,6 +264,7 @@ class NodeExecutionResult(_StrictFrozenModel):
                 code=code,
                 message=message,
                 retryable=retryable,
+                retry_evidence=retry_evidence,
             ),
         )
 
@@ -293,6 +429,7 @@ def _copy_json_value(value: object, *, path: str) -> object:
 __all__ = [
     "AgentNodeExecutor",
     "DeterministicNodeExecutor",
+    "FailedToolCall",
     "HumanApprovalNodeExecutor",
     "KnowledgeSyncNodeExecutor",
     "NodeBackendError",
@@ -305,6 +442,9 @@ __all__ = [
     "NodeExecutorRegistry",
     "NodeExecutorResultError",
     "NodeExecutorUnavailableError",
+    "RetryBudget",
+    "RetryContext",
+    "RetryEvidence",
     "TerminalNodeExecutor",
     "UnsupportedNodeTypeError",
 ]

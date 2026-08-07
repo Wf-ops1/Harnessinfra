@@ -33,8 +33,10 @@ from ai_engineering_harness.persistence import (
     ExecutionLock,
     ResumeStateStorageProvider,
 )
+from ai_engineering_harness.security.redaction import Redactor
 
 from .node_executors import (
+    FailedToolCall,
     NodeBackendError,
     NodeExecutionContext,
     NodeExecutionFailure,
@@ -43,6 +45,8 @@ from .node_executors import (
     NodeExecutorError,
     NodeExecutorRegistry,
     NodeExecutorResultError,
+    RetryContext,
+    RetryEvidence,
     _copy_json_object,
 )
 from .state_machine import (
@@ -88,7 +92,17 @@ class NodeOutputValidationError(GraphExecutionError):
 
 
 class GraphCycleExecutionError(GraphExecutionError):
-    """Traversal attempted a retry/cycle reserved for F2.6."""
+    """Traversal attempted a cycle without a valid retry episode."""
+
+
+class RetryContextIntegrityError(GraphExecutionError):
+    """Retry evidence or its durable digest chain is missing or divergent."""
+
+
+class RetryExhaustedError(GraphExecutionError):
+    """A node reached its declared maximum number of invocations."""
+
+    classification = "retry_exhausted"
 
 
 class GraphClockError(GraphExecutionError):
@@ -350,9 +364,19 @@ class GraphExecutor:
             lock=lock,
         )
         record = state_machine.recover(lock=lock)
+        if record.current_state == ExecutionState.FAILED_RETRY_EXHAUSTED:
+            raise RetryExhaustedError(
+                "execution retry budget is already exhausted",
+                execution_id=execution_id,
+                node_id=record.current_node_id,
+            )
 
         if resume_mode:
-            current_payload = self._recover_resume_payload(
+            (
+                current_payload,
+                retry_context,
+                retry_context_digest,
+            ) = self._recover_resume_payload(
                 artifact,
                 record,
                 nodes=nodes,
@@ -362,6 +386,8 @@ class GraphExecutor:
             record = self._storage.load_execution(execution_id, lock=lock)
         else:
             current_payload = initial_input
+            retry_context = None
+            retry_context_digest = None
         visited: set[str] = set()
         executed_node_ids: list[str] = []
         last_failure: NodeExecutionFailure | None = None
@@ -454,9 +480,46 @@ class GraphExecutor:
                     execution_id=execution_id,
                     node_id=current_id,
                 )
-            if current_id in visited:
+            previous_attempts = record.attempt_by_node.get(current_id, 0)
+            attempt = previous_attempts + 1
+            revisited = previous_attempts > 0 or current_id in visited
+            if revisited and (
+                retry_context is None or node.retry_policy is None
+            ):
                 raise GraphCycleExecutionError(
-                    "node revisit requires F2.6 retry semantics",
+                    "node revisit requires an active bounded retry context",
+                    execution_id=execution_id,
+                    node_id=current_id,
+                )
+            if retry_context is not None:
+                if retry_context.current_attempt != attempt:
+                    raise RetryContextIntegrityError(
+                        "retry context attempt does not match the execution record",
+                        execution_id=execution_id,
+                        node_id=current_id,
+                    )
+                if (
+                    node.retry_policy is not None
+                    and attempt > node.retry_policy.max_iterations
+                ):
+                    state_machine.transition_to(
+                        ExecutionState.FAILED_RETRY_EXHAUSTED,
+                        node_id=current_id,
+                        attempt=previous_attempts,
+                        reason="node_retry_exhausted",
+                        lock=lock,
+                    )
+                    raise RetryExhaustedError(
+                        "node retry limit was exhausted",
+                        execution_id=execution_id,
+                        node_id=current_id,
+                    )
+            if (
+                self._resume_enabled
+                and (retry_context is None) != (retry_context_digest is None)
+            ):
+                raise RetryContextIntegrityError(
+                    "retry context and durable digest presence diverge",
                     execution_id=execution_id,
                     node_id=current_id,
                 )
@@ -508,7 +571,6 @@ class GraphExecutor:
             )
             if not skip_human_backend:
                 executor.ensure_available()
-            attempt = record.attempt_by_node.get(current_id, 0) + 1
             started_at = self._next_timestamp(
                 record.updated_at,
                 execution_id=execution_id,
@@ -521,6 +583,7 @@ class GraphExecutor:
                 attempt=attempt,
                 input_payload=current_payload,
                 fencing_token=lock.fencing_token,
+                retry_context=retry_context,
             )
             self._append_node_event(
                 execution_id,
@@ -530,6 +593,7 @@ class GraphExecutor:
                 lock,
                 started_at,
                 input_digest=input_digest,
+                retry_context_digest=retry_context_digest,
             )
 
             result = (
@@ -554,6 +618,21 @@ class GraphExecutor:
                     )
 
             next_id = node.on_success if result.succeeded else node.on_failure
+            next_retry_context = self._next_retry_context(
+                result,
+                node_id=current_id,
+                next_id=next_id,
+                attempt=attempt,
+                record=record,
+                nodes=nodes,
+                current_context=retry_context,
+                execution_id=execution_id,
+            )
+            next_retry_context_digest = self._store_retry_context(
+                execution_id,
+                next_retry_context,
+                lock=lock,
+            )
             outcome_type: Literal["NODE_COMPLETED", "NODE_FAILED"] = (
                 "NODE_COMPLETED" if result.succeeded else "NODE_FAILED"
             )
@@ -579,6 +658,7 @@ class GraphExecutor:
                 input_digest=input_digest,
                 output_digest=output_digest,
                 record_revision=record.revision + 1,
+                next_retry_context_digest=next_retry_context_digest,
             )
 
             replacement = self._next_record(
@@ -598,6 +678,8 @@ class GraphExecutor:
             executed_node_ids.append(current_id)
             current_payload = result.output
             last_failure = result.failure
+            retry_context = next_retry_context
+            retry_context_digest = next_retry_context_digest
 
     def _resolve_terminal(
         self,
@@ -672,6 +754,7 @@ class GraphExecutor:
                 code=exc.code,
                 message=exc.message,
                 retryable=exc.retryable,
+                retry_evidence=exc.retry_evidence,
             )
         except NodeExecutorResultError as exc:
             return NodeExecutionResult.failed(
@@ -691,6 +774,140 @@ class GraphExecutor:
             )
         return result
 
+    def _next_retry_context(
+        self,
+        result: NodeExecutionResult,
+        *,
+        node_id: str,
+        next_id: str,
+        attempt: int,
+        record: ExecutionRecord,
+        nodes: Mapping[str, NodeSpec],
+        current_context: RetryContext | None,
+        execution_id: str,
+    ) -> RetryContext | None:
+        if not result.succeeded:
+            failure = result.failure
+            if failure is None:
+                raise RetryContextIntegrityError(
+                    "failed node result is missing failure details",
+                    execution_id=execution_id,
+                    node_id=node_id,
+                )
+            if not failure.retryable or next_id not in nodes:
+                return None
+            if failure.retry_evidence is None:
+                raise RetryContextIntegrityError(
+                    "retryable failure is missing retry evidence",
+                    execution_id=execution_id,
+                    node_id=node_id,
+                )
+            return self._build_retry_context(
+                failure.retry_evidence,
+                origin_node_id=node_id,
+                current_attempt=self._next_attempt(
+                    record,
+                    next_id=next_id,
+                    current_node_id=node_id,
+                    current_attempt=attempt,
+                ),
+            )
+
+        if current_context is None or node_id == current_context.origin_node_id:
+            return None
+        if next_id not in nodes:
+            return None
+        return current_context.model_copy(
+            update={
+                "current_attempt": self._next_attempt(
+                    record,
+                    next_id=next_id,
+                    current_node_id=node_id,
+                    current_attempt=attempt,
+                )
+            }
+        )
+
+    @staticmethod
+    def _next_attempt(
+        record: ExecutionRecord,
+        *,
+        next_id: str,
+        current_node_id: str,
+        current_attempt: int,
+    ) -> int:
+        previous_attempts = (
+            current_attempt
+            if next_id == current_node_id
+            else record.attempt_by_node.get(next_id, 0)
+        )
+        return previous_attempts + 1
+
+    @staticmethod
+    def _build_retry_context(
+        evidence: RetryEvidence,
+        *,
+        origin_node_id: str,
+        current_attempt: int,
+    ) -> RetryContext:
+        failed_tool_call = evidence.failed_tool_call
+        redacted_tool_call = None
+        if failed_tool_call is not None:
+            redacted_tool_call = FailedToolCall(
+                tool_name=Redactor.redact_text(failed_tool_call.tool_name),
+                call_id=(
+                    Redactor.redact_text(failed_tool_call.call_id)
+                    if failed_tool_call.call_id is not None
+                    else None
+                ),
+                arguments_digest=failed_tool_call.arguments_digest,
+                error_code=(
+                    Redactor.redact_text(failed_tool_call.error_code)
+                    if failed_tool_call.error_code is not None
+                    else None
+                ),
+            )
+        return RetryContext(
+            origin_node_id=origin_node_id,
+            current_attempt=current_attempt,
+            model_error=(
+                Redactor.redact_text(evidence.model_error)
+                if evidence.model_error is not None
+                else None
+            ),
+            failed_tool_call=redacted_tool_call,
+            redacted_stdout=Redactor.redact_text(evidence.stdout),
+            redacted_stderr=Redactor.redact_text(evidence.stderr),
+            failed_gates=tuple(
+                Redactor.redact_text(gate) for gate in evidence.failed_gates
+            ),
+            current_diff=Redactor.redact_text(evidence.current_diff),
+            remaining_budget=evidence.remaining_budget,
+            correction_instruction=Redactor.redact_text(
+                evidence.correction_instruction
+            ),
+        )
+
+    def _store_retry_context(
+        self,
+        execution_id: str,
+        context: RetryContext | None,
+        *,
+        lock: ExecutionLock,
+    ) -> str | None:
+        if context is None or not self._resume_enabled:
+            return None
+        if not isinstance(self._storage, ResumeStateStorageProvider):
+            raise RetryContextIntegrityError(
+                "retry context storage is unavailable",
+                execution_id=execution_id,
+            )
+        return self._storage.store_payload(
+            execution_id,
+            context.model_dump(mode="json"),
+            lock=lock,
+        )
+
     def _append_node_event(
         self,
         execution_id: str,
@@ -705,6 +922,8 @@ class GraphExecutor:
         input_digest: str | None = None,
         output_digest: str | None = None,
         record_revision: int | None = None,
+        retry_context_digest: str | None = None,
+        next_retry_context_digest: str | None = None,
     ) -> None:
         payload: dict[str, object] = {
             "attempt": attempt,
@@ -720,6 +939,10 @@ class GraphExecutor:
             payload["output_digest"] = output_digest
         if record_revision is not None:
             payload["record_revision"] = record_revision
+        if retry_context_digest is not None:
+            payload["retry_context_digest"] = retry_context_digest
+        if next_retry_context_digest is not None:
+            payload["next_retry_context_digest"] = next_retry_context_digest
         if failure is not None:
             payload["error_code"] = failure.code
             payload["retryable"] = failure.retryable
@@ -763,7 +986,7 @@ class GraphExecutor:
         nodes: Mapping[str, NodeSpec],
         terminals: Mapping[str, TerminalStateSpec],
         lock: ExecutionLock,
-    ) -> dict[str, object]:
+    ) -> tuple[dict[str, object], RetryContext | None, str | None]:
         if not isinstance(self._storage, ResumeStateStorageProvider):
             raise InterruptedNodeExecutionError(
                 "resume bundle storage is unavailable",
@@ -790,8 +1013,18 @@ class GraphExecutor:
 
         expected_node_id = artifact.graph.graph.entrypoint
         expected_payload_digest = bundle.initial_input_digest
+        expected_retry_context: RetryContext | None = None
+        expected_retry_context_digest: str | None = None
         attempts: dict[str, int] = {}
-        open_started: tuple[str, int, str, str, int] | None = None
+        open_started: tuple[
+            str,
+            int,
+            str,
+            str,
+            int,
+            str | None,
+            RetryContext | None,
+        ] | None = None
         pending: tuple[ExecutionEvent, str, int, str] | None = None
         last_record_revision = -1
         last_fencing_token = 0
@@ -850,6 +1083,8 @@ class GraphExecutor:
                     "node_id",
                     "node_type",
                 }
+                if expected_retry_context_digest is not None:
+                    expected_keys.add("retry_context_digest")
                 if set(payload) != expected_keys or open_started is not None:
                     raise InterruptedNodeExecutionError(
                         "node start ledger is malformed or overlapping",
@@ -877,6 +1112,28 @@ class GraphExecutor:
                         execution_id=record.execution_id,
                         node_id=node_id,
                     )
+                observed_retry_context_digest = None
+                consumed_retry_context = None
+                if expected_retry_context_digest is not None:
+                    observed_retry_context_digest = self._ledger_digest(
+                        payload["retry_context_digest"]
+                    )
+                    if observed_retry_context_digest != expected_retry_context_digest:
+                        raise RetryContextIntegrityError(
+                            "node start retry context breaks the durable digest chain",
+                            execution_id=record.execution_id,
+                            node_id=node_id,
+                        )
+                    consumed_retry_context = expected_retry_context
+                    if (
+                        consumed_retry_context is None
+                        or consumed_retry_context.current_attempt != attempt
+                    ):
+                        raise RetryContextIntegrityError(
+                            "node start retry context attempt is divergent",
+                            execution_id=record.execution_id,
+                            node_id=node_id,
+                        )
                 fencing_token = self._ledger_integer(
                     payload["fencing_token"],
                     field="fencing_token",
@@ -906,6 +1163,8 @@ class GraphExecutor:
                     input_digest,
                     node_type,
                     fencing_token,
+                    observed_retry_context_digest,
+                    consumed_retry_context,
                 )
                 last_fencing_token = fencing_token
                 continue
@@ -923,6 +1182,8 @@ class GraphExecutor:
             }
             if failed:
                 expected_keys.update({"error_code", "retryable"})
+            if "next_retry_context_digest" in payload:
+                expected_keys.add("next_retry_context_digest")
             if set(payload) != expected_keys or open_started is None:
                 raise InterruptedNodeExecutionError(
                     "node outcome ledger is malformed or has no matching start",
@@ -937,7 +1198,13 @@ class GraphExecutor:
                 field="fencing_token",
                 minimum=1,
             )
-            if (node_id, attempt, input_digest, node_type, fencing_token) != open_started:
+            if (
+                node_id,
+                attempt,
+                input_digest,
+                node_type,
+                fencing_token,
+            ) != open_started[:5]:
                 raise InterruptedNodeExecutionError(
                     "node outcome does not match its start event",
                     execution_id=record.execution_id,
@@ -971,6 +1238,7 @@ class GraphExecutor:
                     execution_id=record.execution_id,
                     node_id=node_id,
                 )
+            retryable = False
             if failed:
                 self._ledger_string(payload["error_code"], field="error_code")
                 if type(payload["retryable"]) is not bool:
@@ -979,9 +1247,63 @@ class GraphExecutor:
                         execution_id=record.execution_id,
                         node_id=node_id,
                     )
+                retryable = payload["retryable"]
+
+            next_retry_context = None
+            next_retry_context_digest = None
+            if "next_retry_context_digest" in payload:
+                next_retry_context_digest = self._ledger_digest(
+                    payload["next_retry_context_digest"]
+                )
+                next_retry_context = self._load_retry_context(
+                    record.execution_id,
+                    next_retry_context_digest,
+                    nodes=nodes,
+                    lock=lock,
+                )
+            next_attempt = (
+                attempt + 1
+                if next_id == node_id
+                else attempts.get(next_id, 0) + 1
+            )
+            consumed_retry_context = open_started[6]
+            if failed and retryable and next_id in nodes:
+                if (
+                    next_retry_context is None
+                    or next_retry_context.origin_node_id != node_id
+                    or next_retry_context.current_attempt != next_attempt
+                ):
+                    raise RetryContextIntegrityError(
+                        "retryable failure did not publish its exact next context",
+                        execution_id=record.execution_id,
+                        node_id=node_id,
+                    )
+            elif (
+                not failed
+                and consumed_retry_context is not None
+                and node_id != consumed_retry_context.origin_node_id
+                and next_id in nodes
+            ):
+                expected_propagated_context = consumed_retry_context.model_copy(
+                    update={"current_attempt": next_attempt}
+                )
+                if next_retry_context != expected_propagated_context:
+                    raise RetryContextIntegrityError(
+                        "correction path did not propagate the exact retry context",
+                        execution_id=record.execution_id,
+                        node_id=node_id,
+                    )
+            elif next_retry_context is not None:
+                raise RetryContextIntegrityError(
+                    "node outcome published an unexpected retry context",
+                    execution_id=record.execution_id,
+                    node_id=node_id,
+                )
             attempts[node_id] = attempt
             expected_node_id = next_id
             expected_payload_digest = output_digest
+            expected_retry_context = next_retry_context
+            expected_retry_context_digest = next_retry_context_digest
             last_record_revision = target_revision
             last_fencing_token = fencing_token
             open_started = None
@@ -1043,11 +1365,69 @@ class GraphExecutor:
                 execution_id=record.execution_id,
                 node_id=record.current_node_id,
             )
-        return self._storage.load_payload(
-            record.execution_id,
-            expected_payload_digest,
-            lock=lock,
+        return (
+            self._storage.load_payload(
+                record.execution_id,
+                expected_payload_digest,
+                lock=lock,
+            ),
+            expected_retry_context,
+            expected_retry_context_digest,
         )
+
+    def _load_retry_context(
+        self,
+        execution_id: str,
+        digest: str,
+        *,
+        nodes: Mapping[str, NodeSpec],
+        lock: ExecutionLock,
+    ) -> RetryContext:
+        if not isinstance(self._storage, ResumeStateStorageProvider):
+            raise RetryContextIntegrityError(
+                "retry context storage is unavailable",
+                execution_id=execution_id,
+            )
+        document = self._storage.load_payload(execution_id, digest, lock=lock)
+        try:
+            context = RetryContext.model_validate(document)
+        except (TypeError, ValueError, ValidationError) as exc:
+            raise RetryContextIntegrityError(
+                "stored retry context violates its strict contract",
+                execution_id=execution_id,
+            ) from exc
+        if context.origin_node_id not in nodes:
+            raise RetryContextIntegrityError(
+                "stored retry context origin is absent from the artifact",
+                execution_id=execution_id,
+                node_id=context.origin_node_id,
+            )
+        text_fields = [
+            context.model_error,
+            context.redacted_stdout,
+            context.redacted_stderr,
+            *context.failed_gates,
+            context.current_diff,
+            context.correction_instruction,
+        ]
+        if context.failed_tool_call is not None:
+            text_fields.extend(
+                [
+                    context.failed_tool_call.tool_name,
+                    context.failed_tool_call.call_id,
+                    context.failed_tool_call.error_code,
+                ]
+            )
+        if any(
+            value is not None and Redactor.redact_text(value) != value
+            for value in text_fields
+        ):
+            raise RetryContextIntegrityError(
+                "stored retry context contains unredacted evidence",
+                execution_id=execution_id,
+                node_id=context.origin_node_id,
+            )
+        return context
 
     @staticmethod
     def _ledger_string(value: object, *, field: str) -> str:
@@ -1253,5 +1633,7 @@ __all__ = [
     "NodeContractNotFoundError",
     "NodeInputValidationError",
     "NodeOutputValidationError",
+    "RetryContextIntegrityError",
+    "RetryExhaustedError",
     "UnknownCurrentNodeError",
 ]

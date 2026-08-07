@@ -44,6 +44,7 @@ from ai_engineering_harness.runtime import (
     ArtifactExecutionMismatchError,
     DeterministicNodeExecutor,
     EventSourcedStateMachine,
+    FailedToolCall,
     GraphCycleExecutionError,
     GraphExecutor,
     HumanApprovalNodeExecutor,
@@ -56,6 +57,10 @@ from ai_engineering_harness.runtime import (
     NodeExecutorRegistry,
     NodeExecutorUnavailableError,
     NodeInputValidationError,
+    RetryBudget,
+    RetryContext,
+    RetryEvidence,
+    RetryExhaustedError,
     StateReplayError,
     StateTransitionIntegrityError,
     TerminalNodeExecutor,
@@ -111,6 +116,53 @@ class _TraceBackend:
                 code="controlled_failure",
                 message="controlled node failure",
                 retryable=False,
+            )
+        return NodeExecutionResult.completed(output)
+
+
+_RETRY_SECRET = "token=f2-six-secret-value"
+
+
+def _retry_evidence() -> RetryEvidence:
+    return RetryEvidence(
+        model_error=f"model rejected change with {_RETRY_SECRET}",
+        failed_tool_call=FailedToolCall(
+            tool_name="terminal",
+            call_id="call-retry-1",
+            arguments_digest=f"sha256:{'1' * 64}",
+            error_code="exit-1",
+        ),
+        stdout=f"tests started {_RETRY_SECRET}",
+        stderr=f"assertion failed {_RETRY_SECRET}",
+        failed_gates=("pytest",),
+        current_diff=f"+ leaked {_RETRY_SECRET}",
+        remaining_budget=RetryBudget(
+            remaining_tokens=900,
+            remaining_cost_usd=4.5,
+        ),
+        correction_instruction=f"fix the failing assertion; remove {_RETRY_SECRET}",
+    )
+
+
+@dataclass
+class _RetryBackend:
+    trace: list[tuple[str, int, RetryContext | None]]
+    fail_attempts: dict[str, set[int]]
+
+    def execute(self, context: NodeExecutionContext) -> NodeExecutionResult:
+        self.trace.append((context.node.id, context.attempt, context.retry_context))
+        previous = context.input_payload.get("trace", [])
+        assert isinstance(previous, list)
+        output: dict[str, object] = {
+            "trace": [*previous, f"{context.node.id}:{context.attempt}"]
+        }
+        if context.attempt in self.fail_attempts.get(context.node.id, set()):
+            return NodeExecutionResult.failed(
+                output,
+                code="retryable_gate_failure",
+                message="gate failed with redaction-safe summary",
+                retryable=True,
+                retry_evidence=_retry_evidence(),
             )
         return NodeExecutionResult.completed(output)
 
@@ -179,6 +231,30 @@ class _FailOutcomeAppendStorage(AtomicFileStateStorage):
                 "controlled node outcome append interruption",
                 execution_id=execution_id,
             )
+        return super().append_event(execution_id, event, lock=lock)
+
+
+class _FailSecondNodeStartStorage(AtomicFileStateStorage):
+    def __init__(self, project_root: Path) -> None:
+        super().__init__(project_root)
+        self.started_count = 0
+        self.fail_second_start = True
+
+    def append_event(
+        self,
+        execution_id: str,
+        event: ExecutionEvent,
+        *,
+        lock: ExecutionLock | None = None,
+    ) -> ExecutionEvent:
+        if event.event_type == "NODE_STARTED":
+            self.started_count += 1
+            if self.fail_second_start and self.started_count == 2:
+                self.fail_second_start = False
+                raise StateWriteError(
+                    "controlled interruption before retry start",
+                    execution_id=execution_id,
+                )
         return super().append_event(execution_id, event, lock=lock)
 
 
@@ -794,6 +870,212 @@ def test_cycle_revisit_is_rejected_before_second_execution(tmp_path: Path) -> No
     assert trace == ["loop"]
     assert storage.load_execution("exec-cycle").revision == 2
     assert len(_journal(tmp_path, "exec-cycle")) == 3
+
+
+def test_retryable_failure_requires_actionable_evidence() -> None:
+    with pytest.raises(ValueError, match="requires retry evidence"):
+        NodeExecutionResult.failed(
+            {},
+            code="missing_retry_evidence",
+            message="retry was requested without failure evidence",
+            retryable=True,
+        )
+
+
+def test_retry_context_corrects_on_second_attempt_and_is_redacted(
+    tmp_path: Path,
+) -> None:
+    retry_policy = {"max_iterations": 2, "exit_condition": "gates_pass"}
+    artifact = _artifact(
+        [
+            _deterministic_node(
+                "code",
+                "verify",
+                on_failure="code",
+                retry_policy=retry_policy,
+            ),
+            _deterministic_node(
+                "verify",
+                "completed",
+                on_failure="code",
+                retry_policy=retry_policy,
+            ),
+        ]
+    )
+    execution_id = "exec-retry-corrects"
+    storage = AtomicFileStateStorage(tmp_path)
+    _create_resume_execution(storage, artifact, execution_id, {"trace": []})
+    trace: list[tuple[str, int, RetryContext | None]] = []
+    result = _resume_executor(
+        storage,
+        NodeExecutorRegistry(
+            deterministic=DeterministicNodeExecutor(
+                _RetryBackend(trace, {"verify": {1}})
+            ),
+        ),
+    ).execute(artifact, execution_id, {"trace": []})
+
+    assert result.outcome == "success"
+    assert result.executed_node_ids == ("code", "verify", "code", "verify")
+    assert [(node, attempt) for node, attempt, _ in trace] == [
+        ("code", 1),
+        ("verify", 1),
+        ("code", 2),
+        ("verify", 2),
+    ]
+    assert [context is not None for _, _, context in trace] == [
+        False,
+        False,
+        True,
+        True,
+    ]
+    code_retry = trace[2][2]
+    verify_retry = trace[3][2]
+    assert code_retry is not None
+    assert verify_retry is not None
+    assert code_retry.origin_node_id == "verify"
+    assert verify_retry.origin_node_id == "verify"
+    assert code_retry.current_attempt == 2
+    assert verify_retry.current_attempt == 2
+    assert code_retry.failed_gates == ("pytest",)
+    assert code_retry.remaining_budget.remaining_tokens == 900
+    assert _RETRY_SECRET not in code_retry.model_dump_json()
+    assert "[REDACTED_SECRET]" in code_retry.model_dump_json()
+
+    events = _journal(tmp_path, execution_id)
+    starts = [event for event in events if event["event_type"] == "NODE_STARTED"]
+    outcomes = [
+        event
+        for event in events
+        if event["event_type"] in {"NODE_COMPLETED", "NODE_FAILED"}
+    ]
+    assert ["retry_context_digest" in event["payload"] for event in starts] == [
+        False,
+        False,
+        True,
+        True,
+    ]
+    assert [
+        "next_retry_context_digest" in event["payload"] for event in outcomes
+    ] == [False, True, True, False]
+    assert storage.load_execution(execution_id).attempt_by_node == {
+        "code": 2,
+        "verify": 2,
+    }
+    secret_bytes = _RETRY_SECRET.encode("utf-8")
+    assert all(
+        secret_bytes not in path.read_bytes()
+        for path in tmp_path.rglob("*")
+        if path.is_file()
+    )
+
+
+def test_retry_exhausted_stops_before_extra_effect_and_resume_is_idempotent(
+    tmp_path: Path,
+) -> None:
+    artifact = _artifact(
+        [
+            _deterministic_node(
+                "loop",
+                "completed",
+                on_failure="loop",
+                retry_policy={"max_iterations": 2, "exit_condition": "gate_passes"},
+            )
+        ]
+    )
+    execution_id = "exec-retry-exhausted"
+    storage = AtomicFileStateStorage(tmp_path)
+    _create_resume_execution(storage, artifact, execution_id, {"trace": []})
+    trace: list[tuple[str, int, RetryContext | None]] = []
+    executor = _resume_executor(
+        storage,
+        NodeExecutorRegistry(
+            deterministic=DeterministicNodeExecutor(
+                _RetryBackend(trace, {"loop": {1, 2, 3}})
+            ),
+        ),
+    )
+
+    with pytest.raises(RetryExhaustedError) as captured:
+        executor.execute(artifact, execution_id, {"trace": []})
+
+    assert captured.value.classification == "retry_exhausted"
+    assert [(node, attempt) for node, attempt, _ in trace] == [
+        ("loop", 1),
+        ("loop", 2),
+    ]
+    assert trace[0][2] is None
+    assert trace[1][2] is not None
+    record = storage.load_execution(execution_id)
+    assert record.current_state == ExecutionState.FAILED_RETRY_EXHAUSTED
+    assert record.attempt_by_node == {"loop": 2}
+    journal_before = storage.load_events(execution_id)
+    assert [event.event_type for event in journal_before].count("NODE_STARTED") == 2
+    assert journal_before[-1].event_type == "STATE_TRANSITIONED"
+    assert journal_before[-1].payload["reason"] == "node_retry_exhausted"
+
+    with pytest.raises(RetryExhaustedError):
+        executor.resume(artifact, execution_id)
+
+    assert len(trace) == 2
+    assert storage.load_execution(execution_id) == record
+    assert storage.load_events(execution_id) == journal_before
+
+
+def test_resume_rejects_tampered_retry_context_before_backend(
+    tmp_path: Path,
+) -> None:
+    artifact = _artifact(
+        [
+            _deterministic_node(
+                "loop",
+                "completed",
+                on_failure="loop",
+                retry_policy={"max_iterations": 2, "exit_condition": "gate_passes"},
+            )
+        ]
+    )
+    execution_id = "exec-retry-context-tamper"
+    storage = _FailSecondNodeStartStorage(tmp_path)
+    _create_resume_execution(storage, artifact, execution_id, {"trace": []})
+    trace: list[tuple[str, int, RetryContext | None]] = []
+    executor = _resume_executor(
+        storage,
+        NodeExecutorRegistry(
+            deterministic=DeterministicNodeExecutor(
+                _RetryBackend(trace, {"loop": {1}})
+            ),
+        ),
+    )
+    with pytest.raises(StateWriteError, match="before retry start"):
+        executor.execute(artifact, execution_id, {"trace": []})
+
+    failed_event = next(
+        event
+        for event in storage.load_events(execution_id)
+        if event.event_type == "NODE_FAILED"
+    )
+    digest = failed_event.payload["next_retry_context_digest"]
+    assert isinstance(digest, str)
+    context_path = (
+        tmp_path
+        / ".harness"
+        / "artifacts"
+        / "executions"
+        / execution_id
+        / "payloads"
+        / f"{digest.removeprefix('sha256:')}.json"
+    )
+    context_path.write_bytes(b'{"tampered":true}\n')
+    record_before = storage.load_execution(execution_id)
+    journal_before = storage.load_events(execution_id)
+
+    with pytest.raises(ExecutionBundleIntegrityError):
+        executor.resume(artifact, execution_id)
+
+    assert [(node, attempt) for node, attempt, _ in trace] == [("loop", 1)]
+    assert storage.load_execution(execution_id) == record_before
+    assert storage.load_events(execution_id) == journal_before
 
 
 def test_append_failure_prevents_backend_and_cas(tmp_path: Path) -> None:
