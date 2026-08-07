@@ -247,8 +247,8 @@ defensibility:
 retomada após interrupção.
 
 **Status da fase:** `in_progress` — F1 e F2.1–F2.3 foram promovidas por merge commits para `main`,
-com os respectivos CIs pós-merge integralmente verdes. A F2.4 possui branch exclusiva e gate
-defensável `READY`; nenhuma implementação de FSM/replay foi iniciada.
+com os respectivos CIs pós-merge integralmente verdes. A F2.4 está concluída e validada localmente
+na branch exclusiva; promoção remota permanece pendente de autorização, PR, merge e CI pós-merge.
 
 ### Coordenação e ambiente observado
 
@@ -257,7 +257,7 @@ defensável `READY`; nenhuma implementação de FSM/replay foi iniciada.
 | **Executor ativo** | `Codex` — responsável por implementar, validar, manter checkpoints e criar commits locais |
 | **Auditor/revisor** | `Antigravity` — somente-leitura por padrão; só edita quando o usuário solicitar explicitamente ou transferir a execução |
 | **Workspace** | `C:\Users\walla\OneDrive\Desktop\ai-engineering-harness` |
-| **Git** | `available` — branch ativa `task/f2.4-event-fsm`, criada limpa de `main == origin/main == 60597c3a12af8c15ef7c2e416c448f69d98941d0`; PR #9 mesclado; branches F2.2/F2.3 local/remota preservadas; checkpoints permanecem somente locais |
+| **Git** | `available` — branch ativa `task/f2.4-event-fsm`, criada limpa de `main == origin/main == 60597c3a12af8c15ef7c2e416c448f69d98941d0`; gate `c944ca6`; implementação F2.4 validada somente localmente; PR #9 mesclado; branches anteriores preservadas; checkpoints permanecem somente locais |
 | **python_command** | `& 'C:\Users\walla\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe'` — Python `3.12.13` |
 | **uv_command** | `& '.\build\f0.6-tools\uv\bin\uv.exe'` — uv `0.11.32` restaurado de forma isolada/ignorada, sem PATH ou instalação global; `lock --check` e `sync --all-extras --locked` verdes |
 | **Dependências do projeto** | `.venv` gerida pelo uv 0.11.32 com Python 3.12.13 e `uv.lock`; nenhuma dependência foi adicionada; baseline pós-rollback passa mypy em targets `linux` e `win32`; run 31146423972 do rollback concluiu 11/11 verde |
@@ -1274,11 +1274,11 @@ pós-merge possuem 11/11 checks verdes. A implementação permanece ancorada loc
 
 | Campo | Detalhe |
 |---|---|
-| **Status** | `in_progress` — gate defensável `READY`; implementação não iniciada |
+| **Status** | `completed localmente` — gate `READY → COMPLETED`; promoção remota pendente |
 | **Objetivo** | Tornar `ExecutionRecord.current_state` um snapshot derivado de transições canônicas no journal F2.2, aplicar legalidade de estado sob lock/CAS e recuperar de crash entre evento e snapshot sem reinicializar a execução |
 | **Branch exclusiva** | `task/f2.4-event-fsm`, criada limpa de `main == origin/main == 60597c3a12af8c15ef7c2e416c448f69d98941d0` após CI pós-merge verde da F2.3 |
 | **Checkpoint de rollback** | `checkpoint/pre-f2.4-defensibility^{}` → `60597c3a12af8c15ef7c2e416c448f69d98941d0` |
-| **Checkpoint do gate** | `checkpoint/f2.4-ready` identificará o commit exclusivamente documental deste dossiê, anterior à primeira edição de Python ou teste F2.4 |
+| **Checkpoints** | `checkpoint/f2.4-ready^{}` → `c944ca6f3e61c227a7719ff0838fbe7a27df9465`; `checkpoint/f2.4-complete` identificará o commit local de implementação e fechamento |
 | **Executor** | `Codex`, único escritor; nenhum outro executor deixou alteração no baseline |
 | **Dependências** | Nenhuma nova; reutilizar `ExecutionRecord`, `ExecutionEvent`, lock/fencing, journal e CAS F2.1/F2.2 e o `GraphExecutor` F2.3 |
 
@@ -1586,11 +1586,31 @@ defensibility:
 [x] Rollback não destrutivo com gatilhos objetivos e verificação executável
 [x] Executor único e horário de autorização registrados
 [x] Somente TASK.md será alterado na preparação; nenhum Python/teste F2.4 editado antes do checkpoint
+[x] Protocolo separado de journal e `AtomicFileStateStorage.load_events` implementados sem ampliar as sete operações F2.2
+[x] FSM event-sourced, tabela fechada, payload estrito, replay e recovery idempotente implementados
+[x] GraphExecutor integrado somente em INITIATED → EXECUTING → COMPLETED|FAILED
+[x] Positivos, negativos, crash/CAS, multiprocess, regressão, suíte, qualidade e distribuição verdes
+[x] Exatos 15 paths do allowlist; contratos e fronteiras proibidas byte-idênticos
+[x] F2.5/F2.6/F3/F5/F6 não iniciadas; nenhuma operação remota executada
 ```
 
-**Estado de parada obrigatório:** criar o commit documental e o checkpoint local
-`checkpoint/f2.4-ready`, conferir que somente `TASK.md` mudou e parar antes de qualquer implementação
-FSM/replay ou operação remota.
+#### Resultado verificado da F2.4
+
+| Evidência | Resultado observado |
+|---|---|
+| Provider e compatibilidade | `StateStorageProvider` preserva exatamente sete operações; `EventJournalStateStorageProvider` adiciona somente `load_events`; tuple destacada, lock explícito, recovery de temporário e journal canônico verdes |
+| FSM e replay | `EventSourcedStateMachine`, aliases, 23 estados, tabela fechada, payload exato, revisões com gaps de CAS de node, fencing/timestamp não regressivos, snapshot divergente e transição ilegal cobertos |
+| Crash recovery | Falha após `STATE_TRANSITIONED` e antes do CAS deixa exatamente uma pendência; `recover` publica uma revisão sem novo evento e repetição é idempotente, inclusive após reabrir o provider |
+| Integração de grafo | Ordem canônica `STATE_TRANSITIONED`, pares de node e transição terminal; sucesso termina `COMPLETED`, falha termina `FAILED`; terminal consistente não duplica evento/CAS e execução interrompida não reexecuta backend |
+| Filtros congelados | positivos FSM `14 passed`; journal `14 passed`; integração `13 passed`; recovery `4 passed`; negativos FSM `14 passed`; negativos GraphExecutor `8 passed` |
+| Regressão e suíte | regressão F2.1–F2.3/compatibilidade `165 passed`; suíte integral `398 passed, 6 subtests passed` |
+| Qualidade e distribuição | mypy sem issues em 97 arquivos; Ruff e compileall verdes; `uv lock --check`, sync bloqueado e build verdes; smoke externo metadata/pacote/CLI 0.1.0 e probe isolado dos exports F2.4 verdes |
+| Ambiente do smoke | O primeiro subprocesso não encontrou o comando literal `uv`; repetição expôs somente `build/f0.6-tools/uv/bin` no `PATH` do processo e passou, sem instalação, dependência ou arquivo persistente adicional |
+| Escopo | Exatamente os 15 paths permitidos, incluindo este fechamento; `.github`, dependências, lockfile, compiler, contracts, engine/node executors, CLI, defaults, audit, governance, rollback e F3/F5/F6 permanecem byte-idênticos |
+
+**Estado de parada obrigatório:** criar o commit local de implementação e o checkpoint anotado local
+`checkpoint/f2.4-complete`, conferir worktree limpa e parar antes de push, PR, merge, tag remota,
+F2.5 ou F2.6.
 
 ---
 
@@ -4159,13 +4179,13 @@ de `main`.
 ```
 Data:              2026-08-07
 Fase:              F2
-Tarefa:            F2.4 — preparar FSM event-sourced e replay
-Estado:            gate READY; implementação não iniciada; F2.3 promovida e pós-merge verde
-Arquivos alterados: somente TASK.md nesta preparação documental
-Validações:         baseline focal F2.1–F2.3 161; suíte 375 + 6 subtests; mypy 97; Ruff/compileall; lock check; probe de reinicialização/replay
-Checkpoint:         `checkpoint/pre-f2.4-defensibility^{}` = 60597c3; `checkpoint/f2.4-ready` identificará o commit documental deste gate
+Tarefa:            F2.4 — FSM event-sourced e replay
+Estado:            completed localmente; promoção remota pendente; F2.5/F2.6 não iniciadas
+Arquivos alterados: exatos 15 paths do allowlist F2.4; nenhum path proibido
+Validações:         filtros 14/14/13/4/14/8; regressão 165; suíte 398 + 6 subtests; mypy 97; Ruff/compileall; lock/sync/build/smoke/wheel probe verdes
+Checkpoint:         `checkpoint/f2.4-ready^{}` = c944ca6; `checkpoint/f2.4-complete` identificará o commit local deste fechamento
 Promoção anterior:  PR #9; merge 60597c3; runs 31192232855 e 31192555316, ambos 11/11 verdes
-Resultado:          autoridade, leitura do journal, payload/revisão de transição, tabela legal, replay/recovery, integração mínima do GraphExecutor, allowlist, aceite e rollback congelados
+Resultado:          autoridade canônica, load_events, payload/revisão/fencing, tabela legal, replay/recovery e integração mínima do GraphExecutor implementados sem workflow-state ou antecipação
 ```
 
 ---
@@ -4173,22 +4193,17 @@ Resultado:          autoridade, leitura do journal, payload/revisão de transiç
 ## 11. Próxima Ação Exata
 
 ```text
-IMPLEMENTAR SOMENTE A F2.4 — NÃO INICIAR F2.5/F2.6:
-1. Confirmar que `checkpoint/f2.4-ready^{}` aponta para o commit documental do gate, a worktree está
-   limpa e a branch ativa é `task/f2.4-event-fsm` sobre `60597c3`.
-2. Alterar exclusivamente os 15 paths do allowlist congelado. Preservar byte-idênticos
-   ExecutionRecord/ExecutionEvent, RuntimeEngine/node executors, CLI, AuditTrailManager, rollback,
-   dependências, schemas, defaults e CI.
-3. Implementar `EventJournalStateStorageProvider.load_events`, `EventSourcedStateMachine`, payload
-   `STATE_TRANSITIONED`, tabela fechada, replay/recovery e a integração mínima
-   `INITIATED → EXECUTING → COMPLETED|FAILED` no GraphExecutor sob o mesmo lock/fencing/CAS.
-4. Não criar/migrar `workflow-state.json`; não implementar criação/resume/approve/cancel F2.5,
-   retry/reexecução F2.6 nem qualquer efeito F3/F5/F6.
-5. Executar todos os comandos positivos, negativos, recovery/crash, concorrência, regressão,
-   qualidade, lock/sync, build/smoke e auditoria de escopo congelados. Falha aciona o rollback
-   documentado; não flexibilizar legalidade, replay, revisão, lock, fencing, CAS ou integridade.
-6. Somente se tudo estiver verde, atualizar TASK.md com evidências, marcar F2.4 concluída localmente,
-   criar commit/checkpoint local `checkpoint/f2.4-complete` e parar antes de push, PR, merge ou F2.5.
+PARAR — AGUARDAR AUTORIZAÇÃO EXPLÍCITA PARA PROMOVER A F2.4:
+1. Confirmar que `checkpoint/f2.4-complete^{}` aponta para o commit local de implementação, a worktree
+   está limpa e a branch ativa permanece `task/f2.4-event-fsm`.
+2. Não editar F2.5/F2.6 nem criar outra branch antes de a F2.4 integrar `main` por PR único e o CI
+   pós-merge da `main` ficar integralmente verde.
+3. Somente com autorização explícita do usuário: publicar a branch F2.4 e abrir um único PR para
+   `main`; não publicar checkpoints/tags locais e não executar merge, bypass, force-push ou exclusão.
+4. Após PR/CI verde, solicitar ou confirmar autorização separada antes do merge. Depois do merge,
+   comprovar merge commit, ancestralidade e CI pós-merge; sincronizar `main` por fast-forward.
+5. Somente então preparar branch e gate defensável exclusivos da F2.5, sem antecipar resume/approve/
+   cancel, retry F2.6 ou qualquer efeito F3/F5/F6.
 ```
 
 ---

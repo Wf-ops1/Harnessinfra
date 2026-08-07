@@ -32,12 +32,25 @@ from .node_executors import (
     TerminalNodeExecutor,
     UnsupportedNodeTypeError,
 )
-from .state_machine import WorkflowState, WorkflowStateMachine
+from .state_machine import (
+    VALID_STATE_TRANSITIONS,
+    EventSourcedStateMachine,
+    InterruptedExecutionError,
+    InvalidStateTransitionError,
+    StateMachineError,
+    StateReplayError,
+    StateReplayResult,
+    StateTransitionIntegrityError,
+    WorkflowState,
+    WorkflowStateMachine,
+)
 
 __all__ = [
+    "VALID_STATE_TRANSITIONS",
     "AgentNodeExecutor",
     "ArtifactExecutionMismatchError",
     "DeterministicNodeExecutor",
+    "EventSourcedStateMachine",
     "GraphClockError",
     "GraphCycleExecutionError",
     "GraphEventConstructionError",
@@ -45,6 +58,8 @@ __all__ = [
     "GraphExecutionResult",
     "GraphExecutor",
     "HumanApprovalNodeExecutor",
+    "InterruptedExecutionError",
+    "InvalidStateTransitionError",
     "KnowledgeSyncNodeExecutor",
     "NodeBackendError",
     "NodeContractNotFoundError",
@@ -61,6 +76,10 @@ __all__ = [
     "NodeOutputValidationError",
     "RuntimeEngine",
     "RuntimeGraphConfigurationError",
+    "StateMachineError",
+    "StateReplayError",
+    "StateReplayResult",
+    "StateTransitionIntegrityError",
     "TerminalNodeExecutor",
     "UnknownCurrentNodeError",
     "UnsupportedNodeTypeError",

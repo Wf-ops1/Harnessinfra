@@ -7,6 +7,7 @@ import pytest
 
 from ai_engineering_harness.cli.commands.rollback import RollbackManager
 from ai_engineering_harness.compiler.compiler import GraphCompiler
+from ai_engineering_harness.contracts.execution import ExecutionState
 from ai_engineering_harness.models.router import ModelRouter
 from ai_engineering_harness.observability.audit import AuditTrailManager
 from ai_engineering_harness.runtime.agent_executor import AgentExecutor
@@ -17,7 +18,6 @@ from ai_engineering_harness.runtime.engine import (
 )
 from ai_engineering_harness.runtime.planner import PlanDocument, Planner
 from ai_engineering_harness.runtime.state_machine import (
-    InvalidStateTransitionError,
     WorkflowState,
     WorkflowStateMachine,
 )
@@ -116,12 +116,11 @@ def test_runtime_requires_explicit_graph_executor(tmp_path: Path):
     assert not (tmp_path / ".harness").exists()
 
 
-def test_fsm_rejects_invalid_transitions(tmp_path: Path):
-    fsm = WorkflowStateMachine(project_root=tmp_path, execution_id="exec-fsm-invalid")
-    assert fsm.current_state == WorkflowState.INITIATED
-    
-    with pytest.raises(InvalidStateTransitionError):
-        fsm.transition_to(WorkflowState.COMPLETED)
+def test_fsm_legacy_path_constructor_fails_closed(tmp_path: Path):
+    assert WorkflowState is ExecutionState
+    with pytest.raises(TypeError, match="EventJournalStateStorageProvider"):
+        WorkflowStateMachine(tmp_path, "exec-fsm-invalid")
+    assert not (tmp_path / ".harness").exists()
 
 
 def test_runtime_no_longer_runs_fixed_post_verification_sequence(tmp_path: Path):

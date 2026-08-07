@@ -11,6 +11,7 @@ from .atomic_file import (
 )
 from .base import (
     DuplicateEventError,
+    EventJournalStateStorageProvider,
     ExecutionAlreadyExistsError,
     ExecutionIdentityMismatchError,
     ExecutionLock,
@@ -30,6 +31,7 @@ from .base import (
 __all__ = [
     "AtomicFileStateStorage",
     "DuplicateEventError",
+    "EventJournalStateStorageProvider",
     "ExecutionAlreadyExistsError",
     "ExecutionIdentityMismatchError",
     "ExecutionLock",

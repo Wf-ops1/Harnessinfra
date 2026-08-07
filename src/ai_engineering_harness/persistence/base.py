@@ -144,8 +144,22 @@ class StateStorageProvider(Protocol):
         """Release an active handle owned by this provider instance."""
 
 
+@runtime_checkable
+class EventJournalStateStorageProvider(StateStorageProvider, Protocol):
+    """Add canonical journal reads without expanding the F2.2 provider."""
+
+    def load_events(
+        self,
+        execution_id: str,
+        *,
+        lock: ExecutionLock | None = None,
+    ) -> tuple[ExecutionEvent, ...]:
+        """Load the complete canonical journal after fail-closed recovery."""
+
+
 __all__ = [
     "DuplicateEventError",
+    "EventJournalStateStorageProvider",
     "ExecutionAlreadyExistsError",
     "ExecutionIdentityMismatchError",
     "ExecutionLock",
