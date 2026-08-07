@@ -246,9 +246,10 @@ defensibility:
 **Objetivo:** executar cada nó do artefato compilado, persistir todas as transições e permitir
 retomada após interrupção.
 
-**Status da fase:** `in_progress` — a F1 foi promovida por merge commit para `main`, o CI pós-merge
-está verde e a F2.1 foi implementada e validada integralmente na branch exclusiva. A publicação da
-branch/PR ainda depende de autorização explícita; a F2.2 não foi iniciada.
+**Status da fase:** `in_progress` — a F1 e a F2.1 foram promovidas por merge commits para `main`
+e os respectivos CIs pós-merge estão verdes. A F2.2-R1 está concluída e integralmente verificada
+no repositório local após corrigir a falha real de type check do Ubuntu/Python 3.11; sua promoção
+remota permanece pendente e a F2.3 não foi iniciada.
 
 ### Coordenação e ambiente observado
 
@@ -257,10 +258,10 @@ branch/PR ainda depende de autorização explícita; a F2.2 não foi iniciada.
 | **Executor ativo** | `Codex` — responsável por implementar, validar, manter checkpoints e criar commits locais |
 | **Auditor/revisor** | `Antigravity` — somente-leitura por padrão; só edita quando o usuário solicitar explicitamente ou transferir a execução |
 | **Workspace** | `C:\Users\walla\OneDrive\Desktop\ai-engineering-harness` |
-| **Git** | `available` — `main...origin/main` em `6c994b425bcd805db96bf1092c0569f503b55cd2`; branch ativa `task/f2.1-execution-record`, criada desse merge; `checkpoint/pre-f2.1-defensibility^{}` ancora o baseline; checkpoints permanecem somente locais |
+| **Git** | `available` — branch `task/f2.2-state-storage` concluída localmente sobre o gate `417598b` e a restauração `22e2ebf`; origin permanece no rollback documentado `76f2bec51a169ef92b5e03c5ab7e66fa4d4d9995`; `main == origin/main == 34d00a5cadb3ca0b5690420b8ffb5026e207af93`; PR #8 aberto; checkpoints R1 permanecem somente locais |
 | **python_command** | `& 'C:\Users\walla\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe'` — Python `3.12.13` |
 | **uv_command** | `& '.\build\f0.6-tools\uv\bin\uv.exe'` — uv `0.11.32` restaurado de forma isolada/ignorada, sem PATH ou instalação global; `lock --check` e `sync --all-extras --locked` verdes |
-| **Dependências do projeto** | `.venv` gerida pelo uv 0.11.32 com Python 3.12.13 e `uv.lock`; 299 testes + 6 subtests, mypy em 93 arquivos, Ruff, compileall, lock/sync, build e dois smokes isolados verdes no fechamento local da F2.1 |
+| **Dependências do projeto** | `.venv` gerida pelo uv 0.11.32 com Python 3.12.13 e `uv.lock`; nenhuma dependência foi adicionada; baseline pós-rollback passa mypy em targets `linux` e `win32`; run 31146423972 do rollback concluiu 11/11 verde |
 | **Regra de escrita** | apenas um agente escreve por vez |
 
 ---
@@ -278,18 +279,32 @@ branch/PR ainda depende de autorização explícita; a F2.2 não foi iniciada.
 
 ---
 
+### Promoção observada da F2.1
+
+| Evidência | Resultado observado |
+|---|---|
+| PR da tarefa | [#7](https://github.com/Wf-ops1/Harnessinfra/pull/7), mesclado e fechado em 2026-08-06 |
+| Commit implementado | `944a52ae4094563af61e59507889fb732e3a556b`; ancestral confirmado de `origin/main` |
+| Merge commit | `34d00a5cadb3ca0b5690420b8ffb5026e207af93`, com pais `6c994b425bcd805db96bf1092c0569f503b55cd2` e `944a52ae4094563af61e59507889fb732e3a556b` |
+| CI do PR | 11/11 checks concluídos e verdes, incluindo o agregado obrigatório `CI required` |
+| CI pós-merge | [run 31142218012](https://github.com/Wf-ops1/Harnessinfra/actions/runs/31142218012), evento `push` em `main`, commit `34d00a5`, todos os 10 jobs de matriz e `CI required` em `completed/success` |
+| Alinhamento local | `git switch main`; `git merge --ff-only origin/main`; `main == origin/main == 34d00a5`; worktree limpa antes da criação da branch F2.2 |
+| Checkpoints locais | `checkpoint/f2.1-ready^{}` em `bc558998fe9be2a1c221f7bbba9e3d6a5360a271`; `checkpoint/f2.1-complete^{}` em `944a52ae4094563af61e59507889fb732e3a556b` |
+
+---
+
 ## 6. Fase 2 — Estado e tarefa atual
 
 ### F2.1 — Criar `ExecutionRecord`
 
 | Campo | Detalhe |
 |---|---|
-| **Status** | `completed localmente` — gate `READY → COMPLETED`; implementação e critérios congelados aprovados |
+| **Status** | `completed e promovida` — gate `READY → COMPLETED`; PR #7 mesclado e CI pós-merge verde |
 | **Objetivo** | Definir o contrato versionado da execução e persistir `execution.json` atomicamente, sem integrar ainda runtime, CLI, FSM, journal, worktree ou governança |
 | **Branch exclusiva** | `task/f2.1-execution-record`, criada de `main` pós-merge verde em `6c994b4` |
 | **Checkpoint de rollback** | `checkpoint/pre-f2.1-defensibility^{}` → `6c994b425bcd805db96bf1092c0569f503b55cd2` |
-| **Checkpoint do gate** | `checkpoint/f2.1-ready^{}` → `bc558998fe9be2a1c221f7bbba9e3d6a5360a271`; checkpoint local de conclusão será `checkpoint/f2.1-complete` no commit deste fechamento |
-| **Próximo passo permitido** | Somente com autorização explícita, publicar esta branch e abrir um PR F2.1 para `main`; F2.2 exige merge e CI pós-merge verde antes de seu próprio gate |
+| **Checkpoint do gate** | `checkpoint/f2.1-ready^{}` → `bc558998fe9be2a1c221f7bbba9e3d6a5360a271`; `checkpoint/f2.1-complete^{}` → `944a52ae4094563af61e59507889fb732e3a556b` |
+| **Promoção** | PR #7 → merge `34d00a5`; `CI required` pós-merge verde; F2.2 criada somente depois dessa comprovação |
 
 #### Auditoria concreta da F2.1
 
@@ -488,8 +503,423 @@ defensibility:
 | Consumidores | Nenhum consumidor atual foi alterado; RuntimeEngine, FSM, CLI, journal, approval, worktree e ConfigResolver não adotam o record nesta tarefa |
 | Fronteiras | Nenhum provider/CAS/lock/recovery F2.2, executor F2.3, FSM F2.4, CLI F2.5, retry F2.6, F3 ou F5 foi antecipado |
 
-**Estado de parada obrigatório:** a F2.1 está concluída localmente e a implementação da F2.2 não foi
-iniciada. Não publicar, abrir PR ou iniciar F2.2 sem cumprir a autorização e a promoção abaixo.
+**Estado de promoção:** a F2.1 integra a linha oficial em `main`; sua implementação não deve ser
+reaberta pela F2.2, salvo regressão reproduzível.
+
+---
+
+### F2.2 — Criar abstração de persistência
+
+| Campo | Detalhe |
+|---|---|
+| **Status** | `completed locally; F2.2-R1 verified; promotion pending` |
+| **Objetivo** | Criar um provider de estado em arquivo com contrato estável, concorrência entre processos, CAS por revisão, journal encadeado e recuperação fail-closed, sem executar grafo nem adotar o provider no runtime atual |
+| **Branch exclusiva** | `task/f2.2-state-storage`, criada de `main == origin/main == 34d00a5` pós-merge verde |
+| **Checkpoint de rollback** | `checkpoint/pre-f2.2-defensibility^{}` → `34d00a5cadb3ca0b5690420b8ffb5026e207af93` |
+| **Checkpoint do gate** | `checkpoint/f2.2-ready` identifica o commit documental deste gate, anterior a qualquer edição de Python ou teste de implementação |
+| **Checkpoint da tentativa** | `checkpoint/f2.2-complete^{}` → `1e6bd09e88454099141d6812db3a72f638858017`; preservado somente como evidência da implementação que falhou no CI |
+| **Checkpoint corretivo** | `checkpoint/f2.2-r1-ready^{}` → `417598b0210bc3d25d8889b4a932ec30dbf0cdfb`; `checkpoint/f2.2-r1-complete` identificará o commit local de fechamento verificado |
+| **Promoção interrompida** | [PR #8](https://github.com/Wf-ops1/Harnessinfra/pull/8); [run 31145918693](https://github.com/Wf-ops1/Harnessinfra/actions/runs/31145918693) falhou na tentativa; [run 31146423972](https://github.com/Wf-ops1/Harnessinfra/actions/runs/31146423972) comprovou o rollback com 11/11 checks verdes |
+| **Estado de implementação** | A inversão não destrutiva do revert restaurou a F2.2 em `22e2ebf0417e75fd3d895691d3b7e1551b3301ef`; a única correção R1 está em `persistence/locks.py`, sem alteração de teste, dependência, CI ou consumidor |
+
+#### Auditoria concreta da F2.2
+
+| Superfície | Evidência observada | Lacuna comprovada | Decisão do gate |
+|---|---|---|---|
+| Persistência F2.1 | `persistence/atomic_file.py` expõe somente `save_execution_record` e `load_execution_record`; save sempre cria diretório e substitui o destino | Segundo save com o mesmo ID/revisão sobrescreve silenciosamente; não há create exclusivo nem revisão otimista | Preservar wrappers F2.1 e adicionar provider/CAS tipado; create nunca sobrescreve |
+| Interface pública | Busca por `StateStorageProvider`, `AtomicFileStateStorage`, `compare_and_set_execution`, `append_event`, acquire/release e fencing não encontra implementação em `src`/`tests` | As sete operações obrigatórias da F2.2 estão ausentes | Criar contrato único em `persistence/base.py` e implementação inicial em arquivo |
+| Atomicidade atual | O helper usa temp no diretório, write, flush, `fsync`, close, `os.replace` e fsync de diretório fora do Windows | Protege uma publicação isolada, mas não serializa escritores nem recupera crash com temp abandonado | Reutilizar o primitivo; envolver estado compartilhado em lock e recovery determinístico |
+| Recovery | Probe controlado deixou `.execution.json.controlled.tmp` válido sem destino; o loader retornou `FileNotFoundError` e preservou o órfão sem recuperá-lo | Não existe política para canonical ausente, múltiplos candidatos ou canonical corrompido | Recuperar somente candidato único, completo e válido; ambiguidade/corrupção falha fechada e preserva evidência |
+| Concorrência | Não há lock, timeout, owner, handle ou token persistente; `indexer/LeaseManager` mantém lease/token apenas em memória | Dois processos podem perder update; o lease do indexador não protege execution state | Lock de arquivo do SO + token de fencing persistente e estritamente crescente; sem fallback de lock suave |
+| Record/revisão | `ExecutionRecord` 1.0 é estrito, canônico, imutável e possui `revision>=0`, mas não define transição | Não há CAS, incremento exato ou preservação de identidade | Create exige revisão 0; CAS exige revisão atual esperada e replacement exatamente `expected+1` |
+| Evento tipado | `ExecutionEvent` atual é congelado, mas aceita extras, payload `Any`, timestamp sem UTC obrigatório e hashes arbitrários; não possui schema version/canonicalização | O provider não consegue provar linha canônica, JSON seguro ou cadeia íntegra | Endurecer somente o envelope de armazenamento 1.0; sem definir semântica de transição F2.4 |
+| Journal atual | `AuditTrailManager` escreve `event-journal.jsonl` com append textual, sem lock/flush/fsync/replace; atualiza `last_hash` antes da escrita e não usa `ExecutionEvent` | É consumidor legado independente e não oferece nenhuma gravação concorrente perdida | Não migrar nem alterar esse consumidor na F2.2; provider rejeita journal legado/incompatível e será adotado na F2.4 |
+| Consumidores atuais | CLI/FSM leem `workflow-state.json`; audit/rollback/promotion usam `AuditTrailManager`; testes F2.1 chamam wrappers; registry/teste de contrato usam `ExecutionEvent` | Nenhum fluxo operacional usa um `StateStorageProvider`; há múltiplas fontes de estado | Manter consumidores byte-idênticos; integração, replay e autoridade única pertencem a F2.3–F2.5/F6 |
+| Listagem | Não existe índice/listagem; diretórios legados podem conter apenas `workflow-state.json`/journal | Não há enumeração determinística nem distinção entre managed e legado | Listar apenas diretórios com record/temp gerenciado, ordenar por ID e falhar em record gerenciado inválido |
+| Dependências/plataformas | `pyproject.toml`/`uv.lock` não incluem file-lock externo; CI cobre Windows e Ubuntu em versões Python suportadas | Introduzir biblioteca agora ampliaria supply chain e lock | Implementar com `msvcrt.locking`/`fcntl.flock`; syscall indisponível falha fechada |
+
+Probe reproduzível executado em diretório temporário, sem escrita no repositório:
+
+```text
+unconditional_overwrite=True
+abandoned_temp_not_recovered=True
+provider_symbols=StateStorageProvider:False,AtomicFileStateStorage:False,ExecutionLock:False
+```
+
+Baseline local antes do gate: `74 passed` em `test_execution_record.py` +
+`test_documentation.py`, seguido de `299 passed, 6 subtests passed` na suíte integral; branch limpa em `34d00a5` e tag
+`checkpoint/pre-f2.2-defensibility` já criada.
+
+#### Contrato exato congelado da F2.2
+
+1. `StateStorageProvider` será um `Protocol` público e testável em
+   `persistence/base.py`, com exatamente as operações públicas obrigatórias:
+   `create_execution`, `load_execution`, `compare_and_set_execution`, `append_event`,
+   `list_executions`, `acquire_execution_lock` e `release_execution_lock`.
+2. A implementação inicial será `AtomicFileStateStorage(project_root: Path)`. SQLite continua
+   futuro e deverá implementar o mesmo contrato, sem mudar consumidores.
+3. Assinaturas congeladas:
+   - `create_execution(record: ExecutionRecord) -> ExecutionRecord`;
+   - `load_execution(execution_id: str, *, lock: ExecutionLock | None = None) -> ExecutionRecord`;
+   - `compare_and_set_execution(execution_id: str, expected_revision: int,
+     replacement: ExecutionRecord, *, lock: ExecutionLock | None = None) -> ExecutionRecord`;
+   - `append_event(execution_id: str, event: ExecutionEvent,
+     *, lock: ExecutionLock | None = None) -> ExecutionEvent`;
+   - `list_executions() -> tuple[ExecutionRecord, ...]`;
+   - `acquire_execution_lock(execution_id: str, owner_id: str,
+     *, timeout_seconds: float) -> ExecutionLock`;
+   - `release_execution_lock(lock: ExecutionLock) -> None`.
+4. `ExecutionLock` será handle imutável contendo `lock_id` opaco, `execution_id`, `owner_id`,
+   `fencing_token` e `acquired_at` UTC. Só a mesma instância do provider aceita um handle ativo;
+   handle forjado, de outro ID/provider, já liberado ou liberado duas vezes falha tipadamente.
+5. Toda operação por execução adquire/libera lock interno quando `lock=None`; um handle explícito
+   permite que a F2.4 execute append + CAS sob a mesma exclusão. Lock explícito é não reentrante.
+   `create_execution` sempre controla internamente a ordem catalog lock → execution lock.
+6. O lock será advisory entre processos, mantido por descriptor até release/crash: `fcntl.flock`
+   em POSIX e região de um byte com `msvcrt.locking` no Windows. Aquisição usa relógio monotônico,
+   timeout finito `>=0` (`0` = tentativa única). Falha/FS sem suporte não degrada para lock apenas
+   em memória: retorna erro fail-closed.
+7. Cada aquisição bem-sucedida incrementa, ainda sob o OS lock, o contador durável
+   `.harness/state/locks/<execution_id>.fence` por publicação atômica. Tokens podem ter lacunas após
+   crash, mas nunca repetir nem diminuir. O arquivo `.lock` persistente não significa lock ativo;
+   o descriptor do SO é a autoridade.
+8. `create_execution` exige record revision `0`, diretório/ID válido e ausência de record gerenciado;
+   existência resulta em `ExecutionAlreadyExistsError` e preserva bytes. Nunca é upsert.
+9. CAS carrega o canonical sob o mesmo lock, exige `actual_revision == expected_revision`,
+   `replacement.revision == expected_revision + 1`, mesmo `execution_id` e identidade imutável
+   (`workflow_name`, `artifact_digest`, `base_commit_sha`, `original_branch`, `configuration_digest`,
+   `created_at`); `updated_at` não pode regredir. Conflito ou mismatch não escreve byte algum.
+10. Dois processos com a mesma revisão esperada produzem exatamente um sucesso e um
+    `RevisionConflictError`; o destino final possui revisão incrementada uma vez, sem last-write-wins.
+11. `ExecutionEvent` passa a exigir `event_schema_version="1.0"`, IDs válidos, `event_type` não vazio,
+    timestamp UTC, payload recursivamente JSON-native finito e `extra="forbid"`; preserva os campos
+    existentes. Isso define o envelope, não os eventos/transições da F2.4.
+12. O chamador entrega `previous_hash=current_hash=None`. `append_event` valida execução/ID e todo o
+    journal existente, rejeita event ID duplicado e calcula `previous_hash` (64 zeros no primeiro)
+    e `current_hash=sha256(JSON canônico do evento sem current_hash)`; retorna o evento persistido.
+13. Cada linha será JSON UTF-8 canônico (chaves ordenadas, separadores compactos) com um único LF.
+    O append lógico republica `journal_anterior + linha_completa` por temp/flush/fsync/replace sob o
+    execution lock; não usa append textual e não expõe linha parcial ou perde append concorrente.
+14. Destinos continuam exatamente `.harness/state/executions/<id>/execution.json` e
+    `event-journal.jsonl`; locks/fence ficam fora dos diretórios de execução para não criar entradas
+    fantasmas em `list_executions`.
+15. Antes de load/CAS/append/list, recovery inspeciona somente temps de padrão conhecido. Canonical
+    válido vence e permite limpar órfãos conhecidos; canonical ausente + exatamente um temp completo,
+    canônico e vinculado ao ID é promovido atomicamente. Canonical inválido, candidato inválido ou
+    múltiplos candidatos falham com `RecoveryConflictError` e preservam todos os bytes para análise.
+16. `list_executions` usa catalog lock, recupera/carrega cada record gerenciado sob seu lock e retorna
+    tuple ordenada por `execution_id`. Diretório legado sem `execution.json`/temp gerenciado é ignorado;
+    record gerenciado inválido nunca é omitido silenciosamente. A lista é consistente por record,
+    não promete snapshot MVCC global entre revisões concorrentes de IDs diferentes.
+17. Hierarquia pública de falhas: `StateStorageError`, `ExecutionAlreadyExistsError`,
+    `ExecutionNotFoundError`, `RevisionConflictError`, `ExecutionIdentityMismatchError`,
+    `StateIntegrityError`, `JournalIntegrityError`, `DuplicateEventError`,
+    `LockAcquisitionTimeoutError`, `LockOwnershipError`, `LockUnavailableError`,
+    `RecoveryConflictError` e `StateWriteError`. Erros incluem contexto não secreto e preservam causa.
+18. Os helpers/erros públicos da F2.1 permanecem importáveis e com round-trip/canonicalidade já
+    comprovados; implementação pode compartilhar helper atômico, mas não transformar silenciosamente
+    `save_execution_record` em create/CAS nem quebrar seus testes.
+
+#### Compatibilidade e escopo congelados
+
+**Allowlist da implementação futura:**
+
+- `TASK.md` — transição, resultados e handoff F2.2;
+- `src/ai_engineering_harness/persistence/base.py` — provider, lock handle e erros públicos;
+- `src/ai_engineering_harness/persistence/locks.py` — lock cross-process e fencing;
+- `src/ai_engineering_harness/persistence/atomic_file.py` — provider, CAS, journal/recovery e helpers;
+- `src/ai_engineering_harness/persistence/__init__.py` — exports F2.1/F2.2;
+- `src/ai_engineering_harness/contracts/events/execution_event.py` e `events/__init__.py` — envelope
+  canônico compatível;
+- `tests/unit/test_state_storage.py` — provas focais, negativas, concorrentes e de recovery.
+
+**Escopo proibido nesta tarefa:**
+
+- alterar `ExecutionRecord` 1.0, artefato/compilador F1, YAML/schema de produção, package version,
+  `pyproject.toml`, `uv.lock`, CI ou adicionar dependência;
+- adotar o provider no `RuntimeEngine`, CLI, FSM, approval, promotion, rollback,
+  `AuditTrailManager`, registry de execução ou knowledge transaction;
+- executar nodes/arestas (`F2.3`), definir transições/replay (`F2.4`), resume/cancel/approve (`F2.5`)
+  ou retry (`F2.6`);
+- implementar modelo/tools/worktree/promoção (`F3`), configuração/policy/segredos/redaction/aprovação
+  vinculada (`F5`) ou unificar audit/evidence/recovery global (`F6`).
+
+**Compatibilidade explícita:**
+
+- `execution.json` F2.1 válido continua byte-compatível e carregável; package permanece `0.1.0`;
+- `workflow-state.json`, journals legados e approval existentes não são migrados, apagados nem
+  reinterpretados. Journal presente fora do envelope F2.2 é recusado, nunca convertido em silêncio;
+- garantia concorrente vale somente para acessos pelo mesmo contrato provider; consumidores legados
+  permanecem dívida visível até sua adoção em F2.4/F2.5/F6;
+- o provider não detecta/redige segredos: payload deve chegar JSON-safe e já redigido; a política de
+  redaction é F5.4. A F2.2 não persiste stdout/stderr adicional por conta própria;
+- qualquer backend SQLite futuro deverá reproduzir erros, CAS, ordenação, locks/fencing e integridade
+  observáveis antes de substituir o arquivo.
+
+#### Critérios de aceite positivos, negativos e comandos planejados
+
+```yaml
+defensibility:
+  task_id: "F2.2"
+  gate: "READY -> COMPLETED"
+  executor: "Codex"
+  gate_prepared_at: "2026-08-06T23:58:42-03:00"
+  implementation_started: true
+  implementation_completed: true
+  baseline:
+    branch: "task/f2.2-state-storage"
+    head: "34d00a5cadb3ca0b5690420b8ffb5026e207af93"
+    status: "clean; main == origin/main no momento da criação"
+    checkpoint: "checkpoint/pre-f2.2-defensibility"
+    promotion: "PR #7; merge 34d00a5; pós-merge run 31142218012 success"
+    local_validation: "74 focais/documentais; 299 testes + 6 subtests na suíte integral"
+  evidence:
+    - command: >-
+        rg -n "StateStorageProvider|AtomicFileStateStorage|compare_and_set_execution|append_event|
+        acquire_execution_lock|release_execution_lock" src tests
+      observed: "nenhuma implementação das sete operações obrigatórias"
+    - command: >-
+        inspeção integral de persistence/atomic_file.py, contracts/events/execution_event.py,
+        observability/audit.py, runtime/state_machine.py e indexer/lease_manager.py
+      observed: >-
+        snapshot overwrite sem CAS/lock/recovery; journal legado sem durabilidade cross-process;
+        workflow-state direto; lease/fencing somente em memória e fora do execution state
+    - command: "probe isolado com TemporaryDirectory e records revision=0"
+      observed: >-
+        unconditional_overwrite=True; abandoned_temp_not_recovered=True;
+        StateStorageProvider/AtomicFileStateStorage/ExecutionLock ausentes
+  positive_acceptance:
+    - command: >-
+        & '.\\build\\f0.6-tools\\uv\\bin\\uv.exe' run python -m pytest
+        tests/unit/test_state_storage.py -q -k
+        "interface or create or load or list or cas_success or append or canonical or public"
+      expected: >-
+        interface/exports exatos; create/load/list determinísticos; CAS +1; journal canônico/hash
+        íntegro; imports F2.1 preservados
+    - command: >-
+        & '.\\build\\f0.6-tools\\uv\\bin\\uv.exe' run python -m pytest
+        tests/unit/test_state_storage.py -q -k
+        "multiprocess or concurrent or lock or timeout or crash or fencing"
+      expected: >-
+        dois CAS concorrentes resultam 1 sucesso/1 conflito; appends concorrentes preservam ambos;
+        exclusão, timeout, liberação por crash e fencing estritamente crescente em Windows/POSIX
+    - command: >-
+        & '.\\build\\f0.6-tools\\uv\\bin\\uv.exe' run python -m pytest
+        tests/unit/test_state_storage.py -q -k "recovery or abandoned or atomic_failure"
+      expected: >-
+        candidato único válido é recuperado; canonical válido vence; falha de write/flush/fsync/replace
+        preserva destino; ambiguidade preserva evidência
+  negative_acceptance:
+    - command: >-
+        & '.\\build\\f0.6-tools\\uv\\bin\\uv.exe' run python -m pytest
+        tests/unit/test_state_storage.py -q -k
+        "duplicate or stale or mismatch or wrong_revision or corruption or invalid or forged or legacy"
+      expected: >-
+        duplicate create/event, stale CAS, revisão/identidade errada, hash/linha/UTF-8 adulterado,
+        handle forjado/reliberado, temp ambíguo e journal legado falham fechados sem mudar bytes
+  regression_and_quality:
+    - command: >-
+        & '.\\build\\f0.6-tools\\uv\\bin\\uv.exe' run python -m pytest
+        tests/unit/test_execution_record.py tests/unit/test_contracts.py
+        tests/unit/test_public_module_imports.py tests/unit/test_documentation.py -q
+      expected: "F2.1, contrato preexistente, exports e documentação sem regressão"
+    - command: >-
+        & '.\\build\\f0.6-tools\\uv\\bin\\uv.exe' run python -m pytest tests/unit tests/e2e -q;
+        & '.\\build\\f0.6-tools\\uv\\bin\\uv.exe' run python -m mypy src;
+        & '.\\build\\f0.6-tools\\uv\\bin\\uv.exe' run python -m ruff check .;
+        & '.\\build\\f0.6-tools\\uv\\bin\\uv.exe' run python -m compileall -q src compiler tests
+      expected: "todos exit 0, sem skip/xfail/ignore novo"
+    - command: >-
+        & '.\\build\\f0.6-tools\\uv\\bin\\uv.exe' lock --check;
+        & '.\\build\\f0.6-tools\\uv\\bin\\uv.exe' sync --all-extras --locked;
+        & '.\\build\\f0.6-tools\\uv\\bin\\uv.exe' run python -m build;
+        & '.\\build\\f0.6-tools\\uv\\bin\\uv.exe' run python tests/ci/smoke_wheel.py
+      expected: "lock imutável, build/smoke externo e imports públicos F2.2 verdes"
+    - command: >-
+        git diff --check; git diff --name-only checkpoint/f2.2-ready;
+        git diff --exit-code checkpoint/f2.2-ready -- .github compiler
+        src/ai_engineering_harness/runtime src/ai_engineering_harness/cli
+        src/ai_engineering_harness/observability src/ai_engineering_harness/defaults
+        src/ai_engineering_harness/contracts/execution.py pyproject.toml uv.lock
+      expected: "somente allowlist F2.2; todas as fronteiras excluídas byte-idênticas"
+  rollback:
+    triggers:
+      - "qualquer lost update, dois CAS stale aceitos ou linha de journal parcial/perdida"
+      - "lock indisponível degradar para memória, fencing repetir/regredir ou crash manter exclusão"
+      - "recovery promover candidato inválido/ambíguo ou apagar evidência em conflito"
+      - "mudança exigir dependência, runtime/CLI/FSM/audit, F2.3+, F3, F5 ou arquivo fora do allowlist"
+      - "regressão F2.1, artefato F1, build/wheel ou plataforma CI"
+    procedure: >-
+      parar e preservar arquivos/saídas; antes de commit inverter somente hunks F2.2 via apply_patch;
+      depois de commit usar git revert nos commits exclusivos da tarefa; nunca reset, clean ou
+      sobrescrita de trabalho preexistente
+    verify: >-
+      confirmar HEAD/checkpoints/status, diff de escopo, bytes das fronteiras, provas focais e
+      concorrentes, suíte integral, qualidade, lock/sync, build e smoke isolado
+```
+
+#### Checklist de liberação do gate F2.2
+
+```text
+[x] F2.1 comprovadamente mesclada por merge commit e CI pós-merge verde
+[x] Branch exclusiva criada de main sincronizada e checkpoint pré-gate registrado
+[x] Ausência de provider/CAS/lock/journal/recovery comprovada por código, busca e probe isolado
+[x] Consumidores atuais e conflitos com arquivos legados identificados explicitamente
+[x] Contrato, erros, paths, locks, fencing, CAS, journal, listagem e recovery congelados
+[x] Compatibilidade, allowlist, escopo proibido e fronteiras F2.3–F2.6/F3/F5/F6 congelados
+[x] Aceite positivo/negativo, concorrência cross-process, regressão, build/wheel e escopo planejados
+[x] Rollback e gatilhos fail-closed definidos
+[x] Implementação permaneceu nos sete arquivos Python/teste do allowlist e neste TASK.md
+[x] Create/load/list, CAS, lock/fencing, journal, recovery e erros públicos foram provados
+[x] Provas positivas, negativas, multiprocess, atomicidade e recovery passaram sem skip/xfail novo
+[x] Regressão F2.1, suíte integral, qualidade, lock/sync, build, wheel e escopo passaram
+```
+
+#### Falha de promoção e rollback da F2.2
+
+| Evidência | Resultado observado |
+|---|---|
+| Implementação local | commit `1e6bd09e88454099141d6812db3a72f638858017`; 58 testes focais, 78 de regressão e suíte integral de 357 testes + 6 subtests verdes no Windows; mypy local verde em 95 arquivos |
+| Checkpoint preservado | `checkpoint/f2.2-complete^{}` aponta para `1e6bd09`; a tag continua somente local e não foi movida nem apagada |
+| Promoção | branch publicada e PR #8 aberto para `main`, contendo somente os dois commits da F2.2 antes do rollback |
+| Falha concreta | run 31145918693, job `Quality / ubuntu-latest / Python 3.11`, etapa `Type check`: quatro erros `attr-defined` em `persistence/locks.py:392,404` porque os stubs POSIX de `msvcrt` não expõem `locking`, `LK_NBLCK` nem `LK_UNLCK` |
+| Trigger acionado | regressão de plataforma CI prevista no rollback congelado; `CI required` não atingiu `success` |
+| Ação tomada | `git revert --no-edit 1e6bd09...` criou `ec269b8c6c4374825462c399604b353f41935959`; nenhuma configuração, dependência, fronteira ou semântica de lock foi flexibilizada |
+| Verificação pós-revert | árvore em `ec269b8` idêntica ao gate; regressão `78 passed`; suíte baseline `299 passed, 6 subtests passed`; mypy verde em 93 arquivos; Ruff/compileall, lock/sync, build 0.1.0 e smoke externo verdes; somente este registro em `TASK.md` difere do gate; checkpoints preservados; F2.3 não iniciada |
+
+#### Recongelamento F2.2-R1 — tipagem cross-platform dos locks
+
+```yaml
+defensibility:
+  task_id: "F2.2-R1"
+  gate: "READY"
+  executor: "Codex"
+  authorized_at: "2026-08-07T01:18:55-03:00"
+  implementation_started: true
+  implementation_completed: true
+  completed_at: "2026-08-07T01:34:24-03:00"
+  problem_statement: >-
+    A implementação preservada em 1e6bd09 seleciona módulos de lock por os.name e mantém msvcrt/fcntl
+    globais com type: ignore. O mypy em target Linux analisa também as chamadas Windows e falha com
+    quatro attr-defined, impedindo CI required=success apesar dos testes funcionais locais verdes.
+  evidence:
+    - command: >-
+        uv run python -m mypy --platform linux C:/tmp/f2_2_old_lock_typing_probe.py
+      observed: >-
+        exit 1; exatamente quatro attr-defined para msvcrt.locking, LK_NBLCK e LK_UNLCK,
+        reproduzindo o job Ubuntu/Python 3.11 do run 31145918693
+      location: "checkpoint/f2.2-complete:persistence/locks.py:30-39,387-408"
+    - command: >-
+        uv run python -m mypy --platform linux C:/tmp/f2_2_candidate_lock_typing_probe.py;
+        uv run python -m mypy --platform win32 C:/tmp/f2_2_candidate_lock_typing_probe.py;
+        uv run python -m ruff check C:/tmp/f2_2_candidate_lock_typing_probe.py
+      observed: "todos exit 0; sem ignore, Any, cast, Protocol ou stub/dependência adicional"
+      location: "probes temporários fora do repositório"
+    - command: >-
+        uv run python -m mypy --platform linux src;
+        uv run python -m mypy --platform win32 src
+      observed: "baseline pós-rollback verde nos dois targets; 93 arquivos em cada execução"
+    - command: >-
+        git status --short --branch; git rev-parse HEAD origin/task/f2.2-state-storage main origin/main;
+        git rev-parse checkpoint/f2.2-ready^{} checkpoint/f2.2-complete^{}
+      observed: >-
+        branch/worktree limpa e sincronizada em 76f2bec; main/origin em 34d00a5; gate 5728472 e
+        tentativa 1e6bd09 preservados; nenhuma alteração de outro executor
+  baseline:
+    branch: "task/f2.2-state-storage"
+    head: "76f2bec51a169ef92b5e03c5ab7e66fa4d4d9995"
+    status: "clean; sincronizada com origin; implementação revertida"
+    checkpoint: "checkpoint/f2.2-r1-ready^{} = 417598b0210bc3d25d8889b4a932ec30dbf0cdfb"
+    preserved_evidence: "PR #8; runs 31145918693/31146423972; commits 1e6bd09/ec269b8/76f2bec"
+  frozen_strategy:
+    restoration: >-
+      depois do checkpoint R1, inverter de forma não destrutiva somente o revert ec269b8 para restaurar
+      os arquivos F2.2 byte a byte; preservar este dossiê e então aplicar a correção mínima em locks.py
+    platform_dispatch: >-
+      trocar os.name por sys.platform == 'win32', condição que o mypy elimina por target; manter um
+      backend privado Windows e um POSIX, sem módulo impossível visível ao target oposto
+    real_syscalls: >-
+      backend Windows importa localmente msvcrt.locking/LK_NBLCK/LK_UNLCK; backend POSIX importa
+      fcntl.flock/LOCK_EX/LOCK_NB/LOCK_UN; ambos continuam operando o mesmo descriptor de um byte
+    fail_closed: >-
+      ImportError do backend selecionado vira OSError(ENOSYS); CrossProcessLockManager mantém a
+      conversão existente para LockUnavailableError e nunca degrada para lock em memória
+    forbidden_masking: >-
+      proibidos type: ignore, Any, cast, Protocol permissivo, alteração de mypy/CI, dependência externa,
+      remoção de matriz, fallback suave ou mudança das semânticas de lock/fencing
+  frozen_scope:
+    allowed:
+      - "o allowlist original completo da F2.2, restaurado da tentativa preservada"
+      - "persistence/locks.py — única mudança comportamental R1: dispatch/imports privados tipados"
+      - "tests/unit/test_state_storage.py — somente regressão necessária da estratégia R1"
+      - "TASK.md — gate, resultados, handoff e checkpoints R1"
+    excluded:
+      - "todo o escopo proibido original F2.2 permanece proibido sem exceção"
+      - "pyproject.toml, uv.lock, .github/CI, runtime, CLI, schemas/YAML de produção e dependências"
+      - "F2.3, FSM/replay F2.4, resume/approve/cancel F2.5, retry F2.6, F3, F5 e F6"
+  frozen_acceptance:
+    inherited: "todos os comandos positivos, negativos, concorrentes, recovery, regressão, build/wheel e escopo da F2.2 permanecem obrigatórios e inalterados"
+    additions:
+      - command: "uv run python -m mypy src"
+        expected: "exit 0 no host; 95 arquivos após restauração"
+      - command: "uv run python -m mypy --platform linux src"
+        expected: "exit 0; zero attr-defined ou módulo Windows analisado no backend POSIX"
+      - command: "uv run python -m mypy --platform win32 src"
+        expected: "exit 0; zero attr-defined ou módulo POSIX analisado no backend Windows"
+      - command: >-
+          rg -n "type: ignore|\bAny\b|\bcast\(|\bProtocol\b" src/ai_engineering_harness/persistence/locks.py
+        expected: "exit 1; nenhuma máscara de tipagem na implementação corrigida"
+      - command: >-
+          uv run python -m pytest tests/unit/test_state_storage.py -q -k
+          "multiprocess or concurrent or lock or timeout or crash or fencing or unavailable"
+        expected: >-
+          exclusão, timeout, crash, fencing e falha de backend continuam tipados e sem lost update
+  rollback:
+    triggers:
+      - "qualquer critério original F2.2 ou novo target mypy falhar"
+      - "correção exigir ignore/Any/cast/configuração/dependência/CI ou arquivo fora do allowlist"
+      - "syscall real, timeout, crash release, fencing ou erro LockUnavailableError regredir"
+    procedure: >-
+      antes do commit inverter somente hunks R1 por apply_patch; depois do commit usar git revert no
+      commit exclusivo de restauração/correção; preservar gate, tentativa, rollback, PR e runs; nunca reset
+    verify: >-
+      retornar à árvore do checkpoint/f2.2-r1-ready, confirmar status/checkpoints/fronteiras e repetir
+      baseline 78/299+6, mypy linux/win32, Ruff, compileall, lock/sync, build e smoke
+```
+
+#### Checklist de liberação F2.2-R1
+
+```text
+[x] Falha exata do CI reproduzida localmente no target Linux
+[x] Estratégia candidata comprovada por mypy Linux/Windows e Ruff fora do repositório
+[x] Baseline Git, PR/runs, commits e checkpoints preservados; nenhum outro executor alterou arquivos
+[x] Syscalls reais, erro fail-closed e ausência de fallback congelados
+[x] Allowlist original preservado; única mudança comportamental limitada a locks.py
+[x] Critérios originais mantidos e mypy explícito Linux/Windows adicionado
+[x] Rollback não destrutivo e fronteiras F2.3–F6 reconfirmados
+[x] Somente TASK.md será alterado antes do novo checkpoint R1
+[x] Gate documental commitado em 417598b e checkpoint/f2.2-r1-ready criado antes da restauração
+[x] Implementação original restaurada por inversão não destrutiva em 22e2ebf
+[x] Dispatch sys.platform e imports privados aplicados somente em persistence/locks.py
+[x] Critérios originais e adicionais executados integralmente sem flexibilização
+[x] F2.2-R1 concluída localmente; promoção remota e F2.3 permanecem pendentes
+```
+
+#### Resultado verificado da F2.2-R1
+
+| Evidência | Resultado observado |
+|---|---|
+| Correção de plataforma | `locks.py` usa `sys.platform == "win32"`, imports locais dos syscalls reais e `OSError(ENOSYS)` fail-closed; nenhuma máscara `type: ignore`, `Any`, `cast` ou `Protocol` |
+| Tipagem e lint | mypy host, `--platform linux` e `--platform win32`: zero issues em 95 arquivos; Ruff focal e global verdes |
+| Testes focais | `58 passed`; filtros congelados: positivo `21 passed`, multiprocess/lock/crash/fencing `8 passed`, recovery/atomicidade `18 passed`, negativo `32 passed`; filtro R1 com `unavailable` também `8 passed` |
+| Regressão e suíte | regressão F2.1/contratos/imports/documentação: `78 passed`; suíte integral: `357 passed, 6 subtests passed` |
+| Qualidade e ambiente | `compileall -q src compiler tests`, `uv lock --check` e `uv sync --all-extras --locked` verdes; nenhuma dependência ou lockfile mudou |
+| Distribuição | wheel/sdist 0.1.0 reconstruídos; smoke externo confirmou metadata/package/CLI 0.1.0; probe isolado importou 8/8 símbolos F2.2 de `site-packages` |
+| Escopo | Diff desde `checkpoint/f2.2-r1-ready` contém exatamente TASK.md e os sete arquivos Python/teste do allowlist original; seis arquivos restaurados são byte-idênticos a `checkpoint/f2.2-complete`; somente `locks.py` contém a correção R1 |
+| Fronteiras | `.github`, compiler, runtime, CLI, observability, defaults, `contracts/execution.py`, `pyproject.toml` e `uv.lock` permanecem byte-idênticos; F2.3–F2.6/F3/F5/F6 não foram antecipados |
+
+**Estado de parada obrigatório:** F2.2-R1 concluída localmente. Criar o commit/checkpoint local de
+fechamento e parar antes de push, atualização do PR #8, merge ou início da F2.3.
 
 ---
 
@@ -3056,15 +3486,15 @@ de `main`.
 ## 10. Último Checkpoint
 
 ```
-Data:              2026-08-06
+Data:              2026-08-07
 Fase:              F2
-Tarefa:            F2.1 — criar ExecutionRecord e persistência atômica estreita
-Estado:            completed localmente — gate READY → COMPLETED; publicação remota pendente de autorização
-Arquivos alterados: TASK.md; contracts/execution.py e export; persistence/atomic_file.py e export; teste unitário focal
-Validações:         70 focais; 56 negativos; 53 regressões F1; 299 testes + 6 subtests; mypy 93 arquivos; Ruff; compileall; lock/sync; build; dois smokes; escopo verdes
-Checkpoint:         `checkpoint/pre-f2.1-defensibility^{}` em 6c994b4; `checkpoint/f2.1-ready^{}` em bc55899; `checkpoint/f2.1-complete` será a tag local deste fechamento
-Observação:         branch task/f2.1-execution-record; nenhum push/PR/tag remoto; consumidores atuais e fronteiras F2.2–F5 permanecem inalterados
-Resultado:          record 1.0 canônico/fail-closed e save/load atômico concluídos; F2.2 ainda não iniciada
+Tarefa:            F2.2-R1 — recongelar correção cross-platform da abstração de persistência
+Estado:            completed locally; promotion pending; F2.3 não iniciada
+Arquivos alterados: TASK.md; persistence/{base.py,locks.py,atomic_file.py,__init__.py}; contracts/events/{execution_event.py,__init__.py}; tests/unit/test_state_storage.py
+Validações:         focais 58 e filtros 21/8/18/32; regressão 78; suíte 357 + 6 subtests; mypy host/linux/win32 em 95 arquivos; Ruff/compileall; lock/sync; build; smoke; 8/8 imports; escopo verde
+Checkpoint:         `checkpoint/f2.2-r1-ready^{}` = 417598b; `checkpoint/f2.2-r1-complete` identificará o commit local deste fechamento; ready 5728472 e complete-evidence 1e6bd09 preservados
+Observação:         PR #8 e origin ainda apontam para o rollback documentado; nenhuma operação remota, dependência, CI/YAML, runtime/CLI, schema de produção ou F2.3 foi executada
+Resultado:          implementação restaurada em 22e2ebf; sys.platform + imports locais de syscalls + OSError(ENOSYS) corrigem o CI sem ignore/Any/cast/fallback
 ```
 
 ---
@@ -3072,13 +3502,18 @@ Resultado:          record 1.0 canônico/fail-closed e save/load atômico conclu
 ## 11. Próxima Ação Exata
 
 ```text
-PROMOVER SOMENTE A F2.1 — NÃO INICIAR F2.2 AINDA:
-1. Confirmar `checkpoint/f2.1-complete`, branch `task/f2.1-execution-record` limpa e baseline `6c994b4` ancestral.
-2. Não alterar produto, teste, runtime, dependência, YAML, schema ou o contrato congelado durante a promoção.
-3. Somente com autorização explícita do usuário, publicar a branch e abrir um único PR F2.1 para `main`.
-4. Exigir o check agregado `CI required` verde e todos os jobs concluídos antes de qualquer merge.
-5. O usuário efetua/confirma o merge; depois sincronizar `main`, comprovar o merge commit e o CI pós-merge verde.
-6. Somente então criar branch exclusiva da F2.2 e preparar sua auditoria/gate; nenhuma implementação F2.2 é autorizada por este checkpoint.
+PROMOVER SOMENTE A F2.2-R1 — NÃO INICIAR F2.3:
+1. Confirmar que `checkpoint/f2.2-r1-complete` aponta para o commit local de fechamento, a worktree
+   está limpa e a branch difere de origin somente pelos commits R1 documentados.
+2. Parar e obter autorização explícita antes de qualquer push da branch ou tag, atualização do PR #8,
+   merge, alteração de proteção ou operação remota destrutiva.
+3. Se o push da branch for autorizado, publicar somente `task/f2.2-state-storage`, acompanhar todos os
+   jobs do PR #8 e exigir `CI required=success` sem reduzir matriz, checks ou regras.
+4. Se qualquer gate remoto falhar, aplicar o rollback R1 documentado e não flexibilizar lock, CAS,
+   fencing, recovery, integridade, mypy ou testes.
+5. Mesmo com o PR verde, merge exige autorização explícita separada. Depois do merge autorizado,
+   confirmar ancestralidade, sincronizar `main == origin/main` e exigir CI pós-merge integralmente verde.
+6. Somente então preparar branch/gate exclusivo da F2.3. Não implementar F2.3 nesta branch ou etapa.
 ```
 
 ---
@@ -3145,4 +3580,4 @@ Atualizar status neste TASK.md ao concluir cada tarefa.
 
 ---
 
-*Atualizado em: 2026-08-06 | Fonte de verdade: docs/plano_implementacao_harness_operacional.md*
+*Atualizado em: 2026-08-07 | Fonte de verdade: docs/plano_implementacao_harness_operacional.md*

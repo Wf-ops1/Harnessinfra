@@ -1,6 +1,7 @@
 """Durable state primitives for the harness runtime."""
 
 from .atomic_file import (
+    AtomicFileStateStorage,
     ExecutionRecordIntegrityError,
     ExecutionRecordStorageError,
     ExecutionRecordWriteError,
@@ -8,11 +9,44 @@ from .atomic_file import (
     load_execution_record,
     save_execution_record,
 )
+from .base import (
+    DuplicateEventError,
+    ExecutionAlreadyExistsError,
+    ExecutionIdentityMismatchError,
+    ExecutionLock,
+    ExecutionNotFoundError,
+    JournalIntegrityError,
+    LockAcquisitionTimeoutError,
+    LockOwnershipError,
+    LockUnavailableError,
+    RecoveryConflictError,
+    RevisionConflictError,
+    StateIntegrityError,
+    StateStorageError,
+    StateStorageProvider,
+    StateWriteError,
+)
 
 __all__ = [
+    "AtomicFileStateStorage",
+    "DuplicateEventError",
+    "ExecutionAlreadyExistsError",
+    "ExecutionIdentityMismatchError",
+    "ExecutionLock",
+    "ExecutionNotFoundError",
     "ExecutionRecordIntegrityError",
     "ExecutionRecordStorageError",
     "ExecutionRecordWriteError",
+    "JournalIntegrityError",
+    "LockAcquisitionTimeoutError",
+    "LockOwnershipError",
+    "LockUnavailableError",
+    "RecoveryConflictError",
+    "RevisionConflictError",
+    "StateIntegrityError",
+    "StateStorageError",
+    "StateStorageProvider",
+    "StateWriteError",
     "execution_record_path",
     "load_execution_record",
     "save_execution_record",
