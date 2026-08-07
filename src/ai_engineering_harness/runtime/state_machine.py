@@ -169,6 +169,7 @@ _TRANSITIONS: dict[ExecutionState, frozenset[ExecutionState]] = {
     ),
     ExecutionState.PAUSED_AWAITING_APPROVAL: frozenset(
         {
+            ExecutionState.EXECUTING,
             ExecutionState.PROMOTING,
             ExecutionState.CANCELLED,
             ExecutionState.FAILED,

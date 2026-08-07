@@ -1,16 +1,10 @@
 """Suíte de Testes E2E do Ciclo de Vida do Harness (TASK-8.3)."""
 
-import hashlib
 from dataclasses import dataclass
-from datetime import UTC, datetime
 from pathlib import Path
 
 from ai_engineering_harness.compiler.compiler import GraphCompiler
-from ai_engineering_harness.contracts.execution import (
-    ApprovalStatus,
-    ExecutionRecord,
-    ExecutionState,
-)
+from ai_engineering_harness.contracts.execution import ExecutionState
 from ai_engineering_harness.core.detector import StackDetector
 from ai_engineering_harness.doctor.checker import DoctorChecker
 from ai_engineering_harness.indexer.codebase_memory_adapter import CodebaseMemoryAdapter
@@ -19,13 +13,12 @@ from ai_engineering_harness.observability.audit import AuditTrailManager
 from ai_engineering_harness.persistence import AtomicFileStateStorage
 from ai_engineering_harness.runtime import (
     DeterministicNodeExecutor,
-    GraphExecutor,
+    ExecutionLifecycleService,
     NodeExecutionContext,
     NodeExecutionResult,
     NodeExecutorRegistry,
     RuntimeEngine,
 )
-from ai_engineering_harness.runtime.maf_adapter import MAFAdapter
 from ai_engineering_harness.verification.engine import VerificationEngine
 
 
@@ -92,49 +85,27 @@ def test_full_lifecycle_e2e_python(tmp_path: Path):
     ast_data = indexer.query_ast("get_structure", commit_sha="commit-e2e-1")
     assert ast_data["commit_sha"] == "commit-e2e-1"
 
-    # 6. Run the compiled graph through the canonical F2.3 provider boundary
+    # 6. Run through the canonical F2.5 lifecycle and immutable resume bundle
     execution_id = "exec-e2e-100"
-    artifact = MAFAdapter.load_and_validate(compiled_maf)
-    artifact_digest = "sha256:" + hashlib.sha256(
-        artifact.canonical_json().encode("utf-8")
-    ).hexdigest()
     storage = AtomicFileStateStorage(tmp_path)
-    storage.create_execution(
-        ExecutionRecord(
-            record_schema_version="1.0",
-            revision=0,
-            execution_id=execution_id,
-            workflow_name=artifact.graph.graph.name,
-            artifact_digest=artifact_digest,
-            base_commit_sha="a" * 40,
-            original_branch="test",
-            worktree_path=None,
-            current_node_id=artifact.graph.graph.entrypoint,
-            current_state=ExecutionState.INITIATED,
-            attempt_by_node={},
-            created_at=datetime(2020, 1, 1, tzinfo=UTC),
-            updated_at=datetime(2020, 1, 1, tzinfo=UTC),
-            configuration_digest=f"sha256:{'0' * 64}",
-            approval_status=ApprovalStatus.NOT_REQUIRED,
-            candidate_commit_sha=None,
-            promotion_commit_sha=None,
-            failure=None,
-        )
+    lifecycle = ExecutionLifecycleService(
+        tmp_path,
+        storage,
+        NodeExecutorRegistry(
+            deterministic=DeterministicNodeExecutor(_LifecycleBackend()),
+        ),
+        git_identity_provider=lambda: ("a" * 40, "test"),
     )
     engine = RuntimeEngine(
         project_root=tmp_path,
         execution_id=execution_id,
         allowed_providers=[],
-        graph_executor=GraphExecutor(
-            storage,
-            NodeExecutorRegistry(
-                deterministic=DeterministicNodeExecutor(_LifecycleBackend()),
-            ),
-        ),
+        lifecycle_service=lifecycle,
     )
-    result = engine.run_workflow(
+    result = engine.start_execution(
         compiled_maf,
         initial_input={"intent": "Deliver new feature"},
+        configuration={"profile": "e2e"},
     )
     assert result.outcome == "success"
     assert result.executed_node_ids == ("step1",)
@@ -142,6 +113,9 @@ def test_full_lifecycle_e2e_python(tmp_path: Path):
     assert final_record.current_node_id == "completed"
     assert final_record.current_state == ExecutionState.COMPLETED
     assert final_record.revision == 3
+    assert engine.status_execution().current_state == ExecutionState.COMPLETED
+    assert engine.inspect_execution().event_count == 4
+    assert storage.load_execution_bundle(execution_id).execution_id == execution_id
 
     exec_dir = tmp_path / ".harness" / "state" / "executions" / execution_id
     assert (exec_dir / "execution.json").is_file()

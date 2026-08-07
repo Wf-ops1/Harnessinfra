@@ -102,6 +102,36 @@ class MAFAdapter:
                 )
         return artifact
 
+    @classmethod
+    def validate_snapshot(
+        cls,
+        artifact_json: str,
+        *,
+        expected_digest: str,
+    ) -> CompiledGraphArtifact:
+        """Validate exact immutable artifact bytes without consulting live sources."""
+        if type(artifact_json) is not str:
+            raise ArtifactIntegrityError("artifact snapshot must be canonical JSON text")
+        try:
+            raw_artifact = json.loads(artifact_json)
+        except (json.JSONDecodeError, ValueError) as exc:
+            raise ArtifactIntegrityError("artifact snapshot is invalid JSON") from exc
+        if not isinstance(raw_artifact, dict):
+            raise ArtifactIntegrityError("artifact snapshot must be a JSON object")
+        cls._validate_versions(raw_artifact)
+        try:
+            artifact = CompiledGraphArtifact.model_validate(raw_artifact)
+        except (ContractRegistryError, ValidationError, ValueError) as exc:
+            raise ArtifactIntegrityError("artifact snapshot is invalid") from exc
+        if artifact.canonical_json() != artifact_json:
+            raise ArtifactIntegrityError("artifact snapshot is not canonical JSON")
+        observed_digest = "sha256:" + hashlib.sha256(
+            artifact_json.encode("utf-8")
+        ).hexdigest()
+        if observed_digest != expected_digest:
+            raise ArtifactIntegrityError("artifact snapshot digest mismatch")
+        return artifact
+
     @staticmethod
     def _validate_versions(raw_artifact: dict[str, Any]) -> None:
         MAFAdapter._require_exact_version(

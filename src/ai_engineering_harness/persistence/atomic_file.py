@@ -8,13 +8,14 @@ import os
 import re
 import tempfile
 import uuid
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Final
 
 from pydantic import ValidationError
 
+from ai_engineering_harness.contracts import CompiledGraphArtifact
 from ai_engineering_harness.contracts.events import ExecutionEvent
 from ai_engineering_harness.contracts.execution import (
     ExecutionRecord,
@@ -23,21 +24,32 @@ from ai_engineering_harness.contracts.execution import (
 
 from .base import (
     DuplicateEventError,
-    EventJournalStateStorageProvider,
     ExecutionAlreadyExistsError,
+    ExecutionBundle,
+    ExecutionBundleAlreadyExistsError,
+    ExecutionBundleIntegrityError,
+    ExecutionBundleWriteError,
     ExecutionIdentityMismatchError,
     ExecutionLock,
     ExecutionNotFoundError,
     JournalIntegrityError,
     RecoveryConflictError,
+    ResumeStateStorageProvider,
     RevisionConflictError,
     StateIntegrityError,
     StateWriteError,
+    canonical_json_digest,
+    canonical_json_object,
 )
 from .locks import CrossProcessLockManager
 
 _EXECUTION_RECORD_NAME: Final = "execution.json"
 _EVENT_JOURNAL_NAME: Final = "event-journal.jsonl"
+_BUNDLE_MANIFEST_NAME: Final = "bundle.json"
+_BUNDLE_ARTIFACT_NAME: Final = "artifact.json"
+_BUNDLE_CONFIGURATION_NAME: Final = "configuration.json"
+_BUNDLE_PAYLOAD_DIRECTORY: Final = "payloads"
+_DIGEST_WITH_PREFIX_PATTERN: Final = re.compile(r"^sha256:([0-9a-f]{64})$")
 _DEFAULT_LOCK_TIMEOUT_SECONDS: Final = 10.0
 _FIRST_EVENT_HASH: Final = "0" * 64
 _HASH_PATTERN: Final = re.compile(r"^[0-9a-f]{64}$")
@@ -112,13 +124,16 @@ def load_execution_record(project_root: Path, execution_id: str) -> ExecutionRec
     return record
 
 
-class AtomicFileStateStorage(EventJournalStateStorageProvider):
+class AtomicFileStateStorage(ResumeStateStorageProvider):
     """OS-locked, compare-and-set state storage rooted in one project."""
 
     def __init__(self, project_root: Path) -> None:
         self.project_root = Path(project_root).resolve()
         self._execution_root = (
             self.project_root / ".harness" / "state" / "executions"
+        )
+        self._bundle_root = (
+            self.project_root / ".harness" / "artifacts" / "executions"
         )
         self._locks = CrossProcessLockManager(self.project_root)
         self._owner_id = f"atomic-file-provider-{uuid.uuid4().hex}"
@@ -302,6 +317,173 @@ class AtomicFileStateStorage(EventJournalStateStorageProvider):
                 )
             _, events = self._recover_journal(validated_id)
             return events
+
+    def create_execution_bundle(
+        self,
+        bundle: ExecutionBundle,
+        *,
+        initial_input: dict[str, object],
+    ) -> ExecutionBundle:
+        """Create an immutable artifact/configuration/payload bundle."""
+        if not isinstance(bundle, ExecutionBundle):
+            raise ExecutionBundleIntegrityError(
+                "bundle must be an ExecutionBundle"
+            )
+        execution_id = self._validate_execution_id(bundle.execution_id)
+        artifact_json = self._validate_artifact_json(
+            bundle.artifact_json,
+            execution_id=execution_id,
+        )
+        configuration_json = self._validate_json_object_text(
+            bundle.configuration_json,
+            execution_id=execution_id,
+            label="configuration",
+        )
+        try:
+            initial_json = canonical_json_object(initial_input)
+        except ValueError as exc:
+            raise ExecutionBundleIntegrityError(
+                "initial input must be a finite JSON object",
+                execution_id=execution_id,
+            ) from exc
+        if canonical_json_digest(artifact_json) != bundle.artifact_digest:
+            raise ExecutionBundleIntegrityError(
+                "artifact digest does not match bundle content",
+                execution_id=execution_id,
+            )
+        if canonical_json_digest(configuration_json) != bundle.configuration_digest:
+            raise ExecutionBundleIntegrityError(
+                "configuration digest does not match bundle content",
+                execution_id=execution_id,
+            )
+        if canonical_json_digest(initial_json) != bundle.initial_input_digest:
+            raise ExecutionBundleIntegrityError(
+                "initial input digest does not match bundle content",
+                execution_id=execution_id,
+            )
+
+        catalog_lock = self._locks.acquire_catalog(
+            self._owner_id,
+            timeout_seconds=_DEFAULT_LOCK_TIMEOUT_SECONDS,
+        )
+        try:
+            execution_lock = self.acquire_execution_lock(
+                execution_id,
+                self._owner_id,
+                timeout_seconds=_DEFAULT_LOCK_TIMEOUT_SECONDS,
+            )
+            try:
+                directory = self._bundle_directory(execution_id)
+                if self._recover_record(execution_id) is not None:
+                    raise ExecutionBundleAlreadyExistsError(
+                        f"execution state {execution_id!r} already exists",
+                        execution_id=execution_id,
+                    )
+                if directory.exists() or directory.is_symlink():
+                    raise ExecutionBundleAlreadyExistsError(
+                        f"execution bundle {execution_id!r} already exists",
+                        execution_id=execution_id,
+                    )
+                self._ensure_bundle_directory(execution_id)
+                self._publish_bundle_bytes(
+                    self._bundle_artifact_path(execution_id),
+                    artifact_json.encode("utf-8"),
+                    execution_id=execution_id,
+                )
+                self._publish_bundle_bytes(
+                    self._bundle_configuration_path(execution_id),
+                    configuration_json.encode("utf-8"),
+                    execution_id=execution_id,
+                )
+                self._publish_bundle_bytes(
+                    self._payload_path(execution_id, bundle.initial_input_digest),
+                    initial_json.encode("utf-8"),
+                    execution_id=execution_id,
+                )
+                self._publish_bundle_bytes(
+                    self._bundle_manifest_path(execution_id),
+                    bundle.manifest_json().encode("utf-8"),
+                    execution_id=execution_id,
+                )
+                return bundle
+            finally:
+                self.release_execution_lock(execution_lock)
+        finally:
+            self._locks.release_catalog(catalog_lock)
+
+    def load_execution_bundle(
+        self,
+        execution_id: str,
+        *,
+        lock: ExecutionLock | None = None,
+    ) -> ExecutionBundle:
+        """Recover and validate one immutable resume bundle."""
+        validated_id = self._validate_execution_id(execution_id)
+        with self._execution_guard(validated_id, lock):
+            if self._recover_record(validated_id) is None:
+                raise ExecutionNotFoundError(
+                    f"execution {validated_id!r} does not exist",
+                    execution_id=validated_id,
+                )
+            return self._load_bundle_locked(validated_id)
+
+    def store_payload(
+        self,
+        execution_id: str,
+        payload: dict[str, object],
+        *,
+        lock: ExecutionLock | None = None,
+    ) -> str:
+        """Publish a canonical content-addressed JSON payload idempotently."""
+        validated_id = self._validate_execution_id(execution_id)
+        try:
+            payload_json = canonical_json_object(payload)
+        except ValueError as exc:
+            raise ExecutionBundleIntegrityError(
+                "payload must be a finite JSON object",
+                execution_id=validated_id,
+            ) from exc
+        digest = canonical_json_digest(payload_json)
+        with self._execution_guard(validated_id, lock):
+            if self._recover_record(validated_id) is None:
+                raise ExecutionNotFoundError(
+                    f"execution {validated_id!r} does not exist",
+                    execution_id=validated_id,
+                )
+            self._load_bundle_locked(validated_id)
+            path = self._payload_path(validated_id, digest)
+            if path.exists() or self._known_temp_paths(path):
+                observed = self._load_payload_locked(validated_id, digest)
+                if canonical_json_object(observed) != payload_json:
+                    raise ExecutionBundleIntegrityError(
+                        "payload digest collision or divergent content",
+                        execution_id=validated_id,
+                    )
+                return digest
+            self._publish_bundle_bytes(
+                path,
+                payload_json.encode("utf-8"),
+                execution_id=validated_id,
+            )
+            return digest
+
+    def load_payload(
+        self,
+        execution_id: str,
+        digest: str,
+        *,
+        lock: ExecutionLock | None = None,
+    ) -> dict[str, object]:
+        """Load a detached canonical payload after digest verification."""
+        validated_id = self._validate_execution_id(execution_id)
+        with self._execution_guard(validated_id, lock):
+            if self._recover_record(validated_id) is None:
+                raise ExecutionNotFoundError(
+                    f"execution {validated_id!r} does not exist",
+                    execution_id=validated_id,
+                )
+            self._load_bundle_locked(validated_id)
+            return self._load_payload_locked(validated_id, digest)
 
     def list_executions(self) -> tuple[ExecutionRecord, ...]:
         """Return managed records sorted by ID under the catalog hierarchy."""
@@ -582,6 +764,316 @@ class AtomicFileStateStorage(EventJournalStateStorageProvider):
                 "replacement updated_at cannot regress",
                 execution_id=execution_id,
             )
+
+    def _load_bundle_locked(self, execution_id: str) -> ExecutionBundle:
+        manifest_raw = self._recover_bundle_component(
+            self._bundle_manifest_path(execution_id),
+            execution_id=execution_id,
+            validator=lambda raw: self._validate_manifest_bytes(
+                raw,
+                execution_id=execution_id,
+            ),
+        )
+        artifact_raw = self._recover_bundle_component(
+            self._bundle_artifact_path(execution_id),
+            execution_id=execution_id,
+            validator=lambda raw: self._validate_artifact_json(
+                self._decode_bundle_bytes(raw, execution_id=execution_id),
+                execution_id=execution_id,
+            ),
+        )
+        configuration_raw = self._recover_bundle_component(
+            self._bundle_configuration_path(execution_id),
+            execution_id=execution_id,
+            validator=lambda raw: self._validate_json_object_text(
+                self._decode_bundle_bytes(raw, execution_id=execution_id),
+                execution_id=execution_id,
+                label="configuration",
+            ),
+        )
+        manifest = self._validate_manifest_bytes(
+            manifest_raw,
+            execution_id=execution_id,
+        )
+        artifact_json = self._validate_artifact_json(
+            self._decode_bundle_bytes(artifact_raw, execution_id=execution_id),
+            execution_id=execution_id,
+        )
+        configuration_json = self._validate_json_object_text(
+            self._decode_bundle_bytes(configuration_raw, execution_id=execution_id),
+            execution_id=execution_id,
+            label="configuration",
+        )
+        bundle = ExecutionBundle(
+            bundle_schema_version=manifest.bundle_schema_version,
+            execution_id=manifest.execution_id,
+            artifact_digest=manifest.artifact_digest,
+            configuration_digest=manifest.configuration_digest,
+            initial_input_digest=manifest.initial_input_digest,
+            artifact_json=artifact_json,
+            configuration_json=configuration_json,
+        )
+        if canonical_json_digest(artifact_json) != bundle.artifact_digest:
+            raise ExecutionBundleIntegrityError(
+                "stored artifact digest does not match bundle manifest",
+                execution_id=execution_id,
+            )
+        if canonical_json_digest(configuration_json) != bundle.configuration_digest:
+            raise ExecutionBundleIntegrityError(
+                "stored configuration digest does not match bundle manifest",
+                execution_id=execution_id,
+            )
+        self._load_payload_locked(execution_id, bundle.initial_input_digest)
+        return bundle
+
+    def _load_payload_locked(
+        self,
+        execution_id: str,
+        digest: str,
+    ) -> dict[str, object]:
+        path = self._payload_path(execution_id, digest)
+        raw = self._recover_bundle_component(
+            path,
+            execution_id=execution_id,
+            validator=lambda content: self._validate_payload_bytes(
+                content,
+                execution_id=execution_id,
+                digest=digest,
+            ),
+        )
+        return self._validate_payload_bytes(
+            raw,
+            execution_id=execution_id,
+            digest=digest,
+        )
+
+    def _recover_bundle_component(
+        self,
+        destination: Path,
+        *,
+        execution_id: str,
+        validator: Callable[[bytes], object],
+    ) -> bytes:
+        candidates = self._known_temp_paths(destination)
+        if destination.exists():
+            try:
+                raw = destination.read_bytes()
+                validator(raw)
+            except ExecutionBundleIntegrityError:
+                raise
+            except OSError as exc:
+                raise ExecutionBundleIntegrityError(
+                    "cannot read resume bundle component",
+                    execution_id=execution_id,
+                ) from exc
+            self._remove_known_temps(candidates, execution_id=execution_id)
+            return raw
+        if len(candidates) > 1:
+            raise RecoveryConflictError(
+                "multiple abandoned resume bundle candidates exist",
+                execution_id=execution_id,
+            )
+        if not candidates:
+            raise ExecutionBundleIntegrityError(
+                "resume bundle component is missing",
+                execution_id=execution_id,
+            )
+        candidate = candidates[0]
+        try:
+            raw = candidate.read_bytes()
+            validator(raw)
+            os.replace(candidate, destination)
+            _fsync_directory(destination.parent)
+        except ExecutionBundleIntegrityError:
+            raise
+        except OSError as exc:
+            raise ExecutionBundleWriteError(
+                "cannot recover resume bundle component",
+                execution_id=execution_id,
+            ) from exc
+        return raw
+
+    def _validate_manifest_bytes(
+        self,
+        raw: bytes,
+        *,
+        execution_id: str,
+    ) -> ExecutionBundle:
+        text = self._decode_bundle_bytes(raw, execution_id=execution_id)
+        try:
+            document = json.loads(text)
+        except (json.JSONDecodeError, ValueError) as exc:
+            raise ExecutionBundleIntegrityError(
+                "bundle manifest is invalid JSON",
+                execution_id=execution_id,
+            ) from exc
+        expected_keys = {
+            "artifact_digest",
+            "bundle_schema_version",
+            "configuration_digest",
+            "execution_id",
+            "initial_input_digest",
+        }
+        if type(document) is not dict or set(document) != expected_keys:
+            raise ExecutionBundleIntegrityError(
+                "bundle manifest has missing or extra fields",
+                execution_id=execution_id,
+            )
+        if canonical_json_object(document) != text:
+            raise ExecutionBundleIntegrityError(
+                "bundle manifest is not canonical JSON",
+                execution_id=execution_id,
+            )
+        if document.get("execution_id") != execution_id:
+            raise ExecutionBundleIntegrityError(
+                "bundle manifest belongs to another execution",
+                execution_id=execution_id,
+            )
+        try:
+            bundle = ExecutionBundle(
+                **document,
+                artifact_json="{}\n",
+                configuration_json="{}\n",
+            )
+        except (TypeError, ValueError, ValidationError) as exc:
+            raise ExecutionBundleIntegrityError(
+                "bundle manifest violates its public contract",
+                execution_id=execution_id,
+            ) from exc
+        return bundle
+
+    def _validate_artifact_json(
+        self,
+        text: str,
+        *,
+        execution_id: str,
+    ) -> str:
+        try:
+            artifact = CompiledGraphArtifact.model_validate_json(text)
+        except (TypeError, ValueError, ValidationError) as exc:
+            raise ExecutionBundleIntegrityError(
+                "bundle artifact is invalid",
+                execution_id=execution_id,
+            ) from exc
+        if artifact.canonical_json() != text:
+            raise ExecutionBundleIntegrityError(
+                "bundle artifact is not canonical JSON",
+                execution_id=execution_id,
+            )
+        return text
+
+    def _validate_json_object_text(
+        self,
+        text: str,
+        *,
+        execution_id: str,
+        label: str,
+    ) -> str:
+        try:
+            document = json.loads(text)
+            canonical = canonical_json_object(document)
+        except (json.JSONDecodeError, TypeError, ValueError) as exc:
+            raise ExecutionBundleIntegrityError(
+                f"bundle {label} is not a finite JSON object",
+                execution_id=execution_id,
+            ) from exc
+        if canonical != text:
+            raise ExecutionBundleIntegrityError(
+                f"bundle {label} is not canonical JSON",
+                execution_id=execution_id,
+            )
+        return text
+
+    def _validate_payload_bytes(
+        self,
+        raw: bytes,
+        *,
+        execution_id: str,
+        digest: str,
+    ) -> dict[str, object]:
+        text = self._validate_json_object_text(
+            self._decode_bundle_bytes(raw, execution_id=execution_id),
+            execution_id=execution_id,
+            label="payload",
+        )
+        if canonical_json_digest(text) != digest:
+            raise ExecutionBundleIntegrityError(
+                "payload digest does not match its content",
+                execution_id=execution_id,
+            )
+        loaded = json.loads(text)
+        assert type(loaded) is dict
+        return loaded
+
+    @staticmethod
+    def _decode_bundle_bytes(raw: bytes, *, execution_id: str) -> str:
+        try:
+            return raw.decode("utf-8")
+        except UnicodeError as exc:
+            raise ExecutionBundleIntegrityError(
+                "resume bundle component is not UTF-8",
+                execution_id=execution_id,
+            ) from exc
+
+    def _bundle_directory(self, execution_id: str) -> Path:
+        path = self._bundle_root / execution_id
+        self._require_confined(path, execution_id=execution_id)
+        return path
+
+    def _bundle_manifest_path(self, execution_id: str) -> Path:
+        return self._bundle_directory(execution_id) / _BUNDLE_MANIFEST_NAME
+
+    def _bundle_artifact_path(self, execution_id: str) -> Path:
+        return self._bundle_directory(execution_id) / _BUNDLE_ARTIFACT_NAME
+
+    def _bundle_configuration_path(self, execution_id: str) -> Path:
+        return self._bundle_directory(execution_id) / _BUNDLE_CONFIGURATION_NAME
+
+    def _payload_path(self, execution_id: str, digest: str) -> Path:
+        match = _DIGEST_WITH_PREFIX_PATTERN.fullmatch(digest) if type(digest) is str else None
+        if match is None:
+            raise ExecutionBundleIntegrityError(
+                "payload digest is invalid",
+                execution_id=execution_id,
+            )
+        path = (
+            self._bundle_directory(execution_id)
+            / _BUNDLE_PAYLOAD_DIRECTORY
+            / f"{match.group(1)}.json"
+        )
+        self._require_confined(path, execution_id=execution_id)
+        return path
+
+    def _ensure_bundle_directory(self, execution_id: str) -> None:
+        directory = self._bundle_directory(execution_id)
+        try:
+            (directory / _BUNDLE_PAYLOAD_DIRECTORY).mkdir(
+                parents=True,
+                exist_ok=True,
+            )
+        except OSError as exc:
+            raise ExecutionBundleWriteError(
+                "cannot create resume bundle directory",
+                execution_id=execution_id,
+            ) from exc
+        self._require_confined(directory, execution_id=execution_id)
+
+    def _publish_bundle_bytes(
+        self,
+        destination: Path,
+        content: bytes,
+        *,
+        execution_id: str,
+    ) -> None:
+        self._ensure_bundle_directory(execution_id)
+        self._require_confined(destination, execution_id=execution_id)
+        try:
+            _atomic_replace_bytes(destination, content)
+        except OSError as exc:
+            raise ExecutionBundleWriteError(
+                "cannot publish resume bundle component",
+                execution_id=execution_id,
+            ) from exc
 
     def _record_path(self, execution_id: str) -> Path:
         path = execution_record_path(self.project_root, execution_id)

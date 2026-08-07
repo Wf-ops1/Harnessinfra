@@ -4,7 +4,19 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from .graph_executor import GraphExecutionError, GraphExecutionResult, GraphExecutor
+from ai_engineering_harness.contracts.execution import ExecutionRecord
+
+from .execution_lifecycle import (
+    ExecutionInspection,
+    ExecutionLifecycleService,
+    ExecutionStatusView,
+)
+from .graph_executor import (
+    GraphExecutionError,
+    GraphExecutionPausedResult,
+    GraphExecutionResult,
+    GraphExecutor,
+)
 from .maf_adapter import MAFAdapter
 
 
@@ -27,11 +39,13 @@ class RuntimeEngine:
         allowed_providers: list[str],
         *,
         graph_executor: GraphExecutor | None = None,
+        lifecycle_service: ExecutionLifecycleService | None = None,
     ) -> None:
         self.project_root = project_root
         self.execution_id = execution_id
         self.allowed_providers = tuple(allowed_providers)
         self.graph_executor = graph_executor
+        self.lifecycle_service = lifecycle_service
 
     def run_workflow(
         self,
@@ -59,11 +73,61 @@ class RuntimeEngine:
             )
 
         artifact = MAFAdapter.load_and_validate(compiled_maf_path)
-        return self.graph_executor.execute(
+        result = self.graph_executor.execute(
             artifact,
             self.execution_id,
             initial_input,
         )
+        if isinstance(result, GraphExecutionPausedResult):
+            raise RuntimeGraphConfigurationError(
+                "approval pause requires ExecutionLifecycleService",
+                execution_id=self.execution_id,
+            )
+        return result
+
+    def start_execution(
+        self,
+        compiled_artifact_path: Path,
+        *,
+        initial_input: dict[str, object],
+        configuration: dict[str, object] | None = None,
+    ) -> GraphExecutionResult | GraphExecutionPausedResult:
+        """Create and run through the canonical F2.5 lifecycle service."""
+        service = self._require_lifecycle()
+        return service.start(
+            compiled_artifact_path,
+            initial_input=initial_input,
+            execution_id=self.execution_id,
+            configuration=configuration,
+        )
+
+    def resume_execution(self) -> GraphExecutionResult | GraphExecutionPausedResult:
+        """Resume the configured execution from its immutable bundle."""
+        return self._require_lifecycle().resume(self.execution_id)
+
+    def approve_execution(self, *, approver: str) -> ExecutionRecord:
+        """Approve the configured canonical execution subject."""
+        return self._require_lifecycle().approve(self.execution_id, approver=approver)
+
+    def cancel_execution(self) -> ExecutionRecord:
+        """Cancel the configured execution under its lifecycle lock."""
+        return self._require_lifecycle().cancel(self.execution_id)
+
+    def status_execution(self) -> ExecutionStatusView:
+        """Return the canonical status view."""
+        return self._require_lifecycle().status(self.execution_id)
+
+    def inspect_execution(self) -> ExecutionInspection:
+        """Return the canonical redaction-safe inspection view."""
+        return self._require_lifecycle().inspect(self.execution_id)
+
+    def _require_lifecycle(self) -> ExecutionLifecycleService:
+        if self.lifecycle_service is None:
+            raise RuntimeGraphConfigurationError(
+                "ExecutionLifecycleService must be supplied explicitly",
+                execution_id=self.execution_id,
+            )
+        return self.lifecycle_service
 
 
 __all__ = ["RuntimeEngine", "RuntimeGraphConfigurationError"]

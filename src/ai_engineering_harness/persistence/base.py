@@ -2,12 +2,18 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Protocol, runtime_checkable
+from typing import Annotated, Literal, Protocol, runtime_checkable
+
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 from ai_engineering_harness.contracts.events import ExecutionEvent
-from ai_engineering_harness.contracts.execution import ExecutionRecord
+from ai_engineering_harness.contracts.execution import ExecutionId, ExecutionRecord
+
+_DIGEST_PATTERN = r"^sha256:[0-9a-f]{64}$"
 
 
 class StateStorageError(Exception):
@@ -81,6 +87,75 @@ class RecoveryConflictError(StateIntegrityError):
 
 class StateWriteError(StateStorageError):
     """Durable state could not be published atomically."""
+
+
+class ExecutionBundleError(StateStorageError):
+    """Base class for immutable resume-bundle failures."""
+
+
+class ExecutionBundleAlreadyExistsError(ExecutionBundleError):
+    """A resume bundle already occupies the requested execution identity."""
+
+
+class ExecutionBundleIntegrityError(ExecutionBundleError):
+    """A resume bundle or content-addressed payload is invalid."""
+
+
+class ExecutionBundleWriteError(ExecutionBundleError):
+    """A resume bundle could not be published durably."""
+
+
+class ExecutionBundle(BaseModel):
+    """Immutable in-memory view of one exact resumable execution bundle."""
+
+    model_config = ConfigDict(strict=True, frozen=True, extra="forbid")
+
+    bundle_schema_version: Literal["1.0"]
+    execution_id: ExecutionId
+    artifact_digest: str = Field(pattern=_DIGEST_PATTERN)
+    configuration_digest: str = Field(pattern=_DIGEST_PATTERN)
+    initial_input_digest: str = Field(pattern=_DIGEST_PATTERN)
+    artifact_json: Annotated[str, StringConstraints(min_length=1)]
+    configuration_json: Annotated[str, StringConstraints(min_length=1)]
+
+    def manifest_json(self) -> str:
+        """Serialize only the redaction-safe bundle manifest canonically."""
+        return canonical_json_object(
+            {
+                "artifact_digest": self.artifact_digest,
+                "bundle_schema_version": self.bundle_schema_version,
+                "configuration_digest": self.configuration_digest,
+                "execution_id": self.execution_id,
+                "initial_input_digest": self.initial_input_digest,
+            }
+        )
+
+
+def canonical_json_object(value: object) -> str:
+    """Return a detached finite JSON object with deterministic formatting."""
+    if type(value) is not dict:
+        raise ValueError("value must be an exact JSON object")
+    try:
+        serialized = json.dumps(
+            value,
+            ensure_ascii=False,
+            allow_nan=False,
+            indent=2,
+            sort_keys=True,
+        )
+        detached = json.loads(serialized)
+    except (TypeError, ValueError, json.JSONDecodeError) as exc:
+        raise ValueError(f"value is not a finite JSON object: {exc}") from exc
+    if type(detached) is not dict:
+        raise ValueError("value must be a JSON object")
+    return serialized + "\n"
+
+
+def canonical_json_digest(canonical_json: str) -> str:
+    """Return the public sha256-prefixed digest for canonical UTF-8 JSON."""
+    if type(canonical_json) is not str or not canonical_json.endswith("\n"):
+        raise ValueError("canonical JSON must be a newline-terminated string")
+    return "sha256:" + hashlib.sha256(canonical_json.encode("utf-8")).hexdigest()
 
 
 @dataclass(frozen=True, slots=True)
@@ -157,10 +232,54 @@ class EventJournalStateStorageProvider(StateStorageProvider, Protocol):
         """Load the complete canonical journal after fail-closed recovery."""
 
 
+@runtime_checkable
+class ResumeStateStorageProvider(EventJournalStateStorageProvider, Protocol):
+    """Add immutable bundles and content-addressed payloads for F2.5."""
+
+    def create_execution_bundle(
+        self,
+        bundle: ExecutionBundle,
+        *,
+        initial_input: dict[str, object],
+    ) -> ExecutionBundle:
+        """Create one immutable bundle without overwriting an existing identity."""
+
+    def load_execution_bundle(
+        self,
+        execution_id: str,
+        *,
+        lock: ExecutionLock | None = None,
+    ) -> ExecutionBundle:
+        """Load and verify the exact artifact/configuration bundle."""
+
+    def store_payload(
+        self,
+        execution_id: str,
+        payload: dict[str, object],
+        *,
+        lock: ExecutionLock | None = None,
+    ) -> str:
+        """Publish a canonical payload blob and return its digest."""
+
+    def load_payload(
+        self,
+        execution_id: str,
+        digest: str,
+        *,
+        lock: ExecutionLock | None = None,
+    ) -> dict[str, object]:
+        """Load a canonical payload blob after verifying its digest."""
+
+
 __all__ = [
     "DuplicateEventError",
     "EventJournalStateStorageProvider",
     "ExecutionAlreadyExistsError",
+    "ExecutionBundle",
+    "ExecutionBundleAlreadyExistsError",
+    "ExecutionBundleError",
+    "ExecutionBundleIntegrityError",
+    "ExecutionBundleWriteError",
     "ExecutionIdentityMismatchError",
     "ExecutionLock",
     "ExecutionNotFoundError",
@@ -169,9 +288,12 @@ __all__ = [
     "LockOwnershipError",
     "LockUnavailableError",
     "RecoveryConflictError",
+    "ResumeStateStorageProvider",
     "RevisionConflictError",
     "StateIntegrityError",
     "StateStorageError",
     "StateStorageProvider",
     "StateWriteError",
+    "canonical_json_digest",
+    "canonical_json_object",
 ]
