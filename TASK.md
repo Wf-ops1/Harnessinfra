@@ -247,8 +247,8 @@ defensibility:
 retomada após interrupção.
 
 **Status da fase:** `in_progress` — a F1 e a F2.1 foram promovidas por merge commits para `main`,
-os respectivos CIs pós-merge estão verdes e a F2.2 está concluída localmente em branch exclusiva,
-aguardando somente promoção autorizada. A F2.3 não foi iniciada.
+os respectivos CIs pós-merge estão verdes e o gate documental da F2.2 está `READY` em branch
+exclusiva. A implementação da F2.2 ainda não foi iniciada.
 
 ### Coordenação e ambiente observado
 
@@ -260,7 +260,7 @@ aguardando somente promoção autorizada. A F2.3 não foi iniciada.
 | **Git** | `available` — `main...origin/main` em `34d00a5cadb3ca0b5690420b8ffb5026e207af93`; branch ativa `task/f2.2-state-storage`, criada desse merge; `checkpoint/pre-f2.2-defensibility^{}` ancora o baseline; checkpoints permanecem somente locais |
 | **python_command** | `& 'C:\Users\walla\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe'` — Python `3.12.13` |
 | **uv_command** | `& '.\build\f0.6-tools\uv\bin\uv.exe'` — uv `0.11.32` restaurado de forma isolada/ignorada, sem PATH ou instalação global; `lock --check` e `sync --all-extras --locked` verdes |
-| **Dependências do projeto** | `.venv` gerida pelo uv 0.11.32 com Python 3.12.13 e `uv.lock`; CI pós-merge F2.1 com 11/11 checks verde; F2.2 validada com 58 testes focais e suíte integral de 357 testes + 6 subtests; nenhuma dependência foi adicionada |
+| **Dependências do projeto** | `.venv` gerida pelo uv 0.11.32 com Python 3.12.13 e `uv.lock`; CI pós-merge F2.1 com 11/11 checks verde; baseline local da F2.2 com 74 testes focais/documentais e suíte integral de 299 testes + 6 subtests verdes; nenhuma dependência nova permitida no gate |
 | **Regra de escrita** | apenas um agente escreve por vez |
 
 ---
@@ -511,13 +511,12 @@ reaberta pela F2.2, salvo regressão reproduzível.
 
 | Campo | Detalhe |
 |---|---|
-| **Status** | `completed localmente; promoção pendente` — gate `READY → COMPLETED`; F2.3 não iniciada |
+| **Status** | `gate READY; implementation_not_started` |
 | **Objetivo** | Criar um provider de estado em arquivo com contrato estável, concorrência entre processos, CAS por revisão, journal encadeado e recuperação fail-closed, sem executar grafo nem adotar o provider no runtime atual |
 | **Branch exclusiva** | `task/f2.2-state-storage`, criada de `main == origin/main == 34d00a5` pós-merge verde |
 | **Checkpoint de rollback** | `checkpoint/pre-f2.2-defensibility^{}` → `34d00a5cadb3ca0b5690420b8ffb5026e207af93` |
-| **Checkpoint do gate** | `checkpoint/f2.2-ready^{}` → `5728472b698782750411ff6b25a423cdf67aea0a`, anterior a qualquer edição de Python ou teste de implementação |
-| **Checkpoint final** | `checkpoint/f2.2-complete` identifica o commit local exclusivo de implementação/fechamento; nenhum push ou tag remota |
-| **Estado de implementação** | Provider, lock/fencing, CAS, journal, recovery, erros/exports e testes concluídos somente no allowlist; consumidores, runtime, YAMLs, schemas, dependências e CI permanecem inalterados |
+| **Checkpoint do gate** | `checkpoint/f2.2-ready` identifica o commit documental deste gate, anterior a qualquer edição de Python ou teste de implementação |
+| **Estado de implementação** | Nenhum arquivo Python, teste de implementação, YAML, schema, dependência ou runtime foi alterado nesta auditoria |
 
 #### Auditoria concreta da F2.2
 
@@ -658,11 +657,10 @@ Baseline local antes do gate: `74 passed` em `test_execution_record.py` +
 ```yaml
 defensibility:
   task_id: "F2.2"
-  gate: "READY -> COMPLETED"
+  gate: "READY"
   executor: "Codex"
   gate_prepared_at: "2026-08-06T23:58:42-03:00"
-  implementation_started: true
-  implementation_completed: true
+  implementation_started: false
   baseline:
     branch: "task/f2.2-state-storage"
     head: "34d00a5cadb3ca0b5690420b8ffb5026e207af93"
@@ -766,33 +764,11 @@ defensibility:
 [x] Compatibilidade, allowlist, escopo proibido e fronteiras F2.3–F2.6/F3/F5/F6 congelados
 [x] Aceite positivo/negativo, concorrência cross-process, regressão, build/wheel e escopo planejados
 [x] Rollback e gatilhos fail-closed definidos
-[x] Implementação permaneceu nos sete arquivos Python/teste do allowlist e neste TASK.md
-[x] Create/load/list, CAS, lock/fencing, journal, recovery e erros públicos foram provados
-[x] Provas positivas, negativas, multiprocess, atomicidade e recovery passaram sem skip/xfail novo
-[x] Regressão F2.1, suíte integral, qualidade, lock/sync, build, wheel e escopo passaram
+[x] Somente TASK.md alterado; implementação Python/teste permanece não iniciada
 ```
 
-#### Resultado verificado da F2.2
-
-| Evidência | Resultado observado |
-|---|---|
-| Contrato público | `StateStorageProvider` expõe exatamente as sete operações congeladas; `AtomicFileStateStorage`, `ExecutionLock` e toda a hierarquia tipada de erros estão exportados |
-| Create/load/list/CAS | Create exclusivo exige revisão 0; listagem ordena somente records gerenciados; CAS preserva identidade e exige revisão exatamente `expected+1`; nenhum wrapper F2.1 virou create/upsert |
-| Lock e fencing | Lock por descriptor usa `msvcrt.locking` no Windows e `fcntl.flock` no POSIX, timeout monotônico e nenhum fallback em memória; fence atômico persiste tokens crescentes e crash libera a exclusão |
-| Journal | Cada append republica JSONL canônico completo sob lock; primeiro `previous_hash` usa 64 zeros, SHA-256 é recomputado sem `current_hash`, duplicidade/corrupção/legado falham sem mudar bytes |
-| Recovery | Record/journal recuperam somente candidato único, completo, canônico e vinculado; canonical válido vence; corrupção e múltiplos candidatos preservam evidência e falham fechados |
-| Atomicidade | Falhas controladas em create/write/flush/fsync/replace preservaram snapshot e journal anteriores e removeram o temp da tentativa |
-| Testes focais | `58 passed`; filtros congelados finais: positivo `21 passed`, multiprocess/lock/crash/fencing `8 passed`, recovery/atomicidade `18 passed`, negativo `32 passed` |
-| Regressão | `78 passed` em F2.1, contratos preexistentes, imports públicos e documentação; `save_execution_record`/`load_execution_record` mantêm semântica e erros originais |
-| Suíte integral | `357 passed, 6 subtests passed`, sem skip/xfail/ignore novo |
-| Qualidade e ambiente | mypy: sem issues em 95 arquivos; Ruff e compileall verdes; `uv lock --check` e `sync --all-extras --locked` verdes com 41 pacotes resolvidos e lock inalterado |
-| Distribuição | wheel/sdist 0.1.0 reconstruídas; smoke externo confirmou metadata/package/CLI 0.1.0; probe isolado importou 8/8 símbolos F2.2 de `site-packages` |
-| Escopo | Somente `TASK.md`, os seis módulos F2.2/evento/export e `tests/unit/test_state_storage.py`; fronteiras runtime/CLI/observability/defaults/ExecutionRecord/dependências/CI byte-idênticas |
-| Fronteiras | Nenhum executor F2.3, FSM/replay F2.4, resume/approve/cancel F2.5, retry F2.6, runtime/consumidor legado, F3, F5 ou F6 foi antecipado |
-
-**Estado de parada obrigatório:** F2.2 `completed` localmente. Parar antes da F2.3 e aguardar
-autorização explícita para push/PR. A F2.3 só pode receber gate próprio depois do merge da F2.2,
-sincronização de `main`, ancestralidade e CI pós-merge verde comprovados.
+**Estado de parada obrigatório:** gate F2.2 `READY`. Parar antes de qualquer implementação; não
+alterar Python/testes e não avançar para F2.3 sem nova execução explícita da “Próxima Ação Exata”.
 
 ---
 
@@ -3359,15 +3335,15 @@ de `main`.
 ## 10. Último Checkpoint
 
 ```
-Data:              2026-08-07
+Data:              2026-08-06
 Fase:              F2
-Tarefa:            F2.2 — abstração de persistência
-Estado:            completed localmente; promoção pendente; F2.3 não iniciada
-Arquivos alterados: TASK.md; persistence/{base.py,locks.py,atomic_file.py,__init__.py}; contracts/events/{execution_event.py,__init__.py}; tests/unit/test_state_storage.py
-Validações:         58 focais; filtros 21/8/18/32; regressão 78; suíte 357 + 6 subtests; mypy 95 arquivos; Ruff/compileall; lock/sync; build; smoke e 8/8 imports da wheel; diff/UTF-8/escopo verdes
-Checkpoint:         `checkpoint/f2.2-ready^{}` em 5728472; `checkpoint/f2.2-complete` no commit local exclusivo desta implementação
-Observação:         F2.1 byte-compatível; consumidores/runtime/CLI/audit/YAML/schema/dependência/CI intocados; nenhum push/PR/merge/tag remoto
-Resultado:          provider, create/load/list, CAS, lock cross-process, fencing persistente, journal/hash chain, recovery fail-closed e erros tipados concluídos
+Tarefa:            F2.2 — abstração de persistência; auditoria e gate defensável
+Estado:            gate READY; implementation_not_started
+Arquivos alterados: somente TASK.md
+Validações:         branch/main/merge/checkpoints confirmados; auditoria de provider, CAS, lock, fencing, journal, recovery e consumidores; probe controlado; 74 testes focais/documentais e 299 testes + 6 subtests integrais verdes; diff/escopo validados
+Checkpoint:         `checkpoint/pre-f2.2-defensibility^{}` em 34d00a5; `checkpoint/f2.2-ready` identifica localmente o commit deste gate
+Observação:         branch task/f2.2-state-storage criada de main pós-merge verde; nenhum Python/teste/schema/YAML/dependência/runtime alterado; nenhum push/PR/tag remoto
+Resultado:          contrato, compatibilidade, aceite positivo/negativo, rollback e fronteiras F2.3–F6 congelados; implementação F2.2 não iniciada
 ```
 
 ---
@@ -3375,15 +3351,18 @@ Resultado:          provider, create/load/list, CAS, lock cross-process, fencing
 ## 11. Próxima Ação Exata
 
 ```text
-PARAR APÓS A F2.2 — NÃO INICIAR F2.3:
-1. Preservar branch `task/f2.2-state-storage`, commit local e `checkpoint/f2.2-complete`.
-2. Não executar push, PR, merge, tag remota, exclusão de branch ou mudança de proteção sem autorização
-   explícita do usuário.
-3. Quando autorizado, promover somente a F2.2 por um único PR para `main`, sem acrescentar F2.3.
-4. Exigir branch atualizada e `CI required=success`; merge continua dependendo de autorização explícita.
-5. Após merge autorizado, comprovar merge commit, ancestralidade e CI pós-merge verde em `main`.
-6. Somente então criar branch exclusiva F2.3 e preparar novo dossiê/gate `READY` antes de qualquer
-   implementação de executor, grafo, FSM, runtime ou consumidor.
+IMPLEMENTAR SOMENTE A F2.2 — NÃO INICIAR F2.3:
+1. Confirmar branch `task/f2.2-state-storage`, `checkpoint/f2.2-ready^{}`, worktree limpa e HEAD do gate.
+2. Relê integralmente o dossiê/allowlist/aceite F2.2 e confirmar que nenhuma evidência ficou obsoleta.
+3. Alterar somente os arquivos do allowlist, na ordem: contrato/base e erros; lock/fencing; provider
+   atômico/CAS/recovery; envelope de evento/exports; testes. Não adotar o provider em consumidor atual.
+4. Executar todas as provas positivas, negativas, multiprocess, recovery, regressão, suíte integral,
+   qualidade, lock/sync, build, smoke de wheel e diff de escopo congelados.
+5. Se qualquer critério falhar ou o escopo precisar expandir, aplicar o rollback e devolver o gate a
+   BLOCKED; não flexibilizar lock, CAS, recovery, integridade ou teste.
+6. Somente após tudo verde, registrar resultado, commit local e `checkpoint/f2.2-complete`.
+7. Parar. Push/PR/merge/tag remoto exigem autorização explícita; F2.3 só pode começar após merge da
+   F2.2, sincronização de main, ancestralidade e CI pós-merge verde, seguido de novo gate próprio.
 ```
 
 ---
@@ -3450,4 +3429,4 @@ Atualizar status neste TASK.md ao concluir cada tarefa.
 
 ---
 
-*Atualizado em: 2026-08-07 | Fonte de verdade: docs/plano_implementacao_harness_operacional.md*
+*Atualizado em: 2026-08-06 | Fonte de verdade: docs/plano_implementacao_harness_operacional.md*
