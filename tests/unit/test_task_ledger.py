@@ -9,7 +9,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 TASK_PANEL = ROOT / "TASK.md"
+AGENT_RULES = ROOT / ".agents" / "AGENTS.md"
+IMPLEMENTATION_PLAN = ROOT / "docs" / "plano_implementacao_harness_operacional.md"
 TASKS_ROOT = ROOT / "docs" / "tasks"
+TASKS_INDEX = TASKS_ROOT / "README.md"
 ACTIVE_ROOT = TASKS_ROOT / "active"
 COMPLETED_ROOT = TASKS_ROOT / "completed"
 MANIFEST_PATH = TASKS_ROOT / "migration-manifest.json"
@@ -72,6 +75,35 @@ def test_there_is_at_most_one_active_dossier() -> None:
     assert len(active_dossiers) <= 1
 
 
+def test_ready_active_dossier_has_the_normative_gate_fields() -> None:
+    active_dossiers = sorted(
+        path for path in ACTIVE_ROOT.glob("*.md") if path.name != "README.md"
+    )
+    if not active_dossiers:
+        return
+
+    dossier = _read(active_dossiers[0])
+    required_markers = (
+        "> **Gate:**",
+        "> **Executor:**",
+        "> **Autorizado em:**",
+        "## Problema comprovado",
+        "## Baseline conhecido",
+        "## Escopo congelado",
+        "## Critérios de aceite congelados",
+        "## Rollback",
+        "## Checklist de liberação",
+    )
+
+    for marker in required_markers:
+        assert marker in dossier
+
+    if "> **Gate:** `READY`" in dossier:
+        assert "[x] baseline Git" in dossier
+        assert "[x] escopo" in dossier
+        assert "[x] rollback" in dossier
+
+
 def test_completed_dossiers_match_the_integrity_manifest() -> None:
     manifest = json.loads(_read(MANIFEST_PATH))
     entries = manifest["entries"]
@@ -105,9 +137,45 @@ def test_completed_dossiers_match_the_integrity_manifest() -> None:
 
 
 def test_agent_rules_point_to_the_short_panel_and_active_dossier() -> None:
-    rules = _read(ROOT / ".agents" / "AGENTS.md")
+    rules = _read(AGENT_RULES)
 
     assert "TASK.md` — painel curto" in rules
     assert "dossiê ativo apontado por `TASK.md`" in rules
     assert "docs/tasks/README.md" in rules
     assert "no máximo 300 linhas" in rules
+
+
+def test_normative_sources_agree_on_gate_and_single_pr_lifecycle() -> None:
+    rules = _read(AGENT_RULES)
+    plan = _read(IMPLEMENTATION_PLAN)
+    task_index = _read(TASKS_INDEX)
+
+    assert "### 1.2 Contrato normativo do dossiê e do gate `READY`" in plan
+    assert "Atualizar o dossiê ativo com resultado, arquivos, comandos" in plan
+    assert "Atualizar `TASK.md` com resultado, arquivos, comandos" not in plan
+
+    for requirement in (
+        "Problema comprovado",
+        "Baseline conhecido",
+        "Escopo congelado",
+        "Critérios congelados",
+        "Rollback executável",
+        "Responsabilidade explícita",
+        "Nunca remover, ignorar ou tornar mais fraco um critério que falhou",
+        "COMPLETED_LOCAL / PROMOTION_PENDING",
+    ):
+        assert requirement in plan
+
+    assert "um único PR da tarefa" in plan
+    assert "primeiro commit do gate seguinte" in plan
+    assert "proibido abrir PR recursivo" in plan
+    assert "PRs #17 e #18" in plan
+    assert "não criam precedente" in plan
+
+    assert "seção 1.2 do plano principal" in rules
+    assert "Critério que falhou nunca pode ser removido" in rules
+    assert "COMPLETED_LOCAL / PROMOTION_PENDING" in rules
+    assert "primeiro commit do gate seguinte" in rules
+    assert "proibido" in rules and "PR recursivo" in rules
+    assert "DEC-011" in task_index
+    assert "sem PR recursivo de fechamento" in task_index

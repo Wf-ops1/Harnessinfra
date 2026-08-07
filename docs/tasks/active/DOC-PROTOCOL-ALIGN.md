@@ -1,6 +1,7 @@
 # DOC-PROTOCOL-ALIGN — Alinhar o protocolo operacional
 
 > **Gate:** `READY`
+> **Lifecycle:** `COMPLETED_LOCAL / PROMOTION_PENDING`
 > **Executor:** `Codex`
 > **Autorizado em:** `2026-08-07T20:36:12-03:00`
 > **Fronteira:** governança documental anterior à Fase 3; nenhum código de produto ou tarefa F3.
@@ -141,3 +142,22 @@ os testes documentais/estruturais do baseline.
 [x] rollback não destrutivo definido
 [x] executor e horário registrados
 ```
+
+## Resultado local comprovado
+
+| Verificação | Resultado observado |
+|---|---|
+| Alinhamento normativo | plano e `AGENTS.md` concordam sobre painel curto, contrato completo e localização dos detalhes |
+| Gate de defensabilidade | baseline, escopo/aceite, rollback, responsabilidade, `BLOCKED/READY`, recongelamento e não enfraquecimento restaurados no plano |
+| Ciclo Git | uma branch/PR por tarefa; certificação no primeiro commit do gate seguinte; PR recursivo proibido |
+| Desvio histórico | PRs #17/#18 registrados como não precedentes; nenhuma regra de CI ou autorização foi reduzida |
+| Decisão | `DEC-011` registrada no índice permanente |
+| Gate focado | `14 passed, 6 subtests passed` |
+| Regressão integral | `452 passed, 6 subtests passed` |
+| Qualidade | mypy sem issues em 98 arquivos; Ruff, compileall, `uv lock --check` e `git diff --check` verdes |
+| Escopo | somente os seis paths permitidos; zero diff em produto, CI, README raiz e dependências |
+
+O checkpoint local final será `checkpoint/doc-protocol-align-complete`, ancorado pelo commit desta
+mudança e mantido sem publicação. A branch e o PR ainda não existem remotamente. Depois de checks,
+merge e CI pós-merge verdes, não será aberto PR de fechamento: este dossiê permanecerá em `active/`
+como `PROMOTION_PENDING` e será certificado/arquivado no primeiro commit do próximo gate.

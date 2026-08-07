@@ -33,7 +33,7 @@ devem ser corrigidos para refletir a decisão. Nunca depender somente do histór
 | **Fase concluída** | Fase 2 — F2.1–F2.6 implementadas e promovidas |
 | **Próxima fase** | Fase 3 — ainda não iniciada; bloqueada até promover `DOC-PROTOCOL-ALIGN` |
 | **Tarefa ativa** | `DOC-PROTOCOL-ALIGN` — alinhar fontes normativas e ciclo de um PR |
-| **Gate** | `READY`; somente governança documental/testes autorizados |
+| **Gate** | `READY`; aceite local concluído, promoção remota pendente |
 | **Executor ativo** | `Codex`, único escritor |
 | **Workspace** | `C:\Users\walla\OneDrive\Desktop\ai-engineering-harness` |
 | **Branch** | `docs/align-operational-protocol`, criada de `87373ec4ac91e2565e5f78b60bf2a669c121c381` |
@@ -65,6 +65,7 @@ Leia integralmente: [DOC-PROTOCOL-ALIGN](docs/tasks/active/DOC-PROTOCOL-ALIGN.md
 | **Objetivo** | restaurar o contrato exato do gate e eliminar contradições de localização/ciclo |
 | **Escopo** | plano, `AGENTS.md`, painel, dossiê ativo e teste estrutural |
 | **Proibido** | produto, CI, dependências, dossiês históricos e qualquer implementação F3 |
+| **Estado local** | `COMPLETED_LOCAL / PROMOTION_PENDING`; 452 testes + 6 subtestes e quality gates verdes |
 | **Estado remoto** | branch/PR ainda não publicados; nenhum fato remoto antecipado |
 
 ## 6. Bloqueios atuais
@@ -74,14 +75,13 @@ Nenhum bloqueio ativo.
 ## 7. Próxima ação exata
 
 ```text
-CONCLUIR SOMENTE DOC-PROTOCOL-ALIGN EM UM ÚNICO PR:
-1. Restaurar no plano o contrato detalhado do dossiê/gate e alinhar a localização dos resultados.
-2. Alinhar AGENTS ao ciclo de um PR e à certificação da promoção no gate seguinte.
-3. Adicionar regressões que impeçam contradição, gate incompleto e PR recursivo de fechamento.
-4. Executar aceite focado, suíte integral, qualidade e auditoria de escopo.
-5. Publicar somente esta branch; aguardar todos os checks verdes; então mesclar e confirmar CI em main.
-6. Não abrir PR de fechamento. Manter o dossiê `PROMOTION_PENDING` para certificação no primeiro
-   commit do próximo gate; não iniciar F3 nesta execução.
+PROMOVER SOMENTE DOC-PROTOCOL-ALIGN EM SEU ÚNICO PR:
+1. Publicar somente `docs/align-operational-protocol`; não publicar tags.
+2. Abrir um único PR documental para main e aguardar todos os checks, incluindo `CI required`.
+3. Somente com todos os checks verdes, executar merge commit autorizado e confirmar CI pós-merge.
+4. Não abrir PR de fechamento. Manter este dossiê `PROMOTION_PENDING` para certificação/arquivo no
+   primeiro commit do próximo gate, conforme DEC-011.
+5. Parar após a CI pós-merge verde; não iniciar nem preparar código da Fase 3 nesta execução.
 ```
 
 ## 8. Retomada após perda de contexto

@@ -11,7 +11,8 @@ Antes de qualquer ação, ler integralmente:
 
 1. `TASK.md` — painel curto com estado atual, bloqueios, executor, última promoção e próxima ação.
 2. O único dossiê ativo apontado por `TASK.md`, quando houver — problema, evidências, escopo, aceite e rollback.
-3. A fase ativa em `docs/plano_implementacao_harness_operacional.md` — requisitos completos e critérios de aceite.
+3. A fase ativa e as seções 1.1–1.2 de `docs/plano_implementacao_harness_operacional.md` — requisitos,
+   ciclo Git e contrato normativo do gate `READY`.
 
 O histórico concluído está indexado em `docs/tasks/README.md` e só precisa ser aberto quando a tarefa
 atual depender daquela evidência. Não recarregar todos os dossiês concluídos por padrão.
@@ -23,9 +24,20 @@ Em caso de conflito, o pedido explícito do usuário prevalece; depois, o plano 
 1. Apenas um agente pode ser executor/escritor por vez.
 2. Se outro agente estiver registrado como executor ativo em `TASK.md`, atuar somente em auditoria e não editar arquivos.
 3. Antes de editar código, concluir F0.0 e registrar `python_command`, estado Git e workspace.
-4. Atualizar o dossiê ativo com arquivos, validações, decisões e rollback; manter no `TASK.md` somente
-   estado corrente, bloqueios, última promoção e próxima ação.
+4. Atualizar o dossiê ativo com arquivos, comandos, validações, decisões, rollback e checkpoint;
+   manter no `TASK.md` somente estado corrente, bloqueios, última promoção e próxima ação.
 5. Nunca depender apenas do histórico da conversa para retomar trabalho.
+
+## Gate de defensabilidade
+
+1. O contrato completo está na seção 1.2 do plano principal e não pode ser reduzido por este resumo.
+2. O gate começa `BLOCKED`. Antes do primeiro arquivo de implementação, o dossiê deve comprovar
+   problema, baseline, escopo e critérios congelados, rollback, executor, runtime e horário; somente
+   então muda para `READY` e recebe checkpoint Git.
+3. Critério que falhou nunca pode ser removido, ignorado ou enfraquecido. Novo arquivo, efeito,
+   dependência ou critério exige parar e recongelar o dossiê; ampliação material exige novo checkpoint.
+4. Rollback deve ser não destrutivo. `git reset --hard`, descarte amplo e sobrescrita de trabalho
+   preexistente não são autorizados pelo dossiê.
 
 ## Git e recuperação
 
@@ -41,10 +53,14 @@ Em caso de conflito, o pedido explícito do usuário prevalece; depois, o plano 
    Preferir merge commit para preservar histórico e permitir revert isolado da tarefa.
 8. Push, abertura de PR, merge, exclusão de branch/tag remota, force-push, bypass ou mudança de
    proteção exigem autorização explícita do usuário. Force-push e bypass não são o fluxo normal.
-9. Antes do primeiro arquivo da tarefa seguinte, comprovar no Git/GitHub o merge anterior e o CI
-   verde da `main`, registrando PR, merge SHA e run no painel e no novo dossiê ativo.
-10. Mudanças documentais transversais usam `docs/<descricao-curta>` e PR próprio; documentos que
-    preparam ou fecham uma tarefa permanecem na branch dessa tarefa.
+9. Depois dos gates locais, manter o dossiê em `active/` como
+   `COMPLETED_LOCAL / PROMOTION_PENDING`; isso não autoriza iniciar a tarefa seguinte.
+10. No primeiro commit do gate seguinte, comprovar no Git/GitHub o PR/checks/merge anterior e a CI
+    verde da `main`, registrar a evidência no dossiê anterior, marcá-lo `PROMOTED`, movê-lo para
+    `completed/` e somente então criar o novo dossiê `READY`.
+11. Mudanças documentais transversais usam `docs/<descricao-curta>` e um único PR próprio. É proibido
+    abrir PR recursivo somente para registrar o merge/CI do PR anterior; a certificação pertence ao
+    gate seguinte.
 
 O ciclo completo e suas exceções estão em `docs/plano_implementacao_harness_operacional.md`, seção
 `Ciclo Git obrigatório por tarefa`. A F1 é a exceção histórica já concluída em uma branch linear;
@@ -84,11 +100,13 @@ verdade.
 ## Painel e arquivo de dossiês — DEC-010
 
 1. `TASK.md` é painel operacional, não arquivo histórico, e deve permanecer com no máximo 300 linhas.
-2. Existe no máximo um dossiê de execução em `docs/tasks/active/`, além do README do diretório.
-3. Dossiês promovidos ficam em `docs/tasks/completed/`, um por tarefa/PR e indexados por
+2. Existe no máximo um dossiê em `docs/tasks/active/`, além do README: a tarefa corrente ou a última
+   tarefa em `COMPLETED_LOCAL / PROMOTION_PENDING`.
+3. Somente dossiês certificados como `PROMOTED` ficam em `docs/tasks/completed/`, um por tarefa/PR e indexados por
    `docs/tasks/README.md`; os 19 dossiês migrados do painel legado são cobertos pelo manifesto.
 4. Dossiê concluído é evidência imutável. Correção exige PR documental explícito e atualização de
    integridade; nunca reescrever silenciosamente resultado, erro, SHA, PR ou run.
 5. Não duplicar no painel contratos completos, logs, checklists concluídos ou histórico de fases.
-6. Entre tarefas, o painel aponta nenhuma tarefa ativa; o primeiro commit da nova branch cria o dossiê
+6. Entre tarefas, o painel pode apontar o dossiê `PROMOTION_PENDING`, mas deve declarar que não há
+   implementação ativa. O primeiro commit do novo gate certifica/arquiva esse dossiê e cria o próximo
    `READY` antes do primeiro arquivo de implementação.
