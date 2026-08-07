@@ -32,12 +32,12 @@ devem ser corrigidos para refletir a decisão. Nunca depender somente do histór
 |---|---|
 | **Fase concluída** | Fase 2 — F2.1–F2.6 implementadas e promovidas |
 | **Próxima fase** | Fase 3 — ainda não iniciada; auditar dependências e selecionar uma única primeira tarefa |
-| **Tarefa ativa** | nenhuma tarefa ativa; somente o fechamento documental desta promoção está em trânsito |
+| **Tarefa ativa** | nenhuma tarefa ativa; Fase 3 não iniciada |
 | **Gate** | nenhum gate de implementação aberto; F3 permanece sem autorização de código |
-| **Executor ativo** | `Codex`, somente como escritor do fechamento documental |
+| **Executor ativo** | nenhum executor de implementação ativo |
 | **Workspace** | `C:\Users\walla\OneDrive\Desktop\ai-engineering-harness` |
-| **Branch** | `docs/close-task-ledger-refactor`, criada de `fafbf627804f1a2a23d988c06dd123a3eee01348` |
-| **Git baseline** | `main == origin/main == fafbf627804f1a2a23d988c06dd123a3eee01348`; CI pós-merge verde |
+| **Linha de integração** | `main`; nenhuma branch ou worktree da Fase 3 foi criada |
+| **Última main comprovada** | `ff2d9e5035423844e8098757e0c6a9f689e8cab1`; CI pós-merge verde |
 | **Python** | `C:\Users\walla\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe` — 3.12.13 |
 | **uv** | `.\build\f0.6-tools\uv\bin\uv.exe` — 0.11.32; nenhuma dependência nova nesta tarefa |
 
@@ -51,7 +51,9 @@ devem ser corrigidos para refletir a decisão. Nunca depender somente do histór
 | CI do fechamento | PR run `31215674969`; pós-merge run `31215944126`, evento `push` em `main`, 11/11 verdes |
 | Refatoração do ledger | PR #16; checks run `31218206768`, 11/11 verdes antes do merge |
 | Promoção do ledger | merge `fafbf627804f1a2a23d988c06dd123a3eee01348`; pós-merge `31218399437`, 11/11 verdes |
-| Linha oficial | `main == origin/main == fafbf627804f1a2a23d988c06dd123a3eee01348` antes desta branch |
+| Fechamento do ledger | PR #17; checks run `31218768354`, 11/11 verdes antes do merge |
+| Promoção do fechamento | merge `ff2d9e5035423844e8098757e0c6a9f689e8cab1`; pós-merge `31218998232`, 11/11 verdes |
+| Linha comprovada | `main == origin/main == ff2d9e5035423844e8098757e0c6a9f689e8cab1` antes deste ajuste terminal |
 
 ## 5. Tarefa ativa
 
@@ -61,8 +63,8 @@ Nenhuma tarefa ativa. O dossiê `DOC-TASK-LEDGER` foi promovido e está arquivad
 | Campo | Valor |
 |---|---|
 | **Última tarefa** | `DOC-TASK-LEDGER` — `COMPLETED E PROMOVIDA` |
-| **Fechamento atual** | registrar evidência observada e esvaziar `active/`; nenhuma mudança de produto |
-| **Próxima autorização possível** | auditar Fase 3 e congelar um novo dossiê `READY` em nova branch, após este fechamento |
+| **Fechamento** | dossiê arquivado, `active/` vazio e promoções #16/#17 comprovadas com CI pós-merge verde |
+| **Próxima autorização possível** | auditar Fase 3 e congelar um novo dossiê `READY` em nova branch |
 
 ## 6. Bloqueios atuais
 
@@ -71,13 +73,13 @@ Nenhum bloqueio ativo.
 ## 7. Próxima ação exata
 
 ```text
-FECHAR SOMENTE DOC-TASK-LEDGER:
-1. Validar painel sem tarefa ativa, dossiê arquivado, índice, encoding, links e integridade histórica.
-2. Publicar somente esta branch de fechamento e abrir PR documental; não publicar nem apagar tags.
-3. Aguardar todos os checks pré-merge verdes; somente então executar merge commit autorizado.
-4. Confirmar CI pós-merge verde em main, sincronizar o checkout e parar.
-5. Na próxima execução autorizada, auditar a ordem da Fase 3 — incluindo F3.6 antes de F3.1–F3.3 —
-   e congelar uma única primeira tarefa antes de qualquer código.
+NA PRÓXIMA EXECUÇÃO AUTORIZADA, PREPARAR SOMENTE O PRIMEIRO GATE DA FASE 3:
+1. Confirmar que este ajuste terminal foi mesclado e que sua CI pós-merge está verde em main.
+2. Reler integralmente a Fase 3 e auditar o grafo de dependências: F3.6 antes de F3.4–F3.5,
+   que precedem F3.1–F3.3; F3.7 permanece posterior por depender de F4.7.
+3. Selecionar uma única primeira tarefa — F3.6 se a auditoria confirmar a ordem atual do plano.
+4. Criar branch exclusiva de main verde e congelar o novo dossiê com problema, escopo, aceite e rollback.
+5. Não alterar código da Fase 3 antes do gate `READY` e do checkpoint local correspondente.
 ```
 
 ## 8. Retomada após perda de contexto
