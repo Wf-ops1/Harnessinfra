@@ -60,3 +60,4 @@ Fechamentos documentais adicionais preservados no Git: PR #13 / merge `3596df3` 
 | DEC-008 | Artefato 2.0 canônico, íntegro, versionado e publicado atomicamente. |
 | DEC-009 | Uma branch e um PR por tarefa, partindo de `main` pós-merge verde. |
 | DEC-010 | Painel curto; dossiê detalhado por tarefa; histórico concluído imutável e indexado. |
+| DEC-011 | Gate detalhado no plano; promoção certificada no gate seguinte, sem PR recursivo de fechamento. |

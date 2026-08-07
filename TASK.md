@@ -6,7 +6,7 @@
 ## 1. Fontes de verdade
 
 1. Este painel: fase, coordenação, tarefa ativa, bloqueios e próxima ação.
-2. Dossiê ativo em `docs/tasks/active/`, quando apontado pela seção 5; neste momento não há nenhum.
+2. [Dossiê ativo](docs/tasks/active/DOC-PROTOCOL-ALIGN.md): problema, evidência, escopo, aceite e rollback.
 3. [Plano principal](docs/plano_implementacao_harness_operacional.md): requisitos e dependências das fases.
 4. [Regras dos agentes](.agents/AGENTS.md): protocolo obrigatório de execução e Git.
 5. [Índice histórico](docs/tasks/README.md): dossiês concluídos, PRs, merges e runs.
@@ -31,13 +31,13 @@ devem ser corrigidos para refletir a decisão. Nunca depender somente do histór
 | Campo | Estado observado |
 |---|---|
 | **Fase concluída** | Fase 2 — F2.1–F2.6 implementadas e promovidas |
-| **Próxima fase** | Fase 3 — ainda não iniciada; auditar dependências e selecionar uma única primeira tarefa |
-| **Tarefa ativa** | nenhuma tarefa ativa; Fase 3 não iniciada |
-| **Gate** | nenhum gate de implementação aberto; F3 permanece sem autorização de código |
-| **Executor ativo** | nenhum executor de implementação ativo |
+| **Próxima fase** | Fase 3 — ainda não iniciada; bloqueada até promover `DOC-PROTOCOL-ALIGN` |
+| **Tarefa ativa** | `DOC-PROTOCOL-ALIGN` — alinhar fontes normativas e ciclo de um PR |
+| **Gate** | `READY`; aceite local concluído, promoção remota pendente |
+| **Executor ativo** | `Codex`, único escritor |
 | **Workspace** | `C:\Users\walla\OneDrive\Desktop\ai-engineering-harness` |
-| **Linha de integração** | `main`; nenhuma branch ou worktree da Fase 3 foi criada |
-| **Última main comprovada** | `ff2d9e5035423844e8098757e0c6a9f689e8cab1`; CI pós-merge verde |
+| **Branch** | `docs/align-operational-protocol`, criada de `87373ec4ac91e2565e5f78b60bf2a669c121c381` |
+| **Última main comprovada** | `87373ec4ac91e2565e5f78b60bf2a669c121c381`; run `31219589499`, 11/11 verde |
 | **Python** | `C:\Users\walla\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe` — 3.12.13 |
 | **uv** | `.\build\f0.6-tools\uv\bin\uv.exe` — 0.11.32; nenhuma dependência nova nesta tarefa |
 
@@ -53,18 +53,20 @@ devem ser corrigidos para refletir a decisão. Nunca depender somente do histór
 | Promoção do ledger | merge `fafbf627804f1a2a23d988c06dd123a3eee01348`; pós-merge `31218399437`, 11/11 verdes |
 | Fechamento do ledger | PR #17; checks run `31218768354`, 11/11 verdes antes do merge |
 | Promoção do fechamento | merge `ff2d9e5035423844e8098757e0c6a9f689e8cab1`; pós-merge `31218998232`, 11/11 verdes |
-| Linha comprovada | `main == origin/main == ff2d9e5035423844e8098757e0c6a9f689e8cab1` antes deste ajuste terminal |
+| Painel terminal | PR #18; merge `87373ec4ac91e2565e5f78b60bf2a669c121c381`; pós-merge `31219589499`, 11/11 verdes |
+| Linha comprovada | `main == origin/main == 87373ec4ac91e2565e5f78b60bf2a669c121c381` antes desta branch |
 
 ## 5. Tarefa ativa
 
-Nenhuma tarefa ativa. O dossiê `DOC-TASK-LEDGER` foi promovido e está arquivado em
-[`docs/tasks/completed/DOC-TASK-LEDGER.md`](docs/tasks/completed/DOC-TASK-LEDGER.md).
+Leia integralmente: [DOC-PROTOCOL-ALIGN](docs/tasks/active/DOC-PROTOCOL-ALIGN.md).
 
 | Campo | Valor |
 |---|---|
-| **Última tarefa** | `DOC-TASK-LEDGER` — `COMPLETED E PROMOVIDA` |
-| **Fechamento** | dossiê arquivado, `active/` vazio e promoções #16/#17 comprovadas com CI pós-merge verde |
-| **Próxima autorização possível** | auditar Fase 3 e congelar um novo dossiê `READY` em nova branch |
+| **Objetivo** | restaurar o contrato exato do gate e eliminar contradições de localização/ciclo |
+| **Escopo** | plano, `AGENTS.md`, painel, dossiê ativo e teste estrutural |
+| **Proibido** | produto, CI, dependências, dossiês históricos e qualquer implementação F3 |
+| **Estado local** | `COMPLETED_LOCAL / PROMOTION_PENDING`; 452 testes + 6 subtestes e quality gates verdes |
+| **Estado remoto** | branch/PR ainda não publicados; nenhum fato remoto antecipado |
 
 ## 6. Bloqueios atuais
 
@@ -73,13 +75,13 @@ Nenhum bloqueio ativo.
 ## 7. Próxima ação exata
 
 ```text
-NA PRÓXIMA EXECUÇÃO AUTORIZADA, PREPARAR SOMENTE O PRIMEIRO GATE DA FASE 3:
-1. Confirmar que este ajuste terminal foi mesclado e que sua CI pós-merge está verde em main.
-2. Reler integralmente a Fase 3 e auditar o grafo de dependências: F3.6 antes de F3.4–F3.5,
-   que precedem F3.1–F3.3; F3.7 permanece posterior por depender de F4.7.
-3. Selecionar uma única primeira tarefa — F3.6 se a auditoria confirmar a ordem atual do plano.
-4. Criar branch exclusiva de main verde e congelar o novo dossiê com problema, escopo, aceite e rollback.
-5. Não alterar código da Fase 3 antes do gate `READY` e do checkpoint local correspondente.
+PROMOVER SOMENTE DOC-PROTOCOL-ALIGN EM SEU ÚNICO PR:
+1. Publicar somente `docs/align-operational-protocol`; não publicar tags.
+2. Abrir um único PR documental para main e aguardar todos os checks, incluindo `CI required`.
+3. Somente com todos os checks verdes, executar merge commit autorizado e confirmar CI pós-merge.
+4. Não abrir PR de fechamento. Manter este dossiê `PROMOTION_PENDING` para certificação/arquivo no
+   primeiro commit do próximo gate, conforme DEC-011.
+5. Parar após a CI pós-merge verde; não iniciar nem preparar código da Fase 3 nesta execução.
 ```
 
 ## 8. Retomada após perda de contexto

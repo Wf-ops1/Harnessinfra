@@ -54,25 +54,112 @@ tarefa sem reverter a fase inteira.
    checkpoints não substituem commits nem testes.
 5. Executar aceite focado, regressão aplicável, quality gates, build/smoke exigidos e auditoria de
    escopo antes de publicar a branch.
-6. Atualizar `TASK.md` com resultado, arquivos, comandos, rollback, checkpoint e estado remoto
-   realmente observado; nunca registrar antecipadamente PR, CI ou merge ainda não realizados.
+6. Atualizar o dossiê ativo com resultado, arquivos, comandos, decisões, rollback e checkpoint;
+   manter no `TASK.md` somente estado corrente, bloqueios, última promoção e próxima ação. Nunca
+   registrar antecipadamente PR, CI ou merge ainda não realizados.
 7. Publicar uma única branch e abrir um único PR da tarefa para `main`, somente com autorização
    explícita do usuário. É proibido push direto em `main`, force-push, bypass administrativo ou
    enfraquecimento de proteção/check obrigatório.
 8. Exigir branch atualizada e `CI required=success`. Preferir merge commit para preservar os commits
    e permitir revert do merge completo; squash/rebase de histórico exige decisão explícita registrada.
-9. Antes da próxima implementação, confirmar no Git/GitHub que o PR anterior foi mesclado, que o CI
-   pós-merge da `main` está verde e registrar essas evidências no novo checkpoint operacional.
+9. Antes da próxima implementação, confirmar no Git/GitHub que o PR anterior foi mesclado e que o CI
+   pós-merge da `main` está verde. No primeiro commit do gate seguinte, registrar essas evidências no
+   dossiê anterior, marcá-lo `PROMOTED`, movê-lo para `docs/tasks/completed/` e somente então criar o
+   novo dossiê ativo `READY`. Essa certificação é pré-requisito da nova tarefa e não cria um segundo PR
+   para a tarefa anterior.
 10. A branch remota concluída pode ser removida após o merge; commits, PR e checkpoints preservam o
     histórico. Tags remotas, PR, merge, exclusão de branch ou mudança de proteção continuam efeitos
     externos que exigem autorização explícita.
 
-Mudanças exclusivamente documentais e transversais usam branch `docs/<descricao-curta>` e PR próprio.
-Documentação necessária para preparar ou concluir a tarefa permanece na branch dessa tarefa. A F1,
-já concluída linearmente antes desta regra, será promovida por um único PR e constitui a única exceção
-histórica. O próprio commit documental que adota esta regra acompanha a branch da F1 antes desse PR e
-não cria precedente para fases futuras. Nenhuma tarefa da F2 pode começar antes dessa promoção e do
-CI pós-merge verde.
+Mudanças exclusivamente documentais e transversais usam branch `docs/<descricao-curta>` e um único PR
+próprio. Gate, implementação documental, validação e estado local final permanecem nesse PR. Depois do
+merge, o dossiê fica em `active/` como `COMPLETED_LOCAL / PROMOTION_PENDING` até a certificação no gate
+seguinte; é proibido abrir PR recursivo somente para registrar o próprio merge.
+
+A F1, concluída linearmente antes desta regra, foi promovida por um único PR e constitui a única
+exceção planejada. Os PRs #17 e #18 são um desvio histórico de fechamento recursivo de
+`DOC-TASK-LEDGER`: todos respeitaram checks e CI pós-merge, mas não criam precedente. O próprio commit
+documental que adotou a regra acompanhou a branch da F1 antes desse PR. Nenhuma tarefa da F2 começou
+antes dessa promoção e do CI pós-merge verde.
+
+### 1.2 Contrato normativo do dossiê e do gate `READY`
+
+Este contrato define quando há evidência suficiente para autorizar uma implementação. Ele não
+substitui nem reduz os requisitos e critérios da tarefa no restante deste plano. Enquanto qualquer
+campo obrigatório estiver ausente ou sem evidência, o gate permanece `BLOCKED` e nenhum arquivo de
+implementação pode ser alterado; é permitida apenas a preparação documental do próprio dossiê.
+
+| Condição | Evidência mínima obrigatória |
+|---|---|
+| **Problema comprovado** | Comando e saída reproduzível, teste/import/compilação falhando ou referência exata a arquivo e trecho. Impressão, hipótese ou intenção do plano não bastam. |
+| **Baseline conhecido** | Branch, `HEAD`, `git status --short`, upstream/CI aplicável e mudanças preexistentes registrados; trabalho alheio preservado e excluído do escopo. |
+| **Escopo congelado** | Objetivo, arquivos/áreas permitidos, itens proibidos, dependências e efeitos esperados definidos antes da primeira edição de implementação. |
+| **Critérios congelados** | Comandos exatos, resultado esperado e condição de falha definidos antes da implementação; critério não pode ser enfraquecido para passar. |
+| **Rollback executável** | Checkpoint Git existente, gatilhos para interromper/reverter, procedimento não destrutivo e verificação pós-rollback. |
+| **Responsabilidade explícita** | Executor único, data/hora da autorização, estado do gate e runtime efetivamente utilizado. |
+
+O dossiê ativo deve conter, no mínimo, o equivalente aos campos abaixo. Markdown é permitido, mas
+omitir a semântica de qualquer campo mantém o gate `BLOCKED`.
+
+```yaml
+defensibility:
+  task_id: "F0.x"
+  gate: "BLOCKED | READY"
+  lifecycle: "PREPARING | ACTIVE | COMPLETED_LOCAL | PROMOTION_PENDING | PROMOTED"
+  executor: "nome"
+  authorized_at: "YYYY-MM-DDTHH:MM:SS-03:00"
+  problem_statement: "fato observável que precisa ser corrigido"
+  evidence:
+    - command: "comando read-only ou teste de reprodução"
+      observed: "exit code e resultado relevante"
+      location: "arquivo:linha, quando aplicável"
+  baseline:
+    branch: "branch atual"
+    head: "commit completo"
+    status: "clean ou mudanças preexistentes preservadas"
+    upstream_ci: "run e resultado, quando aplicável"
+    checkpoint: "tag ou commit existente"
+  frozen_scope:
+    allowed: ["arquivos/áreas autorizados"]
+    excluded: ["itens explicitamente fora de escopo"]
+  frozen_acceptance:
+    - command: "comando exato"
+      expected: "exit code e resultado esperado"
+  rollback:
+    triggers: ["condições objetivas para interromper ou reverter"]
+    procedure: "git revert ou inversão explícita e não destrutiva dos hunks"
+    verify: "comandos que comprovam retorno ao baseline funcional"
+```
+
+Regras de congelamento e mudança de escopo:
+
+1. Somente quando todas as condições estiverem satisfeitas o gate muda de `BLOCKED` para `READY`; o
+   checkpoint dessa transição deve existir antes do primeiro arquivo de implementação.
+2. Descoberta que exija novo arquivo, efeito, dependência ou mudança de critério interrompe a execução
+   e exige registrar a descoberta e recongelar escopo, aceite e rollback.
+3. Ampliação material exige novo checkpoint antes da retomada.
+4. Nunca remover, ignorar ou tornar mais fraco um critério que falhou. Corrigir a implementação ou
+   registrar bloqueio.
+5. Rollback não autoriza `git reset --hard`, descarte amplo ou sobrescrita de trabalho preexistente.
+   Preferir commits isolados e `git revert`; restauração destrutiva exige autorização explícita e alvo
+   previamente verificado.
+6. Após os gates locais, o dossiê passa a `COMPLETED_LOCAL / PROMOTION_PENDING`, mas a tarefa seguinte
+   continua bloqueada até merge e CI pós-merge verdes serem observados.
+7. No primeiro commit do gate seguinte, certificar a promoção anterior, preencher PR/checks/merge/CI,
+   marcar `PROMOTED`, arquivar o dossiê e só então liberar o novo dossiê `READY`.
+8. Um commit não antecipa prova do próprio merge. Essa limitação é resolvida pela certificação no gate
+   seguinte, nunca por um PR adicional de fechamento.
+
+Checklist mínimo de liberação:
+
+```text
+[ ] Problema comprovado com evidência reproduzível
+[ ] Baseline Git, upstream/CI e mudanças preexistentes registrados
+[ ] Escopo permitido e proibido congelados
+[ ] Critérios exatos, resultados esperados e condições de falha congelados
+[ ] Checkpoint e rollback verificável existentes
+[ ] Executor único, runtime e horário de autorização registrados
+```
 
 ---
 
