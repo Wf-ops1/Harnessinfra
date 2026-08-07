@@ -241,12 +241,14 @@ defensibility:
 
 ## 5. Fase Atual
 
-**→ FASE 1 — Contrato de grafo e compilador único**
+**→ FASE 2 — Runtime real de grafos e persistência retomável**
 
-**Objetivo:** transformar YAMLs declarativos em artefatos executáveis, validados e determinísticos.
+**Objetivo:** executar cada nó do artefato compilado, persistir todas as transições e permitir
+retomada após interrupção.
 
-**Status da fase:** `completed` — F1.1–F1.5 concluídas; todos os gates e critérios de saída da
-Fase 1 estão verdes. A Fase 2 não foi iniciada.
+**Status da fase:** `pending com gate preparado` — a F1 foi promovida por merge commit para `main`,
+o CI pós-merge está verde e a branch exclusiva da F2.1 foi criada. O gate F2.1 está `READY`, mas
+nenhum arquivo de implementação da Fase 2 foi alterado.
 
 ### Coordenação e ambiente observado
 
@@ -255,7 +257,7 @@ Fase 1 estão verdes. A Fase 2 não foi iniciada.
 | **Executor ativo** | `Codex` — responsável por implementar, validar, manter checkpoints e criar commits locais |
 | **Auditor/revisor** | `Antigravity` — somente-leitura por padrão; só edita quando o usuário solicitar explicitamente ou transferir a execução |
 | **Workspace** | `C:\Users\walla\OneDrive\Desktop\ai-engineering-harness` |
-| **Git** | `available` — branch `phase/f1-compiler-unification`; `checkpoint/f1.4-complete^{}` em `60c7718bfad7b6241943d815051604c02342b139`; `checkpoint/f1.5-ready` ancora o gate e `checkpoint/f1.5-complete` ancora o fechamento local; branch publicada no GitHub por solicitação do usuário, sem tag remota |
+| **Git** | `available` — `main...origin/main` em `6c994b425bcd805db96bf1092c0569f503b55cd2`; branch ativa `task/f2.1-execution-record`, criada desse merge; `checkpoint/pre-f2.1-defensibility^{}` ancora o baseline; checkpoints permanecem somente locais |
 | **python_command** | `& 'C:\Users\walla\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe'` — Python `3.12.13` |
 | **uv_command** | `& '.\build\f0.6-tools\uv\bin\uv.exe'` — uv `0.11.32` restaurado de forma isolada/ignorada, sem PATH ou instalação global; `lock --check` e `sync --all-extras --locked` verdes |
 | **Dependências do projeto** | `.venv` gerida pelo uv 0.11.32 com Python 3.12.13 e `uv.lock`; 229 testes + 6 subtests, mypy em 90 arquivos, Ruff, compileall, lock/sync, build e dois smokes isolados verdes no fechamento da F1.5 |
@@ -263,7 +265,215 @@ Fase 1 estão verdes. A Fase 2 não foi iniciada.
 
 ---
 
-## 6. Fase 1 — Estado e tarefa atual
+### Promoção observada da Fase 1
+
+| Evidência | Resultado observado |
+|---|---|
+| PR de promoção | [#6](https://github.com/Wf-ops1/Harnessinfra/pull/6), mesclado e fechado em 2026-08-06 |
+| Merge commit | `6c994b425bcd805db96bf1092c0569f503b55cd2`, com pais `4e3a3531cea44aadcebb9ff3b3e763b4e53adba6` e `ea38f196b6d22d92164836fabc3f0baafdfe67dd`; merge commit real, sem squash/rebase |
+| CI do PR | [run 31133897345](https://github.com/Wf-ops1/Harnessinfra/actions/runs/31133897345), evento `pull_request`, 11/11 checks e `CI required=success` |
+| CI pós-merge | [run 31134295999](https://github.com/Wf-ops1/Harnessinfra/actions/runs/31134295999), evento `push` em `main`, commit `6c994b4`, 10 jobs de matriz + `CI required`, `completed/success` em 1m24s |
+| Alinhamento local | `git fetch origin`; `git switch main`; `git merge --ff-only origin/main`; `main...origin/main`, HEAD idêntico ao merge e worktree limpa |
+| Ancestralidade | `checkpoint/f1.5-complete^{}` e `ea38f19` são ancestrais de `origin/main`; a F1 completa integra a linha oficial |
+
+---
+
+## 6. Fase 2 — Estado e tarefa atual
+
+### F2.1 — Criar `ExecutionRecord`
+
+| Campo | Detalhe |
+|---|---|
+| **Status** | `pending` — gate `READY`; implementação ainda não iniciada |
+| **Objetivo** | Definir o contrato versionado da execução e persistir `execution.json` atomicamente, sem integrar ainda runtime, CLI, FSM, journal, worktree ou governança |
+| **Branch exclusiva** | `task/f2.1-execution-record`, criada de `main` pós-merge verde em `6c994b4` |
+| **Checkpoint de rollback** | `checkpoint/pre-f2.1-defensibility^{}` → `6c994b425bcd805db96bf1092c0569f503b55cd2` |
+| **Próximo passo permitido** | Implementar somente o escopo F2.1 congelado abaixo, após confirmar este gate e o baseline limpo |
+
+#### Auditoria concreta da F2.1
+
+| Superfície | Comportamento observado | Lacuna frente ao plano | Fronteira |
+|---|---|---|---|
+| `src/ai_engineering_harness/contracts/` | Não existe `execution.py` nem símbolo `ExecutionRecord`; os contratos atuais cobrem grafo, policies, payloads de nodes, eventos e knowledge transactions | Os campos mínimos da F2.1 não possuem contrato tipado ou export público | Adicionar contrato; não modificar contratos F1 nem executar nodes |
+| `src/ai_engineering_harness/persistence/` | Pacote ausente | Não existe publicação atômica de `execution.json` | F2.1 cria somente o primitivo estreito de save/load do record; provider, CAS, locks, listagem, journal e recovery são F2.2 |
+| `runtime/state_machine.py` | O construtor sempre define `INITIATED` e chama `_save_state()`; `write_text()` substitui diretamente `workflow-state.json` | Reinicializa execução existente e pode deixar escrita parcial; não produz `ExecutionRecord` | Arquivo byte-idêntico na F2.1; transições, replay e adoção do novo contrato são F2.4 |
+| `runtime/engine.py` | `MAFAdapter.load_and_validate()` retorna o artefato validado, mas o retorno é descartado; o engine segue sequência procedural fixa | Nenhum digest/entrypoint/nó do artefato é registrado em estado de execução | Integração e travessia por arestas pertencem à F2.3 |
+| CLI/status/approve | Leem `workflow-state.json` e `approval_request.json` diretamente; não existem `resume` ou `cancel` | Consumidores não usam um record único e retomável | CLI/resume/cancel ficam F2.5; aprovação vinculada ao conteúdo fica F5.6 |
+| Config/worktree | `ConfigResolver` não produz digest persistido; `ExternalWorktreeManager` apenas cria diretório e ponteiro sintético | F2.1 precisa representar identidades que serão preenchidas por fases futuras | Receber/validar digests e campos nullable; resolução efetiva é F5.1 e Git worktree real é F3.6 |
+
+#### Contrato congelado da F2.1
+
+1. `ExecutionRecord` será Pydantic v2, `strict=True`, `frozen=True` e `extra="forbid"`.
+2. O record terá todos os campos mínimos do plano: `execution_id`, `workflow_name`,
+   `artifact_digest`, `base_commit_sha`, `original_branch`, `worktree_path`, `current_node_id`,
+   `current_state`, `attempt_by_node`, `created_at`, `updated_at`, `configuration_digest`,
+   `approval_status`, `candidate_commit_sha`, `promotion_commit_sha` e `failure`.
+3. Serão adicionados somente dois campos estruturais necessários ao armazenamento futuro:
+   `record_schema_version="1.0"` e `revision>=0`; a F2.2 usará `revision` no CAS, sem implementar
+   essa operação na F2.1.
+4. `execution_id` será path-safe e limitado; nomes/IDs serão não vazios; `attempt_by_node` aceitará
+   somente node IDs válidos e tentativas inteiras `>=0`.
+5. `artifact_digest` será `sha256:` dos bytes UTF-8 do JSON canônico completo aceito pelo loader,
+   não um alias de `graph_digest`; `configuration_digest` usará o mesmo formato e será recebido do
+   chamador, sem antecipar o `ConfigResolver` da F5.1.
+6. SHA Git será hexadecimal lowercase completo de 40 caracteres. `base_commit_sha` é obrigatório;
+   candidate/promotion começam `null` e só aceitam SHA válido quando presentes.
+7. `worktree_path` e `failure` começam `null`; `current_node_id` é o entrypoint já conhecido do
+   artefato. A F2.1 não cria worktree nem executa node.
+8. `ExecutionState` conterá a união fechada dos estados atuais e dos estados adicionais exigidos na
+   F2.4, mas nenhuma transição/FSM será implementada nesta tarefa. `ApprovalStatus` será enum fechado
+   compatível com `PENDING`/`APPROVED` e os estados futuros `NOT_REQUIRED`, `REJECTED`, `EXPIRED` e
+   `INVALIDATED`.
+9. `failure` será `ExecutionFailure | None`, com `code`, `message`, `retryable` e `node_id` opcional;
+   não aceitará stdout/stderr, segredo ou payload arbitrário nesta tarefa.
+10. `created_at` e `updated_at` exigirão timezone UTC; `updated_at >= created_at`. O mesmo record deve
+    produzir bytes JSON canônicos idênticos, com newline final.
+11. O destino exclusivo será `.harness/state/executions/<execution_id>/execution.json`. A publicação
+    estreita da F2.1 usará temp exclusivo no mesmo diretório, write, flush, fsync, close, `os.replace`
+    e fsync do diretório quando suportado; falha preserva o arquivo anterior e remove o temp.
+12. Não há garantia de concorrência na F2.1. Lock, fencing token, CAS, detecção de revisão obsoleta,
+    recuperação de temp abandonado, journal e `StateStorageProvider` permanecem integralmente F2.2.
+
+#### Compatibilidade congelada
+
+- `execution.json` é novo e não migra nem apaga `workflow-state.json`, `event-journal.jsonl` ou
+  `approval_request.json` existentes.
+- Nenhum consumidor atual muda na F2.1; a adoção por runtime/CLI ocorre nas tarefas posteriores.
+- Artefato F1.5, package version, dependências, YAMLs e schemas de grafo/policy permanecem inalterados.
+- Records com versão diferente de `1.0`, campos extras, digest/SHA inválido ou JSON não canônico
+  falham fechados; não haverá preenchimento silencioso de metadados ausentes.
+- Não há promessa de resume para execuções legadas; essa política pertence à F2.5.
+
+#### Gate de defensabilidade da F2.1
+
+```yaml
+defensibility:
+  task_id: "F2.1"
+  gate: "READY"
+  executor: "Codex"
+  authorized_at: "2026-08-06T22:32:34-03:00"
+  problem_statement: >-
+    O pacote não possui ExecutionRecord nem persistence package; a FSM atual reinicializa toda
+    instanciação em INITIATED e grava workflow-state.json diretamente, enquanto engine, CLI,
+    aprovação e journal mantêm estados independentes incapazes de formar a identidade retomável
+    exigida pela Fase 2.
+  evidence:
+    - command: >-
+        rg -n "ExecutionRecord|StateStorageProvider|AtomicFileStateStorage|artifact_digest|attempt_by_node"
+        src tests
+      observed: >-
+        exit 0 apenas por usos incidentais de approval_status/worktree; nenhum ExecutionRecord,
+        StateStorageProvider, AtomicFileStateStorage, artifact_digest ou attempt_by_node existe
+      location: "src/ai_engineering_harness/"
+    - command: >-
+        rg --files src/ai_engineering_harness/persistence;
+        Test-Path src/ai_engineering_harness/contracts/execution.py
+      observed: "persistence package ausente; execution.py ausente"
+      location: "src/ai_engineering_harness/contracts/ e persistence/"
+    - command: >-
+        inspeção de RuntimeEngine.run_workflow, WorkflowStateMachine.__init__/_save_state,
+        CLI run/status/inspect/approve, AuditTrailManager e ExternalWorktreeManager
+      observed: >-
+        loader validado é descartado, fluxo é hardcoded, FSM sempre salva INITIATED por write_text
+        e consumidores gravam arquivos independentes sem record/revision/atomicidade compartilhada
+      location: "src/ai_engineering_harness/runtime/:22; cli/main.py:108; observability/audit.py:10"
+    - command: >-
+        git fetch origin; git show -s --format=%H%n%P%n%s origin/main;
+        inspeção GitHub do PR #6 e runs 31133897345/31134295999
+      observed: >-
+        merge commit 6c994b4 com dois pais; CI do PR 11/11 e CI pós-merge da main completed/success
+      location: "https://github.com/Wf-ops1/Harnessinfra/pull/6"
+  baseline:
+    branch: "task/f2.1-execution-record"
+    head: "6c994b425bcd805db96bf1092c0569f503b55cd2"
+    status: "clean; criada de main...origin/main sincronizada"
+    checkpoint: "checkpoint/pre-f2.1-defensibility"
+  frozen_scope:
+    allowed:
+      - "TASK.md — promoção observada, dossiê, transições e handoff F2.1"
+      - "src/ai_engineering_harness/contracts/execution.py — ExecutionRecord, enums e failure tipado"
+      - "src/ai_engineering_harness/contracts/__init__.py — exports públicos exclusivamente F2.1"
+      - "src/ai_engineering_harness/persistence/__init__.py — exports estreitos F2.1"
+      - "src/ai_engineering_harness/persistence/atomic_file.py — canonical save/load e replace atômico exclusivo do ExecutionRecord"
+      - "tests/unit/test_execution_record.py — provas positivas/negativas/atomicidade F2.1"
+    excluded:
+      - "StateStorageProvider, CAS, lock, fencing, list, journal, recovery de temp e concorrência — F2.2"
+      - "GraphExecutor, node executors, RuntimeEngine e travessia por arestas — F2.3"
+      - "FSM, replay, novos fluxos de transição e adoção de ExecutionState — F2.4"
+      - "CLI resume/approve/cancel e retomada — F2.5; RetryContext — F2.6"
+      - "worktree Git real/promoção/tools/providers — F3; configuração/policy/approval/redaction — F5"
+      - "YAML/schema de grafo/policy, compiler/MAFAdapter, dependências, pyproject.toml, uv.lock e workflow CI"
+  frozen_acceptance:
+    - command: >-
+        & '.\build\f0.6-tools\uv\bin\uv.exe' run python -m pytest
+        tests/unit/test_execution_record.py -q
+      expected: >-
+        exit 0; criação/round-trip/canonicalidade/imutabilidade e escrita atômica verdes, incluindo
+        preservação do arquivo anterior em create/write/flush/fsync/replace failure
+    - command: >-
+        & '.\build\f0.6-tools\uv\bin\uv.exe' run python -m pytest
+        tests/unit/test_execution_record.py -q -k
+        "missing or extra or digest or sha or timestamp or attempt or version or traversal or canonical"
+      expected: >-
+        exit 0; ausências/extras, versão, digest/SHA/path, timestamp, tentativa e JSON adulterado
+        são rejeitados sem arquivo parcial
+    - command: >-
+        & '.\build\f0.6-tools\uv\bin\uv.exe' run python -m pytest
+        tests/unit/test_graph_contracts.py
+        tests/unit/test_artifact_determinism.py tests/unit/test_public_module_imports.py -q
+      expected: "exit 0; contratos/artefato F1.5 e imports públicos sem regressão"
+    - command: >-
+        & '.\build\f0.6-tools\uv\bin\uv.exe' run python -m pytest tests/unit tests/e2e -q
+      expected: "exit 0; suíte integral sem skip/ignore novo"
+    - command: >-
+        & '.\build\f0.6-tools\uv\bin\uv.exe' run python -m mypy src;
+        & '.\build\f0.6-tools\uv\bin\uv.exe' run python -m ruff check .;
+        & '.\build\f0.6-tools\uv\bin\uv.exe' run python -m compileall -q src compiler tests
+      expected: "todos exit 0"
+    - command: >-
+        & '.\build\f0.6-tools\uv\bin\uv.exe' run python -m build;
+        & '.\build\f0.6-tools\uv\bin\uv.exe' run python tests/ci/smoke_wheel.py
+      expected: "build wheel/sdist e smoke instalado fora do checkout exit 0"
+    - command: >-
+        git diff --check; git diff --name-only checkpoint/pre-f2.1-defensibility;
+        git diff --exit-code checkpoint/pre-f2.1-defensibility -- .github compiler
+        src/ai_engineering_harness/runtime src/ai_engineering_harness/cli
+        src/ai_engineering_harness/defaults pyproject.toml uv.lock
+      expected: "somente allowlist F2.1; zero alteração nas fronteiras excluídas"
+  rollback:
+    triggers:
+      - "mudança exigir runtime/CLI/FSM/provider/lock/CAS/worktree/config ou dependência"
+      - "record aceitar versão/digest/SHA/path/timestamp inválido ou JSON não canônico"
+      - "falha atômica truncar/remover o execution.json anterior ou deixar temp da tentativa"
+      - "qualquer arquivo fora do allowlist mudar ou regressão F1.5 aparecer"
+    procedure: >-
+      interromper e preservar evidências; antes de commit inverter somente hunks F2.1 via apply_patch;
+      depois de commit usar git revert nos commits exclusivos da tarefa; nunca resetar, limpar ou
+      sobrescrever trabalho preexistente
+    verify: >-
+      confirmar HEAD/checkpoint, git status, diff de escopo, testes integrais, mypy, Ruff, compileall,
+      build e smokes aplicáveis
+```
+
+#### Checklist de liberação da F2.1
+
+```text
+[x] Problema comprovado com buscas e inspeção reproduzíveis
+[x] F1 mesclada por merge commit e CI pós-merge da main verde
+[x] Branch exclusiva criada da main sincronizada e baseline/checkpoint registrados
+[x] Contrato, compatibilidade e persistência atômica estreita congelados
+[x] Escopo permitido/proibido e fronteiras F2.2–F2.6/F3/F5 congelados
+[x] Aceite positivo/negativo, regressão, build/smoke, escopo e rollback congelados
+[x] Executor único e horário de autorização registrados
+[x] Nenhum Python, teste de implementação, YAML, schema F1, dependência ou runtime alterado
+```
+
+**Estado de parada obrigatório:** o gate F2.1 está `READY`, mas a implementação da F2.1 não foi
+iniciada. Não avançar para F2.2 nem alterar código fora do allowlist congelado.
+
+---
+
+## 6.1. Histórico detalhado da Fase 1
 
 ### F1.1 — Definir schema tipado do grafo
 
@@ -1769,7 +1979,7 @@ não foi iniciada; qualquer continuação exige novo dossiê de defensabilidade.
 
 ---
 
-## 6.1. Histórico detalhado da Fase 0
+## 6.2. Histórico detalhado da Fase 0
 
 ---
 
@@ -2827,14 +3037,14 @@ de `main`.
 
 ```
 Data:              2026-08-06
-Fase:              F1
-Tarefa:            GOV-GIT-001 — formalizar ciclo Git/execução por tarefa (DEC-009)
-Estado:            completed documental — regra ativa para F2.1+; Fase 1 permanece concluída; Fase 2 não iniciada
-Arquivos alterados: .agents/AGENTS.md, docs/plano_implementacao_harness_operacional.md e TASK.md; zero produto/teste/dependência
-Validações:         8 testes documentais + 6 subtests; UTF-8/Markdown, regras cruzadas, git diff --check e auditoria de escopo verdes
-Checkpoint:         checkpoint/f1.5-complete permanece o marco da implementação; commit documental GOV-GIT-001 subsequente na mesma branch antes do PR da F1
-Observação:         phase/f1-compiler-unification publicada e sincronizada antes desta documentação; nenhum PR/merge/tag remota/proteção executado
-Resultado:          uma branch + um PR por tarefa, main pós-merge verde como única base futura e exceção histórica da F1 persistidos fora do chat
+Fase:              F2
+Tarefa:            F2.1 — preparar contrato e gate defensável do ExecutionRecord
+Estado:            pending — gate READY; implementação Python ainda não iniciada
+Arquivos alterados: TASK.md apenas; zero produto/teste/dependência/runtime
+Validações:         12 testes documentais + 6 subtests; UTF-8/Markdown/CI docs, regras cruzadas, git diff --check e auditoria de escopo verdes
+Checkpoint:         `checkpoint/pre-f2.1-defensibility^{}` em 6c994b425bcd805db96bf1092c0569f503b55cd2; `checkpoint/f2.1-ready` será criado no commit deste gate
+Observação:         PR #6 mesclado em 6c994b4; CI do PR 31133897345 e CI pós-merge 31134295999 verdes; main local/remota alinhadas antes da branch F2.1
+Resultado:          contrato, compatibilidade, aceite, rollback e fronteiras F2.1 congelados; nenhum código F2 iniciado
 ```
 
 ---
@@ -2842,13 +3052,13 @@ Resultado:          uma branch + um PR por tarefa, main pós-merge verde como ú
 ## 11. Próxima Ação Exata
 
 ```text
-PROMOVER A F1 SOB A DEC-009 — NÃO INICIAR IMPLEMENTAÇÃO DA F2:
-1. Confirmar phase/f1-compiler-unification limpa/sincronizada, checkpoint/f1.5-complete ancestral e commit documental GOV-GIT-001 no HEAD.
-2. Somente com autorização explícita, abrir um único PR da branch da F1 para main; não enviar tags nem alterar proteção.
-3. Exigir branch atualizada e CI required verde; revisar que o diff contém F1.1–F1.5 e a documentação DEC-009, sem fases futuras.
-4. Somente com autorização explícita adicional, usar merge commit; não usar squash, rebase, force-push ou bypass.
-5. Após merge, confirmar main...origin/main, merge SHA, PR e CI pós-merge verde e registrar a promoção observada no TASK.md.
-6. Criar task/f2.1-execution-record somente da main promovida; preparar apenas o dossiê/gate F2.1 antes de código.
+IMPLEMENTAR SOMENTE A F2.1 — NÃO ANTECIPAR F2.2/F2.3/F2.4/F2.5/F3/F5:
+1. Confirmar task/f2.1-execution-record em checkpoint/f2.1-ready, worktree limpa e baseline 6c994b4 ancestral.
+2. Criar somente ExecutionRecord/enums/failure tipado, exports, persistência atômica estreita e testes do allowlist congelado.
+3. Não integrar RuntimeEngine, FSM, CLI, journal, approval, worktree, ConfigResolver ou qualquer consumidor atual.
+4. Executar todos os critérios positivos/negativos, regressão integral, mypy, Ruff, compileall, build, smoke e auditoria de escopo congelados.
+5. Atualizar TASK.md com resultados reais, commit/checkpoint e rollback; não antecipar PR, CI ou merge remotos.
+6. Somente com autorização explícita, publicar a branch e abrir um único PR F2.1 para main; exigir CI required verde antes de qualquer merge.
 ```
 
 ---
