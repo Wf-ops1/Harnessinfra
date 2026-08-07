@@ -263,6 +263,16 @@ não foi iniciada.
 | **Dependências do projeto** | `.venv` gerida pelo uv 0.11.32 com Python 3.12.13 e `uv.lock`; nenhuma dependência foi adicionada; baseline pós-rollback passa mypy em targets `linux` e `win32`; run 31146423972 do rollback concluiu 11/11 verde |
 | **Regra de escrita** | apenas um agente escreve por vez |
 
+### Tarefa documental ativa — DOC-TASK-LEDGER
+
+| Campo | Valor atual |
+|---|---|
+| **Status** | `in_progress` — gate documental `READY`; nenhuma implementação da Fase 3 autorizada nesta tarefa |
+| **Objetivo** | Separar o painel operacional corrente dos dossiês históricos, preservando evidência auditável por tarefa e reduzindo o conjunto obrigatório de leitura |
+| **Branch** | `docs/refactor-task-ledger`, criada de `main == origin/main == d48151b752aa373756c46bfee58932fa5abf4bf5` com CI pós-merge `31215944126` verde |
+| **Dossiê ativo** | [`docs/tasks/active/DOC-TASK-LEDGER.md`](docs/tasks/active/DOC-TASK-LEDGER.md) |
+| **Próxima ação** | Criar o checkpoint `checkpoint/docs-task-ledger-ready` e somente então executar a migração mecânica congelada no dossiê |
+
 ---
 
 ### Promoção observada da Fase 1
