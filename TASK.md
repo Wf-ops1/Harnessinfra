@@ -246,9 +246,9 @@ defensibility:
 **Objetivo:** executar cada nó do artefato compilado, persistir todas as transições e permitir
 retomada após interrupção.
 
-**Status da fase:** `in_progress` — F1 e F2.1–F2.5 foram promovidas por merge commits para `main`,
-com os respectivos CIs pós-merge integralmente verdes. A F2.6 está concluída e validada localmente;
-promoção por PR, CI remoto pré-merge e CI pós-merge ainda estão pendentes.
+**Status da fase:** `completed e promovida` — F1 e F2.1–F2.6 foram promovidas por merge commits
+para `main`, com os respectivos CIs pós-merge integralmente verdes. A Fase 2 está encerrada; a Fase 3
+não foi iniciada.
 
 ### Coordenação e ambiente observado
 
@@ -257,7 +257,7 @@ promoção por PR, CI remoto pré-merge e CI pós-merge ainda estão pendentes.
 | **Executor ativo** | `Codex` — responsável por implementar, validar, manter checkpoints e criar commits locais |
 | **Auditor/revisor** | `Antigravity` — somente-leitura por padrão; só edita quando o usuário solicitar explicitamente ou transferir a execução |
 | **Workspace** | `C:\Users\walla\OneDrive\Desktop\ai-engineering-harness` |
-| **Git** | `available` — `task/f2.6-retry-context` foi criada limpa de `main == origin/main == 3596df3ed1c27cc82d31b2beccd6416c8424dd27`, após `git fetch` e comprovação do run pós-merge `31211290100` em `completed/success`; gate `df81516` e implementação F2.6 validada permanecem somente locais até o PR |
+| **Git** | `available` — F2.6 promovida pelo PR #14 no merge `2dac824684b541c0b3ae4d6caf08ec9161524d91`; run pré-merge `31214724386` e pós-merge `31215162155` concluídos com sucesso; fechamento documental isolado em `docs/close-f2.6-promotion` |
 | **python_command** | `& 'C:\Users\walla\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe'` — Python `3.12.13` |
 | **uv_command** | `& '.\build\f0.6-tools\uv\bin\uv.exe'` — uv `0.11.32` restaurado de forma isolada/ignorada, sem PATH ou instalação global; `lock --check` e `sync --all-extras --locked` verdes |
 | **Dependências do projeto** | `.venv` gerida pelo uv 0.11.32 com Python 3.12.13 e `uv.lock`; nenhuma dependência foi adicionada; baseline pós-rollback passa mypy em targets `linux` e `win32`; run 31146423972 do rollback concluiu 11/11 verde |
@@ -2014,12 +2014,13 @@ run pós-merge `31209619778` integralmente verde; branch e checkpoints preservad
 
 | Campo | Detalhe |
 |---|---|
-| **Status** | `completed localmente` — gate `READY → COMPLETED`; promoção e CIs remotos pendentes |
+| **Status** | `completed e promovida` — gate `READY → COMPLETED`; PR #14 mesclado somente após CI pré-merge verde e CI pós-merge integralmente verde |
 | **Objetivo** | Executar somente retries autorizados pelas arestas compiladas e pelo limite do `retry_policy`, entregando ao backend evidência real, tipada, redigida e retomável da falha anterior, sem repetir a mesma invocação às cegas |
 | **Branch exclusiva** | `task/f2.6-retry-context`, criada limpa de `main == origin/main == 3596df3ed1c27cc82d31b2beccd6416c8424dd27` |
-| **Checkpoint de rollback** | `checkpoint/f2.6-ready^{}` → `df81516963fc347b5b13689a1d9dfbadfe05a85c`; tag local `checkpoint/f2.6-complete` será criada no commit de implementação |
+| **Checkpoint de rollback** | `checkpoint/f2.6-ready^{}` → `df81516963fc347b5b13689a1d9dfbadfe05a85c`; `checkpoint/f2.6-complete^{}` → `f5893498b3cb46c918939d019ba5a4509abf48b0`; tags preservadas somente localmente |
 | **Executor** | `Codex`, único escritor, sob autorização explícita do usuário em `continue` às 2026-08-07 16:42 -03:00 |
 | **Dependências** | Nenhuma nova; reutilizar artefato F1, record/attempts F2.1, storage/lock/CAS F2.2, arestas F2.3, estado `FAILED_RETRY_EXHAUSTED` F2.4, bundle/payload/ledger/resume F2.5 e `security.Redactor` existente |
+| **Promoção** | [PR #14](https://github.com/Wf-ops1/Harnessinfra/pull/14) → merge `2dac824684b541c0b3ae4d6caf08ec9161524d91`; run do PR `31214724386` e run pós-merge `31215162155`, ambos com 11/11 checks verdes |
 
 #### Promoção e baseline comprovados antes do gate
 
@@ -2250,7 +2251,7 @@ defensibility:
 | Documentação | README reconhece a Fase 2 concluída sem promover capacidades F3–F7; `8 passed, 6 subtests passed` em documentação/encoding |
 | Escopo | Exatos sete paths do allowlist; dependências, CI, schemas, YAML, compiler, persistence, FSM, lifecycle/CLI/engine, security, governance, F3–F7 e demais testes permanecem byte-idênticos |
 
-#### Checklist de conclusão local F2.6
+#### Checklist de conclusão e promoção F2.6
 
 ```text
 [x] RetryContext recebe todas as evidências exigidas e é redigido antes de persistir/entregar
@@ -2261,10 +2262,21 @@ defensibility:
 [x] 446 testes + 6 subtests; mypy 98; Ruff, compileall, lock/sync, build e smokes verdes
 [x] README/TASK alinhados; sete paths do allowlist e nenhuma fronteira F3–F7 alterada
 [x] commit/tag checkpoint/f2.6-complete criados neste fechamento local
-[ ] branch publicada e PR único aberto
-[ ] CI required do PR concluído e verde antes do merge
-[ ] merge autorizado e CI pós-merge de main concluído e verde
+[x] branch publicada e PR único #14 aberto
+[x] CI required do PR concluído e verde antes do merge — run 31214724386, 11/11
+[x] merge autorizado e CI pós-merge de main concluído e verde — merge 2dac824; run 31215162155, 11/11
 ```
+
+#### Promoção remota comprovada da F2.6
+
+| Evidência | Resultado observado |
+|---|---|
+| Branch e PR | `task/f2.6-retry-context` publicada sem tags; [PR #14](https://github.com/Wf-ops1/Harnessinfra/pull/14) contém somente os dois commits e sete paths congelados da F2.6 |
+| CI pré-merge | [run 31214724386](https://github.com/Wf-ops1/Harnessinfra/actions/runs/31214724386), evento `pull_request`, commit `f5893498b3cb46c918939d019ba5a4509abf48b0`, 4 quality + 4 tests + 2 package + `CI required`, todos `completed/success` antes do merge |
+| Merge | merge commit `2dac824684b541c0b3ae4d6caf08ec9161524d91`, com `f5893498b3cb46c918939d019ba5a4509abf48b0` como ancestral; branch remota preservada |
+| CI pós-merge | [run 31215162155](https://github.com/Wf-ops1/Harnessinfra/actions/runs/31215162155), evento `push`, branch `main`, commit `2dac824684b541c0b3ae4d6caf08ec9161524d91`, 11/11 checks `completed/success` |
+| Linha oficial | após `git fetch` e fast-forward, `main == origin/main == 2dac824684b541c0b3ae4d6caf08ec9161524d91`, worktree limpa antes deste fechamento documental |
+| Protocolo | nenhum merge ocorreu antes da prova visual de CI pré-merge verde; nenhuma tag foi publicada, nenhuma branch foi apagada e nenhuma tarefa F3 foi iniciada |
 
 ---
 
@@ -4834,12 +4846,12 @@ de `main`.
 Data:              2026-08-07
 Fase:              F2
 Tarefa:            F2.6 — retry com contexto real
-Estado:            COMPLETED LOCALMENTE; promoção e CI remoto pendentes
-Baseline:          main/origin 3596df3; run pós-merge 31211290100, 11/11 verde
+Estado:            COMPLETED E PROMOVIDA; Fase 2 encerrada; Fase 3 não iniciada
+Baseline:          main/origin 2dac824; run pós-merge 31215162155, 11/11 verde
 Escopo:            runtime boundary/travessia/ledger + testes F2.6 + fechamento TASK/README
 Validações:        446 testes + 6 subtests; mypy 98; Ruff, compileall, lock/sync, build e smokes verdes
-Checkpoint:         `checkpoint/f2.6-ready^{}` = df81516; `checkpoint/f2.6-complete` no commit final
-Promoção:          proibida antes de PR CI required=success; merge exige autorização e nova checagem
+Checkpoint:         `checkpoint/f2.6-ready^{}` = df81516; `checkpoint/f2.6-complete^{}` = f589349
+Promoção:          PR #14; PR run 31214724386; merge 2dac824; pós-merge run 31215162155
 Resultado:         retry real/redigido/retomável e limitado concluído sem antecipar F3–F7
 ```
 
@@ -4848,13 +4860,14 @@ Resultado:         retry real/redigido/retomável e limitado concluído sem ante
 ## 11. Próxima Ação Exata
 
 ```text
-PROMOVER SOMENTE A F2.6 VALIDADA:
-1. Publicar somente `task/f2.6-retry-context` e abrir um único PR para `main`; não publicar tags.
-2. Aguardar todos os checks do PR e comprovar `CI required=success` antes de qualquer merge.
-3. Somente após o CI pré-merge verde, executar merge commit autorizado; depois confirmar CI pós-merge
-   verde em `main`. Não iniciar F3 antes dessa comprovação.
-4. Não implementar provider/tool/worktree F3, contexto/gates F4, governança F5,
-   observabilidade/recovery F6 ou release F7 como parte da F2.6.
+PARAR — FASE 2 CONCLUÍDA E PROMOVIDA:
+1. Preservar as branches remotas e os checkpoints locais da F2.6; não publicar tags nem apagar evidência.
+2. Não iniciar código da Fase 3 nesta execução.
+3. Na próxima execução autorizada, reler integralmente TASK.md e a Fase 3 do plano; auditar a ordem de
+   dependências (incluindo F3.6 antes de F3.1–F3.3), definir uma única próxima tarefa e congelar novo
+   dossiê `READY` em branch exclusiva criada de `main` pós-merge verde antes de qualquer implementação.
+4. Repetir sem exceção: PR único, todos os checks pré-merge verdes, merge commit autorizado e CI
+   pós-merge verde antes de avançar para outra tarefa.
 ```
 
 ---
