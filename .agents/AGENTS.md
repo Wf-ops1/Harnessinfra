@@ -9,8 +9,12 @@ Este projeto ainda é um protótipo arquitetural em evolução para um harness o
 
 Antes de qualquer ação, ler integralmente:
 
-1. `TASK.md` — estado atual, bloqueios, executor e próxima ação.
-2. A fase ativa em `docs/plano_implementacao_harness_operacional.md` — requisitos completos e critérios de aceite.
+1. `TASK.md` — painel curto com estado atual, bloqueios, executor, última promoção e próxima ação.
+2. O único dossiê ativo apontado por `TASK.md`, quando houver — problema, evidências, escopo, aceite e rollback.
+3. A fase ativa em `docs/plano_implementacao_harness_operacional.md` — requisitos completos e critérios de aceite.
+
+O histórico concluído está indexado em `docs/tasks/README.md` e só precisa ser aberto quando a tarefa
+atual depender daquela evidência. Não recarregar todos os dossiês concluídos por padrão.
 
 Em caso de conflito, o pedido explícito do usuário prevalece; depois, o plano principal; por fim, o checkpoint em `TASK.md` deve ser atualizado para refletir a decisão.
 
@@ -19,7 +23,8 @@ Em caso de conflito, o pedido explícito do usuário prevalece; depois, o plano 
 1. Apenas um agente pode ser executor/escritor por vez.
 2. Se outro agente estiver registrado como executor ativo em `TASK.md`, atuar somente em auditoria e não editar arquivos.
 3. Antes de editar código, concluir F0.0 e registrar `python_command`, estado Git e workspace.
-4. Atualizar `TASK.md` após cada tarefa, incluindo arquivos alterados, validações, decisões, bloqueios e próxima ação.
+4. Atualizar o dossiê ativo com arquivos, validações, decisões e rollback; manter no `TASK.md` somente
+   estado corrente, bloqueios, última promoção e próxima ação.
 5. Nunca depender apenas do histórico da conversa para retomar trabalho.
 
 ## Git e recuperação
@@ -37,7 +42,7 @@ Em caso de conflito, o pedido explícito do usuário prevalece; depois, o plano 
 8. Push, abertura de PR, merge, exclusão de branch/tag remota, force-push, bypass ou mudança de
    proteção exigem autorização explícita do usuário. Force-push e bypass não são o fluxo normal.
 9. Antes do primeiro arquivo da tarefa seguinte, comprovar no Git/GitHub o merge anterior e o CI
-   verde da `main`, registrando PR, merge SHA e run no novo checkpoint de `TASK.md`.
+   verde da `main`, registrando PR, merge SHA e run no painel e no novo dossiê ativo.
 10. Mudanças documentais transversais usam `docs/<descricao-curta>` e PR próprio; documentos que
     preparam ou fecham uma tarefa permanecem na branch dessa tarefa.
 
@@ -49,7 +54,7 @@ começa antes dessa promoção para `main` e do CI pós-merge verde.
 ## Ambiente de execução
 
 1. Não assumir que `python`, `py` ou `uv` existem.
-2. Detectar o ambiente, selecionar Python `>=3.11` e registrar o comando como `python_command` no `TASK.md`.
+2. Detectar o ambiente, selecionar Python `>=3.11` e registrar o comando no painel e no dossiê ativo.
 3. Usar o comando registrado nos critérios de aceite; não trocar de runtime silenciosamente.
 4. Instalação de runtime, dependências globais ou ferramentas requer autorização quando alterar o ambiente do usuário.
 
@@ -71,6 +76,19 @@ verdade.
 1. Não criar mocks ou respostas simuladas em código de produção.
 2. Não declarar Serena, Codebase-Memory, MAF, provider, doctor, gate, promoção ou rollback como funcional sem efeito real e teste correspondente.
 3. Integração indisponível deve falhar com erro explícito, não retornar sucesso sintético.
-4. Executar os critérios de aceite definidos para a tarefa ativa no `TASK.md`.
-5. Alterações exclusivamente documentais não exigem compilar um grafo legado; devem ser validadas quanto a encoding, links, consistência e Markdown.
+4. Executar os critérios de aceite definidos no dossiê ativo.
+5. Alterações exclusivamente documentais não exigem compilar um grafo legado; devem ser validadas
+   recursivamente quanto a encoding, links, consistência e Markdown.
 6. Uma tarefa só pode ser marcada `completed` depois que todas as verificações aplicáveis passarem.
+
+## Painel e arquivo de dossiês — DEC-010
+
+1. `TASK.md` é painel operacional, não arquivo histórico, e deve permanecer com no máximo 300 linhas.
+2. Existe no máximo um dossiê de execução em `docs/tasks/active/`, além do README do diretório.
+3. Dossiês promovidos ficam em `docs/tasks/completed/`, um por tarefa/PR e indexados por
+   `docs/tasks/README.md`; os 19 dossiês migrados do painel legado são cobertos pelo manifesto.
+4. Dossiê concluído é evidência imutável. Correção exige PR documental explícito e atualização de
+   integridade; nunca reescrever silenciosamente resultado, erro, SHA, PR ou run.
+5. Não duplicar no painel contratos completos, logs, checklists concluídos ou histórico de fases.
+6. Entre tarefas, o painel aponta nenhuma tarefa ativa; o primeiro commit da nova branch cria o dossiê
+   `READY` antes do primeiro arquivo de implementação.

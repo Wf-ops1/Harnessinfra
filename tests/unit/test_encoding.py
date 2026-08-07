@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import subprocess
@@ -23,6 +24,7 @@ IGNORED_DIRECTORIES = {
 MOJIBAKE_PATTERN = re.compile("\u00c3|\u00e2\u0153|\u00f0\u0178")
 CLI_ENCODINGS = ("utf-8", "cp1252", "cp850")
 CLI_COMMANDS = (("--help",), ("doctor",))
+LEGACY_TASK_MANIFEST = REPOSITORY_ROOT / "docs" / "tasks" / "migration-manifest.json"
 
 
 def _repository_text_files() -> list[Path]:
@@ -39,11 +41,19 @@ def _repository_text_files() -> list[Path]:
 
 
 def _mojibake_scope_files() -> list[Path]:
+    legacy_payloads: set[str] = set()
+    if LEGACY_TASK_MANIFEST.is_file():
+        manifest = json.loads(
+            LEGACY_TASK_MANIFEST.read_text(encoding="utf-8", errors="strict")
+        )
+        legacy_payloads = {entry["path"] for entry in manifest["entries"]}
+
     files = [
         path
         for root in (REPOSITORY_ROOT / "src", REPOSITORY_ROOT / "docs")
         for path in root.rglob("*")
         if path.is_file() and path.suffix.lower() in TEXT_EXTENSIONS
+        and path.relative_to(REPOSITORY_ROOT).as_posix() not in legacy_payloads
     ]
     files.append(REPOSITORY_ROOT / "README.md")
     return sorted(files)

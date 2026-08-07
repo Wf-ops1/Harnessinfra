@@ -1,6 +1,6 @@
 # DOC-TASK-LEDGER — Refatorar o painel e o arquivo de dossiês
 
-> **Gate:** `READY`  
+> **Gate:** `COMPLETED LOCALMENTE`
 > **Executor:** `Codex`  
 > **Autorizado em:** `2026-08-07T17:40:37-03:00`  
 > **Fronteira:** tarefa documental anterior à Fase 3; nenhum código, provider, tool ou worktree F3.
@@ -73,10 +73,10 @@ como evidência do baseline Windows. Nenhum critério foi removido ou enfraqueci
 ### Recongelamento R2 — exemplos históricos e regressão de mojibake
 
 O primeiro aceite focado após a extração concluiu `11 passed` e falhou somente em
-`test_source_docs_and_readme_have_no_known_mojibake`: o payload imutável de F0.2 contém os exemplos
-literais `AutÃ´nomo`, `âœ”` e `Ãndice`, já presentes no snapshot fonte e protegidos pelo SHA-256 do
-manifesto. Corrigi-los adulteraria a evidência; deixar o teste varrer esses payloads tornaria a
-migração impossível por uma regra autorreferente.
+`test_source_docs_and_readme_have_no_known_mojibake`: o payload imutável de F0.2 contém três exemplos
+literais de mojibake, já presentes no snapshot fonte e protegidos pelo SHA-256 do manifesto.
+Corrigi-los adulteraria a evidência; deixar o teste varrer esses payloads tornaria a migração
+impossível por uma regra autorreferente.
 
 O escopo passa a incluir somente `tests/unit/test_encoding.py` para excluir da busca semântica de
 mojibake os caminhos legados enumerados em `migration-manifest.json`. A leitura UTF-8 estrita continua
@@ -137,8 +137,8 @@ acceptance:
     expected: "todos exit 0"
   scope:
     command: >-
-      git diff --name-only checkpoint/docs-task-ledger-r1-ready;
-      git diff --exit-code checkpoint/docs-task-ledger-r1-ready -- src compiler .github README.md
+      git diff --name-only checkpoint/docs-task-ledger-r2-ready;
+      git diff --exit-code checkpoint/docs-task-ledger-r2-ready -- src compiler .github README.md
       docs/plano_implementacao_harness_operacional.md pyproject.toml uv.lock
     expected: "somente o allowlist documental/testes congelado; produto, CI, plano e dependências idênticos"
 ```
@@ -179,3 +179,19 @@ documentais/encoding do baseline.
 [x] aceite de integridade, estrutura, documentação, regressão, qualidade e escopo definido
 [x] rollback não destrutivo e gatilhos objetivos registrados
 ```
+
+## Resultado local comprovado
+
+| Verificação | Resultado observado |
+|---|---|
+| Migração mecânica | 19/19 payloads extraídos de `d48151b:TASK.md`; headings únicos e SHA-256 íntegros |
+| Painel | `TASK.md` reduzido de `4937` linhas/`377092` bytes para `100` linhas/menos de `6 KiB` |
+| Gate focado final | `12 passed, 6 subtests passed` |
+| Regressão integral | `450 passed, 6 subtests passed` |
+| Tipos | mypy sem issues em `98` arquivos fonte |
+| Qualidade | Ruff, compileall, `uv lock --check` e `git diff --check` com exit `0` |
+| Escopo | somente o allowlist congelado; zero diff em produto, CI, README, plano e dependências |
+
+O checkpoint de implementação será `checkpoint/docs-task-ledger-complete`, ancorado pelo commit desta
+mudança e mantido apenas localmente. Branch, PR, checks, merge e CI pós-merge continuam pendentes e
+serão registrados somente depois de observados. Nenhuma tarefa da Fase 3 foi iniciada.

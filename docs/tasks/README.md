@@ -1,0 +1,61 @@
+# Arquivo de tarefas e promoções
+
+Este diretório separa o estado operacional corrente do histórico auditável. O painel atual permanece
+em [`TASK.md`](../../TASK.md); requisitos normativos permanecem no
+[`plano de implementação`](../plano_implementacao_harness_operacional.md).
+
+## Como retomar
+
+1. Leia integralmente `TASK.md`.
+2. Leia o único dossiê apontado como ativo, quando houver.
+3. Leia a fase ativa no plano principal.
+4. Use este índice apenas para consultar evidência concluída; não recoloque histórico no painel.
+
+## Convenções
+
+- `active/`: no máximo um dossiê de execução, além do README do diretório.
+- `completed/`: um arquivo imutável por tarefa/PR; correções exigem PR documental explícito.
+- `migration-manifest.json`: origem e SHA-256 dos 19 payloads extraídos do painel legado.
+- Git, PRs e runs de CI permanecem a evidência externa autoritativa de promoção.
+
+## Ledger concluído
+
+| Fase | Tarefa | Dossiê | Promoção principal |
+|---|---|---|---|
+| F0 | F0.0 | [Preflight](completed/F0.0.md) | PR #1 / merge `3f29c4c` / pós-merge `30917066077` |
+| F0 | F0.1 | [Código bloqueante](completed/F0.1.md) | PR #1 / merge `3f29c4c` / pós-merge `30917066077` |
+| F0 | F0.2 | [Encoding](completed/F0.2.md) | PR #1 / merge `3f29c4c` / pós-merge `30917066077` |
+| F0 | F0.3 | [Ambiente reproduzível](completed/F0.3.md) | PR #1 / merge `3f29c4c` / pós-merge `30917066077` |
+| F0 | F0.4 | [Versionamento](completed/F0.4.md) | PR #1 / merge `3f29c4c` / pós-merge `30917066077` |
+| F0 | F0.5 | [Documentação honesta](completed/F0.5.md) | PR #1 / merge `3f29c4c` / pós-merge `30917066077` |
+| F0 | F0.6 | [CI mínima](completed/F0.6.md) | PR #1 / merge `3f29c4c` / pós-merge `30917066077` |
+| F1 | F1.1 | [Schema do grafo](completed/F1.1.md) | PR #6 / merge `6c994b4` / pós-merge `31134295999` |
+| F1 | F1.2 | [Registry de contratos](completed/F1.2.md) | PR #6 / merge `6c994b4` / pós-merge `31134295999` |
+| F1 | F1.3 | [Policies e tools](completed/F1.3.md) | PR #6 / merge `6c994b4` / pós-merge `31134295999` |
+| F1 | F1.4 | [Compilador único](completed/F1.4.md) | PR #6 / merge `6c994b4` / pós-merge `31134295999` |
+| F1 | F1.5 | [Artefato determinístico](completed/F1.5.md) | PR #6 / merge `6c994b4` / pós-merge `31134295999` |
+| F2 | F2.1 | [ExecutionRecord](completed/F2.1.md) | PR #7 / merge `34d00a5` / pós-merge `31142218012` |
+| F2 | F2.2 | [Storage concorrente](completed/F2.2.md) | PR #8 / merge `b8307ca` / pós-merge `31148484495` |
+| F2 | F2.3 | [Executor de grafo](completed/F2.3.md) | PR #9 / merge `60597c3` / pós-merge `31192555316` |
+| F2 | F2.4 | [FSM por eventos](completed/F2.4.md) | PR #10 / merge `0579990` / pós-merge `31202447617` |
+| F2 | F2.5 | [Retomada](completed/F2.5.md) | PR #11 / merge `2aa324b` / pós-merge `31209619778` |
+| F2 | DOC-F2-STATUS | [Alinhamento público](completed/DOC-F2-STATUS.md) | PR #12 / merge `f23d74d` / pós-merge `31210521957` |
+| F2 | F2.6 | [Retry com contexto](completed/F2.6.md) | PR #14 / merge `2dac824` / pós-merge `31215162155` |
+
+Fechamentos documentais adicionais preservados no Git: PR #13 / merge `3596df3` / run
+`31211290100` e PR #15 / merge `d48151b` / run `31215944126`.
+
+## Decisões permanentes
+
+| ID | Decisão resumida |
+|---|---|
+| DEC-001 | Gate de defensabilidade `READY` antes de implementação. |
+| DEC-002 | `uv`, lockfile e Python `>=3.11,<3.15` como ambiente reproduzível. |
+| DEC-003 | Versionamento separado para pacote, schemas e definições. |
+| DEC-004 | Claims públicos classificados como implementados, experimentais ou planejados. |
+| DEC-005 | `CI required` obrigatório e fail-closed em `main`. |
+| DEC-006 | Capability declarada não implica adapter operacional; default-deny/deny-wins. |
+| DEC-007 | `GraphCompiler` do pacote como pipeline único. |
+| DEC-008 | Artefato 2.0 canônico, íntegro, versionado e publicado atomicamente. |
+| DEC-009 | Uma branch e um PR por tarefa, partindo de `main` pós-merge verde. |
+| DEC-010 | Painel curto; dossiê detalhado por tarefa; histórico concluído imutável e indexado. |
