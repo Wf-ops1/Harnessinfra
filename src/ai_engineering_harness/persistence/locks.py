@@ -5,6 +5,7 @@ from __future__ import annotations
 import errno
 import math
 import os
+import sys
 import tempfile
 import threading
 import time
@@ -25,23 +26,44 @@ from .base import (
     StateWriteError,
 )
 
-if os.name == "nt":
-    try:
-        import msvcrt  # type: ignore[assignment]
-    except ImportError:  # pragma: no cover - platform import failure
-        msvcrt = None  # type: ignore[assignment]
-    fcntl = None  # type: ignore[assignment]
-else:
-    try:
-        import fcntl  # type: ignore[assignment]
-    except ImportError:  # pragma: no cover - platform import failure
-        fcntl = None  # type: ignore[assignment]
-    msvcrt = None  # type: ignore[assignment]
-
-
 _POLL_INTERVAL_SECONDS: Final = 0.01
 _FENCE_SUFFIX: Final = ".fence"
 _LOCK_SUFFIX: Final = ".lock"
+
+
+if sys.platform == "win32":
+
+    def _lock_descriptor_backend(descriptor: int) -> None:
+        try:
+            from msvcrt import LK_NBLCK, locking
+        except ImportError as exc:  # pragma: no cover - platform import failure
+            raise OSError(errno.ENOSYS, "msvcrt.locking is unavailable") from exc
+        locking(descriptor, LK_NBLCK, 1)
+
+
+    def _unlock_descriptor_backend(descriptor: int) -> None:
+        try:
+            from msvcrt import LK_UNLCK, locking
+        except ImportError as exc:  # pragma: no cover - platform import failure
+            raise OSError(errno.ENOSYS, "msvcrt.locking is unavailable") from exc
+        locking(descriptor, LK_UNLCK, 1)
+
+else:
+
+    def _lock_descriptor_backend(descriptor: int) -> None:
+        try:
+            from fcntl import LOCK_EX, LOCK_NB, flock
+        except ImportError as exc:  # pragma: no cover - platform import failure
+            raise OSError(errno.ENOSYS, "fcntl.flock is unavailable") from exc
+        flock(descriptor, LOCK_EX | LOCK_NB)
+
+
+    def _unlock_descriptor_backend(descriptor: int) -> None:
+        try:
+            from fcntl import LOCK_UN, flock
+        except ImportError as exc:  # pragma: no cover - platform import failure
+            raise OSError(errno.ENOSYS, "fcntl.flock is unavailable") from exc
+        flock(descriptor, LOCK_UN)
 
 
 @dataclass(slots=True)
@@ -386,26 +408,12 @@ class CrossProcessLockManager:
 
 def _try_lock_descriptor(descriptor: int) -> None:
     os.lseek(descriptor, 0, os.SEEK_SET)
-    if os.name == "nt":
-        if msvcrt is None:
-            raise OSError(errno.ENOSYS, "msvcrt.locking is unavailable")
-        msvcrt.locking(descriptor, msvcrt.LK_NBLCK, 1)
-        return
-    if fcntl is None:
-        raise OSError(errno.ENOSYS, "fcntl.flock is unavailable")
-    fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    _lock_descriptor_backend(descriptor)
 
 
 def _unlock_descriptor(descriptor: int) -> None:
     os.lseek(descriptor, 0, os.SEEK_SET)
-    if os.name == "nt":
-        if msvcrt is None:
-            raise OSError(errno.ENOSYS, "msvcrt.locking is unavailable")
-        msvcrt.locking(descriptor, msvcrt.LK_UNLCK, 1)
-        return
-    if fcntl is None:
-        raise OSError(errno.ENOSYS, "fcntl.flock is unavailable")
-    fcntl.flock(descriptor, fcntl.LOCK_UN)
+    _unlock_descriptor_backend(descriptor)
 
 
 def _is_lock_contention(exc: OSError) -> bool:

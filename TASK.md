@@ -247,9 +247,9 @@ defensibility:
 retomada após interrupção.
 
 **Status da fase:** `in_progress` — a F1 e a F2.1 foram promovidas por merge commits para `main`
-e os respectivos CIs pós-merge estão verdes. A primeira implementação da F2.2 foi revertida após
-falha real de type check no Ubuntu/Python 3.11; a correção cross-platform foi reautorizada e possui
-gate documental F2.2-R1 `READY`, ainda sem código restaurado. A F2.3 não foi iniciada.
+e os respectivos CIs pós-merge estão verdes. A F2.2-R1 está concluída e integralmente verificada
+no repositório local após corrigir a falha real de type check do Ubuntu/Python 3.11; sua promoção
+remota permanece pendente e a F2.3 não foi iniciada.
 
 ### Coordenação e ambiente observado
 
@@ -258,7 +258,7 @@ gate documental F2.2-R1 `READY`, ainda sem código restaurado. A F2.3 não foi i
 | **Executor ativo** | `Codex` — responsável por implementar, validar, manter checkpoints e criar commits locais |
 | **Auditor/revisor** | `Antigravity` — somente-leitura por padrão; só edita quando o usuário solicitar explicitamente ou transferir a execução |
 | **Workspace** | `C:\Users\walla\OneDrive\Desktop\ai-engineering-harness` |
-| **Git** | `available` — branch `task/f2.2-state-storage` limpa e sincronizada com origin em `76f2bec51a169ef92b5e03c5ab7e66fa4d4d9995`; `main == origin/main == 34d00a5cadb3ca0b5690420b8ffb5026e207af93`; PR #8 aberto; checkpoints permanecem somente locais |
+| **Git** | `available` — branch `task/f2.2-state-storage` concluída localmente sobre o gate `417598b` e a restauração `22e2ebf`; origin permanece no rollback documentado `76f2bec51a169ef92b5e03c5ab7e66fa4d4d9995`; `main == origin/main == 34d00a5cadb3ca0b5690420b8ffb5026e207af93`; PR #8 aberto; checkpoints R1 permanecem somente locais |
 | **python_command** | `& 'C:\Users\walla\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe'` — Python `3.12.13` |
 | **uv_command** | `& '.\build\f0.6-tools\uv\bin\uv.exe'` — uv `0.11.32` restaurado de forma isolada/ignorada, sem PATH ou instalação global; `lock --check` e `sync --all-extras --locked` verdes |
 | **Dependências do projeto** | `.venv` gerida pelo uv 0.11.32 com Python 3.12.13 e `uv.lock`; nenhuma dependência foi adicionada; baseline pós-rollback passa mypy em targets `linux` e `win32`; run 31146423972 do rollback concluiu 11/11 verde |
@@ -512,15 +512,15 @@ reaberta pela F2.2, salvo regressão reproduzível.
 
 | Campo | Detalhe |
 |---|---|
-| **Status** | `gate F2.2-R1 READY; correction_not_started` |
+| **Status** | `completed locally; F2.2-R1 verified; promotion pending` |
 | **Objetivo** | Criar um provider de estado em arquivo com contrato estável, concorrência entre processos, CAS por revisão, journal encadeado e recuperação fail-closed, sem executar grafo nem adotar o provider no runtime atual |
 | **Branch exclusiva** | `task/f2.2-state-storage`, criada de `main == origin/main == 34d00a5` pós-merge verde |
 | **Checkpoint de rollback** | `checkpoint/pre-f2.2-defensibility^{}` → `34d00a5cadb3ca0b5690420b8ffb5026e207af93` |
 | **Checkpoint do gate** | `checkpoint/f2.2-ready` identifica o commit documental deste gate, anterior a qualquer edição de Python ou teste de implementação |
 | **Checkpoint da tentativa** | `checkpoint/f2.2-complete^{}` → `1e6bd09e88454099141d6812db3a72f638858017`; preservado somente como evidência da implementação que falhou no CI |
-| **Checkpoint corretivo** | `checkpoint/f2.2-r1-ready` identificará o commit exclusivamente documental deste recongelamento, anterior à restauração da implementação |
+| **Checkpoint corretivo** | `checkpoint/f2.2-r1-ready^{}` → `417598b0210bc3d25d8889b4a932ec30dbf0cdfb`; `checkpoint/f2.2-r1-complete` identificará o commit local de fechamento verificado |
 | **Promoção interrompida** | [PR #8](https://github.com/Wf-ops1/Harnessinfra/pull/8); [run 31145918693](https://github.com/Wf-ops1/Harnessinfra/actions/runs/31145918693) falhou na tentativa; [run 31146423972](https://github.com/Wf-ops1/Harnessinfra/actions/runs/31146423972) comprovou o rollback com 11/11 checks verdes |
-| **Estado de implementação** | O commit exclusivo foi revertido por `ec269b8c6c4374825462c399604b353f41935959`; nenhum Python/teste F2.2 permanece ativo antes do novo checkpoint R1 |
+| **Estado de implementação** | A inversão não destrutiva do revert restaurou a F2.2 em `22e2ebf0417e75fd3d895691d3b7e1551b3301ef`; a única correção R1 está em `persistence/locks.py`, sem alteração de teste, dependência, CI ou consumidor |
 
 #### Auditoria concreta da F2.2
 
@@ -795,7 +795,9 @@ defensibility:
   gate: "READY"
   executor: "Codex"
   authorized_at: "2026-08-07T01:18:55-03:00"
-  implementation_started: false
+  implementation_started: true
+  implementation_completed: true
+  completed_at: "2026-08-07T01:34:24-03:00"
   problem_statement: >-
     A implementação preservada em 1e6bd09 seleciona módulos de lock por os.name e mantém msvcrt/fcntl
     globais com type: ignore. O mypy em target Linux analisa também as chamadas Windows e falha com
@@ -827,7 +829,7 @@ defensibility:
     branch: "task/f2.2-state-storage"
     head: "76f2bec51a169ef92b5e03c5ab7e66fa4d4d9995"
     status: "clean; sincronizada com origin; implementação revertida"
-    checkpoint: "checkpoint/f2.2-r1-ready será criado no commit deste dossiê"
+    checkpoint: "checkpoint/f2.2-r1-ready^{} = 417598b0210bc3d25d8889b4a932ec30dbf0cdfb"
     preserved_evidence: "PR #8; runs 31145918693/31146423972; commits 1e6bd09/ec269b8/76f2bec"
   frozen_strategy:
     restoration: >-
@@ -896,10 +898,28 @@ defensibility:
 [x] Critérios originais mantidos e mypy explícito Linux/Windows adicionado
 [x] Rollback não destrutivo e fronteiras F2.3–F6 reconfirmados
 [x] Somente TASK.md será alterado antes do novo checkpoint R1
+[x] Gate documental commitado em 417598b e checkpoint/f2.2-r1-ready criado antes da restauração
+[x] Implementação original restaurada por inversão não destrutiva em 22e2ebf
+[x] Dispatch sys.platform e imports privados aplicados somente em persistence/locks.py
+[x] Critérios originais e adicionais executados integralmente sem flexibilização
+[x] F2.2-R1 concluída localmente; promoção remota e F2.3 permanecem pendentes
 ```
 
-**Estado de parada obrigatório:** gate F2.2-R1 `READY`. A restauração/correção só pode começar depois
-do commit documental e de `checkpoint/f2.2-r1-ready`; F2.3 e merge do PR #8 permanecem proibidos.
+#### Resultado verificado da F2.2-R1
+
+| Evidência | Resultado observado |
+|---|---|
+| Correção de plataforma | `locks.py` usa `sys.platform == "win32"`, imports locais dos syscalls reais e `OSError(ENOSYS)` fail-closed; nenhuma máscara `type: ignore`, `Any`, `cast` ou `Protocol` |
+| Tipagem e lint | mypy host, `--platform linux` e `--platform win32`: zero issues em 95 arquivos; Ruff focal e global verdes |
+| Testes focais | `58 passed`; filtros congelados: positivo `21 passed`, multiprocess/lock/crash/fencing `8 passed`, recovery/atomicidade `18 passed`, negativo `32 passed`; filtro R1 com `unavailable` também `8 passed` |
+| Regressão e suíte | regressão F2.1/contratos/imports/documentação: `78 passed`; suíte integral: `357 passed, 6 subtests passed` |
+| Qualidade e ambiente | `compileall -q src compiler tests`, `uv lock --check` e `uv sync --all-extras --locked` verdes; nenhuma dependência ou lockfile mudou |
+| Distribuição | wheel/sdist 0.1.0 reconstruídos; smoke externo confirmou metadata/package/CLI 0.1.0; probe isolado importou 8/8 símbolos F2.2 de `site-packages` |
+| Escopo | Diff desde `checkpoint/f2.2-r1-ready` contém exatamente TASK.md e os sete arquivos Python/teste do allowlist original; seis arquivos restaurados são byte-idênticos a `checkpoint/f2.2-complete`; somente `locks.py` contém a correção R1 |
+| Fronteiras | `.github`, compiler, runtime, CLI, observability, defaults, `contracts/execution.py`, `pyproject.toml` e `uv.lock` permanecem byte-idênticos; F2.3–F2.6/F3/F5/F6 não foram antecipados |
+
+**Estado de parada obrigatório:** F2.2-R1 concluída localmente. Criar o commit/checkpoint local de
+fechamento e parar antes de push, atualização do PR #8, merge ou início da F2.3.
 
 ---
 
@@ -3469,12 +3489,12 @@ de `main`.
 Data:              2026-08-07
 Fase:              F2
 Tarefa:            F2.2-R1 — recongelar correção cross-platform da abstração de persistência
-Estado:            gate READY; correction_not_started; F2.3 não iniciada
-Arquivos alterados: somente TASK.md no gate R1
-Validações:         falha antiga reproduzida com 4 attr-defined; probe candidato e baseline completo verdes em mypy linux/win32; Ruff do probe verde; Git/checkpoints/refs limpos
-Checkpoint:         `checkpoint/f2.2-r1-ready` será criado no commit documental; ready 5728472 e complete-evidence 1e6bd09 preservados
-Observação:         PR #8 aberto; rollback remoto 11/11 verde; nenhuma operação remota, restauração Python, dependência, CI/YAML, runtime/CLI, schema de produção ou F2.3 nesta preparação
-Resultado:          estratégia sys.platform + imports locais de syscalls + OSError(ENOSYS) congelada sem ignore/Any/cast/fallback
+Estado:            completed locally; promotion pending; F2.3 não iniciada
+Arquivos alterados: TASK.md; persistence/{base.py,locks.py,atomic_file.py,__init__.py}; contracts/events/{execution_event.py,__init__.py}; tests/unit/test_state_storage.py
+Validações:         focais 58 e filtros 21/8/18/32; regressão 78; suíte 357 + 6 subtests; mypy host/linux/win32 em 95 arquivos; Ruff/compileall; lock/sync; build; smoke; 8/8 imports; escopo verde
+Checkpoint:         `checkpoint/f2.2-r1-ready^{}` = 417598b; `checkpoint/f2.2-r1-complete` identificará o commit local deste fechamento; ready 5728472 e complete-evidence 1e6bd09 preservados
+Observação:         PR #8 e origin ainda apontam para o rollback documentado; nenhuma operação remota, dependência, CI/YAML, runtime/CLI, schema de produção ou F2.3 foi executada
+Resultado:          implementação restaurada em 22e2ebf; sys.platform + imports locais de syscalls + OSError(ENOSYS) corrigem o CI sem ignore/Any/cast/fallback
 ```
 
 ---
@@ -3482,22 +3502,18 @@ Resultado:          estratégia sys.platform + imports locais de syscalls + OSEr
 ## 11. Próxima Ação Exata
 
 ```text
-CORRIGIR SOMENTE A F2.2-R1 — NÃO INICIAR F2.3:
-1. Commitar somente este dossiê e criar `checkpoint/f2.2-r1-ready`; preservar todos os checkpoints,
-   commits, PR e runs existentes sem mover/apagar evidência.
-2. Depois do checkpoint, inverter de forma não destrutiva o revert `ec269b8` para restaurar exatamente
-   a implementação F2.2; preservar o dossiê R1 em qualquer conflito documental.
-3. Alterar somente `persistence/locks.py` conforme a estratégia congelada e, se necessário, apenas a
-   regressão focal em `test_state_storage.py`; nenhum outro comportamento da tentativa pode mudar.
-4. Executar todos os comandos congelados originais e adicionais: 58 focais/filtros, concorrência,
-   recovery, regressão 78, suíte integral, mypy host/linux/win32, busca sem máscaras, Ruff/compileall,
-   lock/sync, build, smoke da wheel, imports públicos e diff de escopo.
-5. Se qualquer critério falhar ou surgir nova ampliação, aplicar o rollback R1 e devolver o gate a
-   BLOCKED; não flexibilizar lock, CAS, fencing, recovery, integridade, mypy ou testes.
-6. Somente com tudo verde, atualizar TASK.md, criar commit exclusivo e
-   `checkpoint/f2.2-r1-complete`; parar antes de push/atualização do PR/merge.
-7. Operações remotas exigem nova autorização explícita. F2.3 continua proibida até CI do PR, merge
-   autorizado, sincronização/ancestralidade e CI pós-merge verde em main.
+PROMOVER SOMENTE A F2.2-R1 — NÃO INICIAR F2.3:
+1. Confirmar que `checkpoint/f2.2-r1-complete` aponta para o commit local de fechamento, a worktree
+   está limpa e a branch difere de origin somente pelos commits R1 documentados.
+2. Parar e obter autorização explícita antes de qualquer push da branch ou tag, atualização do PR #8,
+   merge, alteração de proteção ou operação remota destrutiva.
+3. Se o push da branch for autorizado, publicar somente `task/f2.2-state-storage`, acompanhar todos os
+   jobs do PR #8 e exigir `CI required=success` sem reduzir matriz, checks ou regras.
+4. Se qualquer gate remoto falhar, aplicar o rollback R1 documentado e não flexibilizar lock, CAS,
+   fencing, recovery, integridade, mypy ou testes.
+5. Mesmo com o PR verde, merge exige autorização explícita separada. Depois do merge autorizado,
+   confirmar ancestralidade, sincronizar `main == origin/main` e exigir CI pós-merge integralmente verde.
+6. Somente então preparar branch/gate exclusivo da F2.3. Não implementar F2.3 nesta branch ou etapa.
 ```
 
 ---
