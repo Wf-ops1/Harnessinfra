@@ -54,6 +54,14 @@ baseline:
    autorização ou proteção foi enfraquecida: todos os merges ocorreram após checks verdes.
 8. Testes estruturais impedirão nova divergência entre plano, `AGENTS.md` e painel.
 
+### Recongelamento R1 — registro permanente da decisão
+
+A inspeção do diff encontrou a regra 5 da seção “Como usar este documento”: toda decisão que altera
+o plano deve ser registrada em ADR. O alinhamento muda a governança do ciclo, portanto precisa de uma
+decisão permanente no índice. O allowlist passa a incluir somente `docs/tasks/README.md` para registrar
+`DEC-011` — contrato normativo do dossiê, painel curto e certificação não recursiva no gate seguinte.
+Nenhum código, critério ou efeito remoto adicional é autorizado.
+
 ## Escopo congelado
 
 ### Permitido
@@ -61,6 +69,7 @@ baseline:
 - `TASK.md` — estado corrente, gate, baseline e próxima ação desta tarefa;
 - `.agents/AGENTS.md` — localização dos detalhes, contrato do gate e fechamento não recursivo;
 - `docs/plano_implementacao_harness_operacional.md` — contrato normativo e correção do passo 6;
+- `docs/tasks/README.md` — registrar somente a decisão permanente `DEC-011`;
 - `docs/tasks/active/DOC-PROTOCOL-ALIGN.md` — dossiê desta tarefa;
 - `tests/unit/test_task_ledger.py` — regressões de consistência e ciclo de vida.
 
@@ -81,7 +90,7 @@ acceptance:
       inspecionar plano, AGENTS e TASK; executar tests/unit/test_task_ledger.py
     expected: >-
       plano e AGENTS concordam sobre painel curto, dossiê detalhado, campos obrigatórios,
-      BLOCKED/READY, não enfraquecimento, um PR e certificação no gate seguinte
+      BLOCKED/READY, não enfraquecimento, um PR, DEC-011 e certificação no gate seguinte
   historical_integrity:
     command: >-
       python -m pytest tests/unit/test_task_ledger.py tests/unit/test_documentation.py
@@ -96,8 +105,8 @@ acceptance:
       python -m compileall -q src compiler tests; uv lock --check; git diff --check
     expected: "todos exit 0"
   scope:
-    command: "auditar git diff desde checkpoint/doc-protocol-align-ready"
-    expected: "somente os cinco paths permitidos; zero diff nos paths proibidos"
+    command: "auditar git diff desde checkpoint/doc-protocol-align-r1-ready"
+    expected: "somente os seis paths permitidos; zero diff nos paths proibidos"
 ```
 
 ## Rollback
