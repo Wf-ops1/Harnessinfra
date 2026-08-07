@@ -247,8 +247,8 @@ defensibility:
 retomada após interrupção.
 
 **Status da fase:** `in_progress` — F1 e F2.1–F2.4 foram promovidas por merge commits para `main`,
-com os respectivos CIs pós-merge integralmente verdes. A F2.5 possui branch exclusiva e gate
-defensável `READY`; nenhuma implementação de retomada foi iniciada.
+com os respectivos CIs pós-merge integralmente verdes. A F2.5 está concluída e validada localmente
+na branch exclusiva; ainda não foi promovida e a F2.6 não foi iniciada.
 
 ### Coordenação e ambiente observado
 
@@ -257,7 +257,7 @@ defensável `READY`; nenhuma implementação de retomada foi iniciada.
 | **Executor ativo** | `Codex` — responsável por implementar, validar, manter checkpoints e criar commits locais |
 | **Auditor/revisor** | `Antigravity` — somente-leitura por padrão; só edita quando o usuário solicitar explicitamente ou transferir a execução |
 | **Workspace** | `C:\Users\walla\OneDrive\Desktop\ai-engineering-harness` |
-| **Git** | `available` — branch ativa `task/f2.5-execution-resume`, criada limpa de `main == origin/main == 05799906099c2ff77a497867d653ba8be049bde8`; PR #10 mesclado por merge commit; CI pós-merge `31202447617` integralmente verde; branches anteriores preservadas; checkpoints permanecem somente locais |
+| **Git** | `available` — branch ativa `task/f2.5-execution-resume`; gate `checkpoint/f2.5-ready^{}` em `bafca140f781e4dbb320c6324a8aa7629987c04d`; `main == origin/main == 05799906099c2ff77a497867d653ba8be049bde8`; implementação F2.5 validada para commit/checkpoint exclusivamente locais; branches anteriores preservadas |
 | **python_command** | `& 'C:\Users\walla\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe'` — Python `3.12.13` |
 | **uv_command** | `& '.\build\f0.6-tools\uv\bin\uv.exe'` — uv `0.11.32` restaurado de forma isolada/ignorada, sem PATH ou instalação global; `lock --check` e `sync --all-extras --locked` verdes |
 | **Dependências do projeto** | `.venv` gerida pelo uv 0.11.32 com Python 3.12.13 e `uv.lock`; nenhuma dependência foi adicionada; baseline pós-rollback passa mypy em targets `linux` e `win32`; run 31146423972 do rollback concluiu 11/11 verde |
@@ -1631,11 +1631,11 @@ preservados, sem publicação de tags ou exclusão remota.
 
 | Campo | Detalhe |
 |---|---|
-| **Status** | `READY` — gate defensável congelado; implementação ainda não iniciada |
+| **Status** | `completed localmente` — gate `READY → COMPLETED`; implementação e todos os critérios congelados verdes; não promovida |
 | **Objetivo** | Criar, retomar, aprovar, cancelar e inspecionar execuções usando exclusivamente o `ExecutionRecord`, journal e bundle imutável vinculados por digest, sem reexecutar node concluído nem transformar crash ambíguo em retry silencioso |
 | **Branch exclusiva** | `task/f2.5-execution-resume`, criada limpa de `main == origin/main == 05799906099c2ff77a497867d653ba8be049bde8` após CI pós-merge verde da F2.4 |
 | **Checkpoint de rollback** | `checkpoint/pre-f2.5-defensibility^{}` → `05799906099c2ff77a497867d653ba8be049bde8` |
-| **Checkpoint do gate** | `checkpoint/f2.5-ready` identificará o commit local exclusivamente documental deste gate |
+| **Checkpoint do gate** | `checkpoint/f2.5-ready^{}` → `bafca140f781e4dbb320c6324a8aa7629987c04d`; `checkpoint/f2.5-complete` identificará o commit local deste fechamento |
 | **Executor** | `Codex`, único escritor; nenhuma alteração de outro executor no baseline |
 | **Dependências** | Nenhuma nova; reutilizar contratos F2.1, lock/CAS/journal F2.2, executor F2.3, FSM/replay F2.4, `ConfigResolver` e artefato compilado F1 |
 
@@ -1786,7 +1786,7 @@ Todo arquivo fora dessa lista é proibido. Permanecem byte-idênticos: `.github/
 ```yaml
 defensibility:
   task_id: "F2.5"
-  gate: "READY"
+  gate: "READY -> COMPLETED"
   executor: "Codex"
   baseline:
     branch: "task/f2.5-execution-resume"
@@ -1891,11 +1891,34 @@ defensibility:
 [x] Aceite positivo, negativo, crash, multiprocess, regressão, distribuição e escopo congelados
 [x] Rollback não destrutivo com gatilhos objetivos e verificação executável
 [x] Executor único; nenhum Python/teste F2.5 alterado antes do checkpoint do gate
-[ ] Implementação F2.5 iniciada somente após autorização explícita posterior
+[x] Implementação F2.5 iniciada somente após autorização explícita posterior
+[x] Bundle/payload canônicos, protocolo separado, create estrito, atomicidade e recovery implementados
+[x] Ledger de nodes, outcome pendente, crash ambíguo, revisions e fencing validados fail-closed
+[x] Approval subject/approver, pause/resume/cancel e única aresta nova da FSM implementados
+[x] CLI run/resume/approve/cancel/status/inspect usa somente lifecycle e views redaction-safe
+[x] Filtros positivos/negativos, multiprocess, regressão, suíte, qualidade e distribuição verdes
+[x] Exatos 18 paths do allowlist; fronteiras proibidas byte-idênticas; F2.6/F3/F5/F6 não iniciadas
 ```
 
-**Estado de parada obrigatório:** validar este dossiê, criar commit local exclusivamente documental e
-`checkpoint/f2.5-ready`, conferir worktree limpa e parar antes de qualquer implementação, push ou PR.
+#### Resultado verificado da F2.5
+
+| Evidência | Resultado observado |
+|---|---|
+| Persistência e compatibilidade | `StateStorageProvider` permaneceu com sete operações e `EventJournalStateStorageProvider` somente com `load_events`; `ResumeStateStorageProvider` adicionou exatamente quatro operações; bundle/payload canônicos, imutáveis, destacados, content-addressed, create estrito, temp recovery e atomicidade verdes |
+| Resume e crash | Outcome durável antes do CAS é recuperado por um único CAS; node concluído não reexecuta; `NODE_STARTED` sem outcome retorna `requires_intervention`; attempt, edge, digest, duplicate/gap de revision e fencing divergentes falham preservando record/journal |
+| Concorrência | Dois processos retomando o mesmo outcome pendente concluem sem duplicar efeito, evento ou CAS; publicação concorrente do mesmo payload é idempotente sob o lock/fencing persistente |
+| Aprovação e cancelamento | Node humano explícito pausa antes de backend; subject digest, approver, revision e fencing são estritos; evento à frente do CAS é recuperável; cancel invalida aprovação pendente e `CANCELLED` repetido é idempotente |
+| Snapshot e views | Resume usa somente artifact/config/payload do bundle, inclusive após remoção do artefato live; divergência/tamper falha fechado; status/inspect ignoram `workflow-state.json` e `approval_request.json` e não exibem payload/configuração |
+| CLI e fachada | `run --input-json`, `resume`, `approve --approver`, `cancel`, `status` e `inspect` usam `ExecutionLifecycleService`; ausência de backend falha no preflight antes de record/bundle; `RuntimeEngine` expõe a fachada F2.5 sem alterar `run_workflow` legado |
+| Filtros positivos | persistência/lifecycle `20 passed`; resume/ledger/E2E `15 passed`; approval/cancel `8 passed`; CLI `7 passed` |
+| Filtros negativos | mismatch/corrupt/missing/noncanonical/divergent/legacy/tamper `25 passed`; interrupted/started-without-outcome/duplicate/gap/unavailable `11 passed` |
+| Regressão e suíte | regressão congelada F2.1–F2.4 `205 passed`; suíte integral `440 passed, 6 subtests passed`, sem skip/xfail novo |
+| Qualidade e distribuição | mypy sem issues em 98 arquivos; Ruff e compileall verdes; `uv lock --check`, sync bloqueado e build sdist/wheel verdes; smoke externo CLI/metadata/pacote 0.1.0 e probe isolado `F2.5_WHEEL_EXPORTS_OK` verdes |
+| Ambiente do smoke | O primeiro subprocesso não encontrou o comando literal `uv`; a repetição final expôs somente `build/f0.6-tools/uv/bin` no `PATH` do processo e passou, sem instalação global, dependência ou mudança persistente |
+| Escopo | Exatos 18 paths permitidos, incluindo este fechamento e três arquivos novos; `.github`, `pyproject.toml`, `uv.lock`, compiler, contracts/schemas, defaults, node executors, config, governance, observability, models/tools/indexer/knowledge e CI permanecem byte-idênticos |
+
+**Estado de parada obrigatório:** criar o commit e `checkpoint/f2.5-complete` somente locais, conferir
+worktree limpa e parar antes de push, PR, merge, operação remota ou início da F2.6.
 
 ---
 
@@ -4464,13 +4487,13 @@ de `main`.
 ```
 Data:              2026-08-07
 Fase:              F2
-Tarefa:            F2.5 — gate defensável de retomada
-Estado:            READY; implementação F2.5 não iniciada; F2.6/F3/F5/F6 não antecipadas
-Arquivos alterados: somente TASK.md no gate; zero Python/teste/dependência/schema/CI
-Validações:         promoção F2.4 comprovada; baseline focal 103; suíte 398 + 6 subtests; mypy 97; Ruff/compileall/lock, diff, Markdown e UTF-8 verdes
-Checkpoint:         `checkpoint/pre-f2.5-defensibility^{}` = 0579990; `checkpoint/f2.5-ready` identificará o commit documental
+Tarefa:            F2.5 — retomada canônica de execução
+Estado:            COMPLETED localmente; F2.6/F3/F5/F6 não iniciadas; sem promoção remota
+Arquivos alterados: 18 paths do allowlist: TASK, 10 src e 7 testes; zero dependência/schema/CI/default proibido
+Validações:         positivos 20/15/8/7; negativos 25/11; regressão 205; suíte 440 + 6 subtests; mypy 98; Ruff/compileall/lock/build/smoke/diff verdes
+Checkpoint:         `checkpoint/f2.5-ready^{}` = bafca14; `checkpoint/f2.5-complete` identificará o commit deste fechamento
 Promoção anterior:  PR #10; merge 0579990; PR 11/11 e run pós-merge 31202447617 integralmente verdes
-Resultado:          contrato, bundle/digests, ledger de payload, crash, approval, cancel, allowlist, aceite e rollback F2.5 congelados
+Resultado:          bundle/digests, ledger/recovery, approval/cancel, CLI/views, multiprocess e distribuição F2.5 verdes
 ```
 
 ---
@@ -4478,17 +4501,15 @@ Resultado:          contrato, bundle/digests, ledger de payload, crash, approval
 ## 11. Próxima Ação Exata
 
 ```text
-PARAR — AGUARDAR AUTORIZAÇÃO EXPLÍCITA PARA IMPLEMENTAR A F2.5:
-1. Confirmar que `checkpoint/f2.5-ready^{}` aponta para o commit documental do gate, a worktree está
-   limpa e a branch ativa permanece `task/f2.5-execution-resume`.
-2. Não editar qualquer Python/teste antes dessa autorização; preservar integralmente o contrato,
-   allowlist, critérios de aceite, rollback e fronteiras congelados no dossiê F2.5.
-3. Somente com autorização explícita do usuário: implementar F2.5 nos paths permitidos; não iniciar
-   retry F2.6, provider/worktree F3, trust/approval F5 ou audit/evidence F6.
-4. Executar todos os comandos congelados. Se qualquer critério falhar ou o escopo precisar crescer,
-   parar e aplicar o rollback documentado; não flexibilizar digest, lock, CAS, fencing ou recovery.
-5. Somente se tudo ficar verde: atualizar evidências, marcar F2.5 concluída localmente, criar commit e
-   `checkpoint/f2.5-complete`; parar antes de push, PR, merge, F2.6 ou operação remota.
+PARAR — F2.5 CONCLUÍDA LOCALMENTE; NÃO INICIAR F2.6:
+1. Confirmar commit local de implementação, `checkpoint/f2.5-complete`, branch
+   `task/f2.5-execution-resume` e worktree limpa.
+2. Preservar branch e checkpoints locais; não executar push, PR, merge, tag remota, exclusão de branch
+   ou alteração de proteção sem autorização explícita do usuário.
+3. Não iniciar retry F2.6, provider/worktree F3, trust/approval F5, audit/evidence F6 nem ampliar o
+   runtime/CLI além do contrato F2.5.
+4. Em uma próxima execução autorizada, auditar primeiro a promoção da F2.5 e o CI pós-merge antes de
+   preparar qualquer gate posterior.
 ```
 
 ---

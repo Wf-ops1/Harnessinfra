@@ -31,18 +31,24 @@ from ai_engineering_harness.contracts.execution import (
 from ai_engineering_harness.persistence import (
     AtomicFileStateStorage,
     EventJournalStateStorageProvider,
+    ExecutionBundle,
+    ExecutionBundleIntegrityError,
     ExecutionLock,
     StateStorageProvider,
     StateWriteError,
+    canonical_json_digest,
+    canonical_json_object,
 )
 from ai_engineering_harness.runtime import (
     AgentNodeExecutor,
     ArtifactExecutionMismatchError,
     DeterministicNodeExecutor,
+    EventSourcedStateMachine,
     GraphCycleExecutionError,
     GraphExecutor,
     HumanApprovalNodeExecutor,
     InterruptedExecutionError,
+    InterruptedNodeExecutionError,
     KnowledgeSyncNodeExecutor,
     NodeBackendError,
     NodeExecutionContext,
@@ -126,6 +132,54 @@ class _StaticBackend:
 
     def execute(self, context: NodeExecutionContext) -> object:
         return self.result
+
+
+class _FailOutcomeCasStorage(AtomicFileStateStorage):
+    def __init__(self, project_root: Path) -> None:
+        super().__init__(project_root)
+        self.fail_outcome_cas = True
+
+    def compare_and_set_execution(
+        self,
+        execution_id: str,
+        expected_revision: int,
+        replacement: ExecutionRecord,
+        *,
+        lock: ExecutionLock | None = None,
+    ) -> ExecutionRecord:
+        if self.fail_outcome_cas and replacement.current_node_id == "completed":
+            self.fail_outcome_cas = False
+            raise StateWriteError(
+                "controlled node outcome CAS failure",
+                execution_id=execution_id,
+            )
+        return super().compare_and_set_execution(
+            execution_id,
+            expected_revision,
+            replacement,
+            lock=lock,
+        )
+
+
+class _FailOutcomeAppendStorage(AtomicFileStateStorage):
+    def __init__(self, project_root: Path) -> None:
+        super().__init__(project_root)
+        self.fail_outcome_append = True
+
+    def append_event(
+        self,
+        execution_id: str,
+        event: ExecutionEvent,
+        *,
+        lock: ExecutionLock | None = None,
+    ) -> ExecutionEvent:
+        if self.fail_outcome_append and event.event_type == "NODE_COMPLETED":
+            self.fail_outcome_append = False
+            raise StateWriteError(
+                "controlled node outcome append interruption",
+                execution_id=execution_id,
+            )
+        return super().append_event(execution_id, event, lock=lock)
 
 
 class _FailingStorage:
@@ -370,6 +424,46 @@ def _executor(
         event_id_factory=_EventIds(),
         owner_id_factory=lambda: "unit-test-worker",
     )
+
+
+def _resume_executor(
+    storage: AtomicFileStateStorage,
+    registry: NodeExecutorRegistry,
+) -> GraphExecutor:
+    return GraphExecutor(
+        storage,
+        registry,
+        resume_enabled=True,
+        lock_timeout_seconds=5,
+        clock=_Clock(),
+        event_id_factory=_EventIds(),
+        owner_id_factory=lambda: "resume-unit-test-worker",
+    )
+
+
+def _create_resume_execution(
+    storage: AtomicFileStateStorage,
+    artifact: CompiledGraphArtifact,
+    execution_id: str,
+    initial_input: dict[str, object],
+) -> None:
+    artifact_json = artifact.canonical_json()
+    configuration_json = canonical_json_object({})
+    initial_json = canonical_json_object(initial_input)
+    bundle = ExecutionBundle(
+        bundle_schema_version="1.0",
+        execution_id=execution_id,
+        artifact_digest=canonical_json_digest(artifact_json),
+        configuration_digest=canonical_json_digest(configuration_json),
+        initial_input_digest=canonical_json_digest(initial_json),
+        artifact_json=artifact_json,
+        configuration_json=configuration_json,
+    )
+    storage.create_execution_bundle(bundle, initial_input=initial_input)
+    record = _record(artifact, execution_id).model_copy(
+        update={"configuration_digest": bundle.configuration_digest}
+    )
+    storage.create_execution(record)
 
 
 def _journal(root: Path, execution_id: str) -> list[dict[str, object]]:
@@ -818,6 +912,234 @@ def test_interrupted_execution_does_not_reexecute_backend(tmp_path: Path) -> Non
 
     assert trace == ["loop"]
     assert _journal(tmp_path, "exec-interrupted") == journal_before
+
+
+def test_resume_recovers_pending_outcome_without_reexecuting_completed_node(
+    tmp_path: Path,
+) -> None:
+    artifact = _artifact([_deterministic_node("gate", "completed")])
+    storage = _FailOutcomeCasStorage(tmp_path)
+    execution_id = "exec-resume-pending-outcome"
+    initial_input = {"trace": []}
+    _create_resume_execution(storage, artifact, execution_id, initial_input)
+    trace: list[str] = []
+    registry = NodeExecutorRegistry(
+        deterministic=DeterministicNodeExecutor(_TraceBackend(trace)),
+    )
+    executor = _resume_executor(storage, registry)
+
+    with pytest.raises(StateWriteError, match="outcome CAS"):
+        executor.execute(artifact, execution_id, initial_input)
+
+    assert trace == ["gate"]
+    assert storage.load_execution(execution_id).revision == 1
+    outcome_count = [
+        event.event_type for event in storage.load_events(execution_id)
+    ].count("NODE_COMPLETED")
+    result = executor.resume(artifact, execution_id)
+
+    assert result.outcome == "success"
+    assert result.executed_node_ids == ()
+    assert trace == ["gate"]
+    assert storage.load_execution(execution_id).current_state == ExecutionState.COMPLETED
+    assert [
+        event.event_type for event in storage.load_events(execution_id)
+    ].count("NODE_COMPLETED") == outcome_count
+
+
+def test_resume_started_without_outcome_requires_intervention_without_backend(
+    tmp_path: Path,
+) -> None:
+    artifact = _artifact([_deterministic_node("gate", "completed")])
+    storage = _FailOutcomeAppendStorage(tmp_path)
+    execution_id = "exec-started-without-outcome"
+    initial_input = {"trace": []}
+    _create_resume_execution(storage, artifact, execution_id, initial_input)
+    trace: list[str] = []
+    executor = _resume_executor(
+        storage,
+        NodeExecutorRegistry(
+            deterministic=DeterministicNodeExecutor(_TraceBackend(trace)),
+        ),
+    )
+
+    with pytest.raises(StateWriteError, match="append interruption"):
+        executor.execute(artifact, execution_id, initial_input)
+    journal_before = storage.load_events(execution_id)
+    with pytest.raises(InterruptedNodeExecutionError) as captured:
+        executor.resume(artifact, execution_id)
+
+    assert captured.value.classification == "requires_intervention"
+    assert captured.value.node_id == "gate"
+    assert trace == ["gate"]
+    assert storage.load_events(execution_id) == journal_before
+
+
+def test_resume_missing_payload_fails_without_backend_or_mutation(tmp_path: Path) -> None:
+    artifact = _artifact([_deterministic_node("gate", "completed")])
+    storage = AtomicFileStateStorage(tmp_path)
+    execution_id = "exec-resume-missing-payload"
+    initial_input = {"trace": []}
+    _create_resume_execution(storage, artifact, execution_id, initial_input)
+    trace: list[str] = []
+    executor = _resume_executor(
+        storage,
+        NodeExecutorRegistry(
+            deterministic=DeterministicNodeExecutor(_TraceBackend(trace)),
+        ),
+    )
+    executor.execute(artifact, execution_id, initial_input)
+    outcome = next(
+        event
+        for event in storage.load_events(execution_id)
+        if event.event_type == "NODE_COMPLETED"
+    )
+    output_digest = outcome.payload["output_digest"]
+    assert isinstance(output_digest, str)
+    payload_path = (
+        tmp_path
+        / ".harness"
+        / "artifacts"
+        / "executions"
+        / execution_id
+        / "payloads"
+        / f"{output_digest.removeprefix('sha256:')}.json"
+    )
+    payload_path.unlink()
+    journal_before = storage.load_events(execution_id)
+    record_before = storage.load_execution(execution_id)
+
+    with pytest.raises(ExecutionBundleIntegrityError, match="missing"):
+        executor.resume(artifact, execution_id)
+
+    assert trace == ["gate"]
+    assert storage.load_events(execution_id) == journal_before
+    assert storage.load_execution(execution_id) == record_before
+
+
+def test_resume_duplicate_outcome_is_rejected_without_backend(tmp_path: Path) -> None:
+    artifact = _artifact([_deterministic_node("gate", "completed")])
+    storage = AtomicFileStateStorage(tmp_path)
+    execution_id = "exec-resume-duplicate-outcome"
+    initial_input = {"trace": []}
+    _create_resume_execution(storage, artifact, execution_id, initial_input)
+    trace: list[str] = []
+    executor = _resume_executor(
+        storage,
+        NodeExecutorRegistry(
+            deterministic=DeterministicNodeExecutor(_TraceBackend(trace)),
+        ),
+    )
+    executor.execute(artifact, execution_id, initial_input)
+    outcome = next(
+        event
+        for event in storage.load_events(execution_id)
+        if event.event_type == "NODE_COMPLETED"
+    )
+    duplicate = ExecutionEvent.model_validate(
+        {
+            **outcome.model_dump(),
+            "event_id": "duplicate-outcome-event",
+            "timestamp": outcome.timestamp + timedelta(seconds=1),
+            "previous_hash": None,
+            "current_hash": None,
+        }
+    )
+    storage.append_event(execution_id, duplicate)
+    journal_before = storage.load_events(execution_id)
+
+    with pytest.raises(InterruptedNodeExecutionError, match="duplicate or gap"):
+        executor.resume(artifact, execution_id)
+
+    assert trace == ["gate"]
+    assert storage.load_events(execution_id) == journal_before
+
+
+@pytest.mark.parametrize(
+    ("tamper", "message"),
+    [
+        ("attempt", "attempt"),
+        ("next_id", "declared edge"),
+        ("input_digest", "payload chain"),
+        ("revision_gap", "duplicate or gap"),
+    ],
+)
+def test_resume_tampered_ledger_attempt_next_digest_or_gap_fails_closed(
+    tmp_path: Path,
+    tamper: str,
+    message: str,
+) -> None:
+    artifact = _artifact([_deterministic_node("gate", "completed")])
+    storage = AtomicFileStateStorage(tmp_path)
+    execution_id = f"exec-ledger-{tamper.replace('_', '-')}"
+    initial_input = {"trace": []}
+    _create_resume_execution(storage, artifact, execution_id, initial_input)
+    machine = EventSourcedStateMachine(
+        storage,
+        execution_id,
+        clock=_Clock(),
+        event_id_factory=_EventIds(),
+    )
+    machine.transition_to(
+        ExecutionState.EXECUTING,
+        node_id="gate",
+        attempt=1,
+        reason="graph_execution_started",
+    )
+    bundle = storage.load_execution_bundle(execution_id)
+    input_digest = bundle.initial_input_digest
+    if tamper == "input_digest":
+        input_digest = storage.store_payload(execution_id, {"different": True})
+    output_digest = storage.store_payload(execution_id, {"trace": ["gate"]})
+    state_event = storage.load_events(execution_id)[0]
+    fencing_token = state_event.payload["fencing_token"]
+    attempt = 2 if tamper == "attempt" else 1
+    storage.append_event(
+        execution_id,
+        ExecutionEvent(
+            event_id=f"started-{tamper}",
+            execution_id=execution_id,
+            event_type="NODE_STARTED",
+            timestamp=_BASE_TIME + timedelta(seconds=2),
+            payload={
+                "attempt": attempt,
+                "fencing_token": fencing_token,
+                "input_digest": input_digest,
+                "node_id": "gate",
+                "node_type": "deterministic",
+            },
+        ),
+    )
+    storage.append_event(
+        execution_id,
+        ExecutionEvent(
+            event_id=f"outcome-{tamper}",
+            execution_id=execution_id,
+            event_type="NODE_COMPLETED",
+            timestamp=_BASE_TIME + timedelta(seconds=3),
+            payload={
+                "attempt": attempt,
+                "fencing_token": fencing_token,
+                "input_digest": input_digest,
+                "next_id": "failed" if tamper == "next_id" else "completed",
+                "node_id": "gate",
+                "node_type": "deterministic",
+                "output_digest": output_digest,
+                "record_revision": 3 if tamper == "revision_gap" else 2,
+            },
+        ),
+    )
+    journal_before = storage.load_events(execution_id)
+    record_before = storage.load_execution(execution_id)
+
+    with pytest.raises(InterruptedNodeExecutionError, match=message):
+        _resume_executor(storage, NodeExecutorRegistry()).resume(
+            artifact,
+            execution_id,
+        )
+
+    assert storage.load_events(execution_id) == journal_before
+    assert storage.load_execution(execution_id) == record_before
 
 
 def test_concurrent_workers_do_not_duplicate_effect(tmp_path: Path) -> None:

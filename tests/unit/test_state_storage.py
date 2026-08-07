@@ -18,6 +18,11 @@ from pydantic import ValidationError
 
 import ai_engineering_harness.persistence.atomic_file as ATOMIC_FILE_MODULE
 import ai_engineering_harness.persistence.locks as LOCKS_MODULE
+from ai_engineering_harness.contracts import (
+    CompiledGraphArtifact,
+    GraphSpec,
+    SourceManifestEntry,
+)
 from ai_engineering_harness.contracts.events import (
     EXECUTION_EVENT_SCHEMA_VERSION,
     ExecutionEvent,
@@ -33,6 +38,10 @@ from ai_engineering_harness.persistence import (
     DuplicateEventError,
     EventJournalStateStorageProvider,
     ExecutionAlreadyExistsError,
+    ExecutionBundle,
+    ExecutionBundleAlreadyExistsError,
+    ExecutionBundleIntegrityError,
+    ExecutionBundleWriteError,
     ExecutionIdentityMismatchError,
     ExecutionLock,
     ExecutionNotFoundError,
@@ -41,11 +50,14 @@ from ai_engineering_harness.persistence import (
     LockOwnershipError,
     LockUnavailableError,
     RecoveryConflictError,
+    ResumeStateStorageProvider,
     RevisionConflictError,
     StateIntegrityError,
     StateStorageError,
     StateStorageProvider,
     StateWriteError,
+    canonical_json_digest,
+    canonical_json_object,
     execution_record_path,
     load_execution_record,
     save_execution_record,
@@ -179,6 +191,17 @@ def _crash_lock_worker(root: str, execution_id: str, connection: Any) -> None:
     os._exit(0)
 
 
+def _payload_worker(
+    root: str,
+    execution_id: str,
+    start_event: Any,
+    result_queue: Any,
+) -> None:
+    provider = AtomicFileStateStorage(Path(root))
+    start_event.wait(10)
+    result_queue.put(provider.store_payload(execution_id, {"worker": "shared"}))
+
+
 def test_interface_has_exact_operations_and_public_exports(tmp_path: Path) -> None:
     expected = {
         "create_execution",
@@ -199,12 +222,24 @@ def test_interface_has_exact_operations_and_public_exports(tmp_path: Path) -> No
         for name, value in vars(EventJournalStateStorageProvider).items()
         if not name.startswith("_") and callable(value)
     }
+    resume_operations = {
+        name
+        for name, value in vars(ResumeStateStorageProvider).items()
+        if not name.startswith("_") and callable(value)
+    }
     provider = AtomicFileStateStorage(tmp_path)
 
     assert operations == expected
     assert journal_operations == {"load_events"}
+    assert resume_operations == {
+        "create_execution_bundle",
+        "load_execution_bundle",
+        "load_payload",
+        "store_payload",
+    }
     assert isinstance(provider, StateStorageProvider)
     assert isinstance(provider, EventJournalStateStorageProvider)
+    assert isinstance(provider, ResumeStateStorageProvider)
     assert issubclass(RevisionConflictError, StateStorageError)
     assert issubclass(JournalIntegrityError, StateStorageError)
 
@@ -216,6 +251,7 @@ def test_interface_has_exact_operations_and_public_exports(tmp_path: Path) -> No
         is EventJournalStateStorageProvider
     )
     assert persistence.StateStorageProvider is StateStorageProvider
+    assert persistence.ResumeStateStorageProvider is ResumeStateStorageProvider
     assert persistence.ExecutionLock is ExecutionLock
     assert persistence.save_execution_record is save_execution_record
     assert persistence.load_execution_record is load_execution_record
@@ -983,3 +1019,301 @@ def test_invalid_execution_id_and_symlink_escape_fail_closed(tmp_path: Path) -> 
     finally:
         (state_root / "executions").unlink()
         outside.rmdir()
+
+
+def _bundle_fixture(
+    execution_id: str,
+) -> tuple[ExecutionBundle, dict[str, object]]:
+    graph = GraphSpec.model_validate(
+        {
+            "graph": {
+                "name": "bundle-test",
+                "graph_schema_version": "1.0",
+                "definition_version": "1.0.0",
+                "entrypoint": "execute",
+                "status": "stable",
+            },
+            "nodes": [
+                {
+                    "id": "execute",
+                    "type": "deterministic",
+                    "executor": "deterministic_gate",
+                    "gate_name": "bundle",
+                    "on_success": "completed",
+                    "on_failure": "failed",
+                }
+            ],
+            "terminal_states": [
+                {"id": "completed", "outcome": "success"},
+                {"id": "failed", "outcome": "failure"},
+            ],
+            "policies": [],
+            "contracts": [],
+        }
+    )
+    artifact = CompiledGraphArtifact.build(
+        graph=graph,
+        resolved_contracts=(),
+        resolved_policies=(),
+        source_manifest=(
+            SourceManifestEntry(
+                source_kind="graph",
+                source_id="project://bundle-test.yaml",
+                content_digest=f"sha256:{'0' * 64}",
+            ),
+        ),
+    )
+    artifact_json = artifact.canonical_json()
+    configuration_json = canonical_json_object({"profile": "bundle-test"})
+    initial_input = {"intent": "persist exactly"}
+    initial_json = canonical_json_object(initial_input)
+    return (
+        ExecutionBundle(
+            bundle_schema_version="1.0",
+            execution_id=execution_id,
+            artifact_digest=canonical_json_digest(artifact_json),
+            configuration_digest=canonical_json_digest(configuration_json),
+            initial_input_digest=canonical_json_digest(initial_json),
+            artifact_json=artifact_json,
+            configuration_json=configuration_json,
+        ),
+        initial_input,
+    )
+
+
+def _create_bundle_and_record(
+    root: Path,
+    execution_id: str = "exec-bundle",
+) -> tuple[AtomicFileStateStorage, ExecutionBundle, dict[str, object]]:
+    provider = AtomicFileStateStorage(root)
+    bundle, initial_input = _bundle_fixture(execution_id)
+    provider.create_execution_bundle(bundle, initial_input=initial_input)
+    provider.create_execution(
+        _record(
+            execution_id,
+            artifact_digest=bundle.artifact_digest,
+            configuration_digest=bundle.configuration_digest,
+            current_node_id="execute",
+        )
+    )
+    return provider, bundle, initial_input
+
+
+def test_bundle_payload_create_load_public_immutable_and_canonical(
+    tmp_path: Path,
+) -> None:
+    provider, bundle, initial_input = _create_bundle_and_record(tmp_path)
+
+    assert provider.load_execution_bundle(bundle.execution_id) == bundle
+    assert provider.load_payload(
+        bundle.execution_id,
+        bundle.initial_input_digest,
+    ) == initial_input
+    payload = {"nested": {"value": 1}, "items": [True, None]}
+    digest = provider.store_payload(bundle.execution_id, payload)
+    loaded = provider.load_payload(bundle.execution_id, digest)
+    loaded["mutated"] = True
+    assert provider.load_payload(bundle.execution_id, digest) == payload
+
+    directory = (
+        tmp_path / ".harness" / "artifacts" / "executions" / bundle.execution_id
+    )
+    assert (directory / "artifact.json").read_text(encoding="utf-8") == bundle.artifact_json
+    assert (directory / "configuration.json").read_text(
+        encoding="utf-8"
+    ) == bundle.configuration_json
+    assert (directory / "bundle.json").read_text(
+        encoding="utf-8"
+    ) == bundle.manifest_json()
+    with pytest.raises(ExecutionBundleAlreadyExistsError):
+        provider.create_execution_bundle(bundle, initial_input=initial_input)
+
+
+def test_bundle_create_conflict_with_existing_record_preserves_state(
+    tmp_path: Path,
+) -> None:
+    execution_id = "exec-bundle-record-conflict"
+    provider = AtomicFileStateStorage(tmp_path)
+    record = _record(execution_id)
+    provider.create_execution(record)
+    record_bytes = execution_record_path(tmp_path, execution_id).read_bytes()
+    bundle, initial_input = _bundle_fixture(execution_id)
+
+    with pytest.raises(ExecutionBundleAlreadyExistsError):
+        provider.create_execution_bundle(bundle, initial_input=initial_input)
+
+    assert execution_record_path(tmp_path, execution_id).read_bytes() == record_bytes
+    assert not (
+        tmp_path / ".harness" / "artifacts" / "executions" / execution_id
+    ).exists()
+
+
+@pytest.mark.parametrize(
+    "component",
+    ["artifact.json", "configuration.json", "bundle.json", "initial-payload"],
+)
+def test_bundle_or_payload_tamper_fails_closed_and_preserves_bytes(
+    tmp_path: Path,
+    component: str,
+) -> None:
+    provider, bundle, _ = _create_bundle_and_record(tmp_path)
+    directory = (
+        tmp_path / ".harness" / "artifacts" / "executions" / bundle.execution_id
+    )
+    target = (
+        directory / "payloads" / f"{bundle.initial_input_digest.removeprefix('sha256:')}.json"
+        if component == "initial-payload"
+        else directory / component
+    )
+    target.write_bytes(b'{"tampered":true}\n')
+    tampered = target.read_bytes()
+
+    with pytest.raises(ExecutionBundleIntegrityError):
+        provider.load_execution_bundle(bundle.execution_id)
+
+    assert target.read_bytes() == tampered
+
+
+def test_bundle_missing_component_fails_closed_without_reconstruction(
+    tmp_path: Path,
+) -> None:
+    provider, bundle, _ = _create_bundle_and_record(tmp_path)
+    target = (
+        tmp_path
+        / ".harness"
+        / "artifacts"
+        / "executions"
+        / bundle.execution_id
+        / "configuration.json"
+    )
+    target.unlink()
+
+    with pytest.raises(ExecutionBundleIntegrityError, match="missing"):
+        provider.load_execution_bundle(bundle.execution_id)
+
+    assert not target.exists()
+
+
+def test_bundle_recovery_of_one_abandoned_canonical_payload_temp(
+    tmp_path: Path,
+) -> None:
+    provider, bundle, initial_input = _create_bundle_and_record(tmp_path)
+    target = (
+        tmp_path
+        / ".harness"
+        / "artifacts"
+        / "executions"
+        / bundle.execution_id
+        / "payloads"
+        / f"{bundle.initial_input_digest.removeprefix('sha256:')}.json"
+    )
+    temporary = target.with_name(f".{target.name}.recovery.tmp")
+    target.replace(temporary)
+
+    assert provider.load_payload(
+        bundle.execution_id,
+        bundle.initial_input_digest,
+    ) == initial_input
+    assert target.is_file()
+    assert not temporary.exists()
+
+
+def test_bundle_recovery_with_multiple_temporaries_fails_closed(
+    tmp_path: Path,
+) -> None:
+    provider, bundle, _ = _create_bundle_and_record(tmp_path)
+    target = (
+        tmp_path
+        / ".harness"
+        / "artifacts"
+        / "executions"
+        / bundle.execution_id
+        / "configuration.json"
+    )
+    canonical = target.read_bytes()
+    target.unlink()
+    first = target.with_name(f".{target.name}.one.tmp")
+    second = target.with_name(f".{target.name}.two.tmp")
+    first.write_bytes(canonical)
+    second.write_bytes(canonical)
+
+    with pytest.raises(RecoveryConflictError, match="multiple"):
+        provider.load_execution_bundle(bundle.execution_id)
+
+    assert not target.exists()
+    assert first.read_bytes() == canonical
+    assert second.read_bytes() == canonical
+
+
+def test_payload_atomic_write_failure_removes_temp_and_publishes_nothing(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider, bundle, _ = _create_bundle_and_record(tmp_path)
+    payload = {"new": "payload"}
+    digest = canonical_json_digest(canonical_json_object(payload))
+    target = (
+        tmp_path
+        / ".harness"
+        / "artifacts"
+        / "executions"
+        / bundle.execution_id
+        / "payloads"
+        / f"{digest.removeprefix('sha256:')}.json"
+    )
+    original_atomic_replace = ATOMIC_FILE_MODULE._atomic_replace_bytes
+
+    def fail_target_only(destination: Path, content: bytes) -> None:
+        if destination == target:
+            raise OSError("controlled bundle replace failure")
+        original_atomic_replace(destination, content)
+
+    monkeypatch.setattr(
+        ATOMIC_FILE_MODULE,
+        "_atomic_replace_bytes",
+        fail_target_only,
+    )
+
+    with pytest.raises(ExecutionBundleWriteError, match="publish"):
+        provider.store_payload(bundle.execution_id, payload)
+
+    assert not target.exists()
+    assert not tuple(target.parent.glob(f".{target.name}.*.tmp"))
+
+
+def test_payload_noncanonical_missing_or_invalid_digest_fails_closed(
+    tmp_path: Path,
+) -> None:
+    provider, bundle, _ = _create_bundle_and_record(tmp_path)
+
+    with pytest.raises(ExecutionBundleIntegrityError):
+        provider.store_payload(bundle.execution_id, {"bad": float("nan")})
+    with pytest.raises(ExecutionBundleIntegrityError, match="invalid"):
+        provider.load_payload(bundle.execution_id, "sha256:not-a-digest")
+    with pytest.raises(ExecutionBundleIntegrityError, match="missing"):
+        provider.load_payload(bundle.execution_id, f"sha256:{'f' * 64}")
+
+
+def test_concurrent_payload_publication_is_idempotent(tmp_path: Path) -> None:
+    _, bundle, _ = _create_bundle_and_record(tmp_path)
+    context = multiprocessing.get_context("spawn")
+    start_event = context.Event()
+    result_queue = context.Queue()
+    processes = [
+        context.Process(
+            target=_payload_worker,
+            args=(str(tmp_path), bundle.execution_id, start_event, result_queue),
+        )
+        for _ in range(2)
+    ]
+    for process in processes:
+        process.start()
+    start_event.set()
+    results = [result_queue.get(timeout=20) for _ in processes]
+    for process in processes:
+        process.join(timeout=20)
+        assert process.exitcode == 0
+
+    assert len(set(results)) == 1
+    provider = AtomicFileStateStorage(tmp_path)
+    assert provider.load_payload(bundle.execution_id, results[0]) == {"worker": "shared"}

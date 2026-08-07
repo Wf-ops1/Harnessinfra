@@ -3,8 +3,6 @@
 import json
 import shutil
 import sys
-import uuid
-from datetime import UTC, datetime
 from pathlib import Path
 
 import click
@@ -17,13 +15,45 @@ from ai_engineering_harness.compiler import GraphCompiler, GraphCompilerError
 from ai_engineering_harness.compiler.visualizer import GraphVisualizer
 from ai_engineering_harness.doctor.checker import DoctorChecker
 from ai_engineering_harness.doctor.report import DoctorReport
-from ai_engineering_harness.governance.approval import ApprovalManager
 from ai_engineering_harness.indexer.codebase_memory_adapter import CodebaseMemoryAdapter
 from ai_engineering_harness.observability.audit import AuditTrailManager
-from ai_engineering_harness.runtime.engine import RuntimeEngine
+from ai_engineering_harness.persistence import AtomicFileStateStorage, StateStorageError
+from ai_engineering_harness.runtime import (
+    ExecutionLifecycleError,
+    ExecutionLifecycleService,
+    GraphExecutionError,
+    GraphExecutionPausedResult,
+    NodeExecutorError,
+    NodeExecutorRegistry,
+    StateMachineError,
+)
+from ai_engineering_harness.runtime.maf_adapter import ArtifactValidationError
 from ai_engineering_harness.verification.engine import VerificationEngine
 
 console = Console()
+
+
+def _lifecycle_service(project_root: Path) -> ExecutionLifecycleService:
+    """Build the canonical lifecycle with deliberately unavailable real backends."""
+    return ExecutionLifecycleService(
+        project_root,
+        AtomicFileStateStorage(project_root),
+        NodeExecutorRegistry(),
+    )
+
+
+def _parse_json_object(raw: str) -> dict[str, object]:
+    try:
+        value = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise click.ClickException("--input-json must be valid JSON") from exc
+    if type(value) is not dict:
+        raise click.ClickException("--input-json must be a JSON object")
+    return value
+
+
+def _raise_lifecycle_click_error(exc: Exception) -> None:
+    raise click.ClickException(str(exc)) from exc
 
 def _get_symbol(success: bool) -> str:
     encoding = getattr(sys.stdout, "encoding", "") or ""
@@ -105,8 +135,19 @@ def index():
 @main.command(help="Executa um workflow agentic autônomo.")
 @click.argument("workflow_name")
 @click.option("--approval-required", is_flag=True, help="Requer aprovação humana prévia para promoção.")
-def run(workflow_name, approval_required):
+@click.option(
+    "--input-json",
+    default="{}",
+    show_default=True,
+    help="Objeto JSON usado como input inicial canônico.",
+)
+def run(workflow_name, approval_required, input_json):
     project_root = Path.cwd()
+    if approval_required:
+        raise click.ClickException(
+            "--approval-required is unsupported; approval is declared by an explicit human node"
+        )
+    initial_input = _parse_json_object(input_json)
     try:
         compiler = GraphCompiler(project_root=project_root)
         compiled_file = compiler.compiled_path(workflow_name)
@@ -121,77 +162,139 @@ def run(workflow_name, approval_required):
     except GraphCompilerError as exc:
         raise click.ClickException(str(exc)) from exc
 
-    timestamp_str = datetime.now(UTC).strftime("%Y%m%d%H%M%S")
-    short_hash = uuid.uuid4().hex[:6]
-    execution_id = f"exec-{timestamp_str}-{short_hash}"
+    try:
+        result = _lifecycle_service(project_root).start(
+            compiled_file,
+            initial_input=initial_input,
+        )
+    except (
+        ArtifactValidationError,
+        ExecutionLifecycleError,
+        GraphExecutionError,
+        NodeExecutorError,
+        StateMachineError,
+        StateStorageError,
+    ) as exc:
+        _raise_lifecycle_click_error(exc)
 
-    console.print(f"[bold green]harness run {workflow_name}[/bold green] - Execução iniciada. ID: [bold cyan]{execution_id}[/bold cyan]")
-
-    # Executar RuntimeEngine
-    engine = RuntimeEngine(project_root=project_root, execution_id=execution_id, allowed_providers=["local", "openai", "anthropic", "google"])
-    final_state = engine.run_workflow(compiled_file, approval_required=approval_required)
-
-    # Registrar no AuditTrail
-    audit_mgr = AuditTrailManager(project_root=project_root, execution_id=execution_id)
-    audit_mgr.log_event("WORKFLOW_COMPLETED", {"workflow": workflow_name, "final_state": final_state})
-
-    console.print(f"[bold green]{_get_symbol(True)}Workflow {workflow_name} finalizado![/bold green] Estado FSM: [bold yellow]{final_state}[/bold yellow]")
+    if isinstance(result, GraphExecutionPausedResult):
+        console.print(
+            f"[yellow]Execução {result.execution_id} pausada para aprovação "
+            f"no node {result.node_id}.[/yellow]"
+        )
+        return
+    console.print(
+        f"[green]{_get_symbol(True)}[/green]Workflow {workflow_name} concluído. "
+        f"Execution ID: [bold cyan]{result.execution_id}[/bold cyan]; "
+        f"outcome: [bold]{result.outcome}[/bold]."
+    )
 
 @main.command(help="Consulta o status em tempo real de uma execução.")
 @click.argument("execution_id")
 def status(execution_id):
-    project_root = Path.cwd()
-    state_file = project_root / ".harness" / "state" / "executions" / execution_id / "workflow-state.json"
-
-    if not state_file.exists():
-        console.print(f"[red]{_get_symbol(False)}Execução '{execution_id}' não encontrada em .harness/state/executions/[/red]")
-        sys.exit(1)
-
-    data = json.loads(state_file.read_text(encoding="utf-8"))
+    try:
+        view = _lifecycle_service(Path.cwd()).status(execution_id)
+    except (
+        ExecutionLifecycleError,
+        StateMachineError,
+        StateStorageError,
+    ) as exc:
+        _raise_lifecycle_click_error(exc)
     table = Table(title=f"Status da Execução {execution_id}")
     table.add_column("Campo", style="cyan")
     table.add_column("Valor", style="bold green")
-
-    table.add_row("Execution ID", data.get("execution_id", execution_id))
-    table.add_row("FSM State", data.get("state", "UNKNOWN"))
-    table.add_row("Última Atualização", data.get("updated_at_iso", "N/A"))
-
+    table.add_row("Execution ID", view.execution_id)
+    table.add_row("Workflow", view.workflow_name)
+    table.add_row("Current node", view.current_node_id)
+    table.add_row("FSM State", view.current_state.value)
+    table.add_row("Approval", view.approval_status.value)
+    table.add_row("Revision", str(view.revision))
+    table.add_row("Última Atualização", view.updated_at.isoformat())
     console.print(table)
 
 @main.command(help="Inspeciona os detalhes e o histórico de uma execução.")
 @click.argument("execution_id")
 def inspect(execution_id):
-    project_root = Path.cwd()
-    exec_dir = project_root / ".harness" / "state" / "executions" / execution_id
-
-    if not exec_dir.exists():
-        console.print(f"[red]{_get_symbol(False)}Diretório de execução '{execution_id}' não encontrado.[/red]")
-        sys.exit(1)
-
-    state_file = exec_dir / "workflow-state.json"
-    fsm_state = "DESCONHECIDO"
-    if state_file.exists():
-        fsm_state = json.loads(state_file.read_text(encoding="utf-8")).get("state", "DESCONHECIDO")
-
-    audit_mgr = AuditTrailManager(project_root=project_root, execution_id=execution_id)
-    is_valid, msg = audit_mgr.verify_integrity()
-
-    approval_mgr = ApprovalManager(project_root=project_root)
-    approval_status = approval_mgr.get_approval_status(execution_id) or "NENHUMA"
-
-    console.print(f"[bold cyan]Inspeção Detalhada da Execução {execution_id}:[/bold cyan]")
-    console.print(f"  - [bold]Estado FSM:[/bold] {fsm_state}")
-    console.print(f"  - [bold]Integridade Hash Chain:[/bold] [{'green' if is_valid else 'red'}]{msg}[/{'green' if is_valid else 'red'}]")
-    console.print(f"  - [bold]Status de Aprovação:[/bold] {approval_status}")
+    try:
+        view = _lifecycle_service(Path.cwd()).inspect(execution_id)
+    except (
+        ExecutionLifecycleError,
+        StateMachineError,
+        StateStorageError,
+    ) as exc:
+        _raise_lifecycle_click_error(exc)
+    console.print(f"[bold cyan]Inspeção da Execução {execution_id}:[/bold cyan]")
+    console.print(f"  - [bold]Estado FSM:[/bold] {view.status.current_state.value}")
+    console.print(f"  - [bold]Node atual:[/bold] {view.status.current_node_id}")
+    console.print(f"  - [bold]Aprovação:[/bold] {view.status.approval_status.value}")
+    console.print(f"  - [bold]Artifact digest:[/bold] {view.artifact_digest}")
+    console.print(f"  - [bold]Configuration digest:[/bold] {view.configuration_digest}")
+    console.print(f"  - [bold]Initial input digest:[/bold] {view.initial_input_digest}")
+    console.print(f"  - [bold]Eventos:[/bold] {view.event_count}")
+    console.print(f"  - [bold]Tipos de evento:[/bold] {', '.join(view.event_types)}")
 
 @main.command(help="Aprova manualmente a promoção de alterações em estado AWAITING_APPROVAL.")
 @click.argument("execution_id")
-def approve(execution_id):
-    mgr = ApprovalManager(project_root=Path.cwd())
-    if mgr.approve(execution_id):
-        console.print(f"[green]{_get_symbol(True)}[/green]Execução [bold]{execution_id}[/bold] APROVADA com sucesso.")
-    else:
-        console.print(f"[red]{_get_symbol(False)}[/red]Falha ao aprovar execução {execution_id}.")
+@click.option("--approver", required=True, help="Identificador não vazio do aprovador.")
+def approve(execution_id, approver):
+    try:
+        record = _lifecycle_service(Path.cwd()).approve(
+            execution_id,
+            approver=approver,
+        )
+    except (
+        ExecutionLifecycleError,
+        StateMachineError,
+        StateStorageError,
+    ) as exc:
+        _raise_lifecycle_click_error(exc)
+    console.print(
+        f"[green]{_get_symbol(True)}[/green]Execução [bold]{execution_id}[/bold] "
+        f"aprovada na revisão {record.revision}."
+    )
+
+
+@main.command(help="Retoma uma execução exclusivamente de seu bundle canônico.")
+@click.argument("execution_id")
+def resume(execution_id):
+    try:
+        result = _lifecycle_service(Path.cwd()).resume(execution_id)
+    except (
+        ArtifactValidationError,
+        ExecutionLifecycleError,
+        GraphExecutionError,
+        NodeExecutorError,
+        StateMachineError,
+        StateStorageError,
+    ) as exc:
+        _raise_lifecycle_click_error(exc)
+    if isinstance(result, GraphExecutionPausedResult):
+        console.print(
+            f"[yellow]Execução {execution_id} permanece pausada no node "
+            f"{result.node_id}.[/yellow]"
+        )
+        return
+    console.print(
+        f"[green]{_get_symbol(True)}[/green]Execução [bold]{execution_id}[/bold] "
+        f"concluída com outcome {result.outcome}."
+    )
+
+
+@main.command(help="Cancela uma execução cancelável sob o lock canônico.")
+@click.argument("execution_id")
+def cancel(execution_id):
+    try:
+        record = _lifecycle_service(Path.cwd()).cancel(execution_id)
+    except (
+        ExecutionLifecycleError,
+        StateMachineError,
+        StateStorageError,
+    ) as exc:
+        _raise_lifecycle_click_error(exc)
+    console.print(
+        f"[green]{_get_symbol(True)}[/green]Execução [bold]{execution_id}[/bold] "
+        f"cancelada na revisão {record.revision}."
+    )
 
 @main.command(help="Executa os verificadores poliglotas aplicáveis ao projeto.")
 def verify():

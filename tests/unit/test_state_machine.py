@@ -281,6 +281,43 @@ def test_states_table_is_closed_and_illegal_self_terminal_transitions_preserve_b
     assert _journal_path(tmp_path, execution_id).read_bytes() == terminal_journal
 
 
+def test_paused_approval_can_resume_only_through_the_explicit_executing_edge(
+    tmp_path: Path,
+) -> None:
+    assert VALID_STATE_TRANSITIONS[ExecutionState.PAUSED_AWAITING_APPROVAL] == {
+        ExecutionState.EXECUTING,
+        ExecutionState.PROMOTING,
+        ExecutionState.CANCELLED,
+        ExecutionState.FAILED,
+    }
+    execution_id = "exec-paused-approval-resume"
+    storage = AtomicFileStateStorage(tmp_path)
+    storage.create_execution(_record(execution_id))
+    machine = EventSourcedStateMachine(storage, execution_id, clock=_Clock())
+    machine.transition_to(
+        ExecutionState.EXECUTING,
+        node_id="approval",
+        attempt=1,
+        reason="execution_started",
+    )
+    machine.transition_to(
+        ExecutionState.PAUSED_AWAITING_APPROVAL,
+        node_id="approval",
+        attempt=1,
+        reason="approval_requested",
+    )
+
+    resumed = machine.transition_to(
+        ExecutionState.EXECUTING,
+        node_id="approval",
+        attempt=1,
+        reason="approval_granted",
+    )
+
+    assert resumed.current_state == ExecutionState.EXECUTING
+    assert machine.recover() == resumed
+
+
 def test_replay_allows_node_revision_gaps_and_reproduces_snapshot(
     tmp_path: Path,
 ) -> None:
