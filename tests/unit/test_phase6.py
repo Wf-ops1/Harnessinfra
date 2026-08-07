@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from ai_engineering_harness.compiler.compiler import GraphCompiler
+from ai_engineering_harness.contracts.execution import ExecutionState
 from ai_engineering_harness.governance.approval import ApprovalManager
 from ai_engineering_harness.runtime.engine import (
     RuntimeEngine,
@@ -45,16 +46,18 @@ contracts: []
 
 
 def test_workflow_state_machine_transitions(tmp_path: Path):
-    fsm = WorkflowStateMachine(project_root=tmp_path, execution_id="exec-111")
-    assert fsm.current_state == WorkflowState.INITIATED
-    
-    fsm.transition_to(WorkflowState.PLANNING)
-    assert fsm.current_state == WorkflowState.PLANNING
-
-    state_file = tmp_path / ".harness" / "state" / "executions" / "exec-111" / "workflow-state.json"
-    assert state_file.is_file()
-    data = json.loads(state_file.read_text(encoding="utf-8"))
-    assert data["state"] == "PLANNING"
+    assert WorkflowState is ExecutionState
+    with pytest.raises(TypeError, match="EventJournalStateStorageProvider"):
+        WorkflowStateMachine(tmp_path, "exec-111")
+    state_file = (
+        tmp_path
+        / ".harness"
+        / "state"
+        / "executions"
+        / "exec-111"
+        / "workflow-state.json"
+    )
+    assert not state_file.exists()
 
 def test_approval_manager_flow(tmp_path: Path):
     mgr = ApprovalManager(project_root=tmp_path)

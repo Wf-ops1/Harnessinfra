@@ -31,6 +31,7 @@ from ai_engineering_harness.contracts.execution import (
 from ai_engineering_harness.persistence import (
     AtomicFileStateStorage,
     DuplicateEventError,
+    EventJournalStateStorageProvider,
     ExecutionAlreadyExistsError,
     ExecutionIdentityMismatchError,
     ExecutionLock,
@@ -193,16 +194,27 @@ def test_interface_has_exact_operations_and_public_exports(tmp_path: Path) -> No
         for name, value in vars(StateStorageProvider).items()
         if not name.startswith("_") and callable(value)
     }
+    journal_operations = {
+        name
+        for name, value in vars(EventJournalStateStorageProvider).items()
+        if not name.startswith("_") and callable(value)
+    }
     provider = AtomicFileStateStorage(tmp_path)
 
     assert operations == expected
+    assert journal_operations == {"load_events"}
     assert isinstance(provider, StateStorageProvider)
+    assert isinstance(provider, EventJournalStateStorageProvider)
     assert issubclass(RevisionConflictError, StateStorageError)
     assert issubclass(JournalIntegrityError, StateStorageError)
 
     from ai_engineering_harness import persistence
 
     assert persistence.AtomicFileStateStorage is AtomicFileStateStorage
+    assert (
+        persistence.EventJournalStateStorageProvider
+        is EventJournalStateStorageProvider
+    )
     assert persistence.StateStorageProvider is StateStorageProvider
     assert persistence.ExecutionLock is ExecutionLock
     assert persistence.save_execution_record is save_execution_record
@@ -394,6 +406,37 @@ def test_append_event_is_canonical_and_hash_chained(tmp_path: Path) -> None:
             sort_keys=True,
             separators=(",", ":"),
         ).encode("utf-8")
+
+
+def test_load_events_returns_detached_canonical_tuple_under_lock(
+    tmp_path: Path,
+) -> None:
+    provider = AtomicFileStateStorage(tmp_path)
+    provider.create_execution(_record())
+    lock = provider.acquire_execution_lock(
+        "exec-f2-2",
+        "journal-reader",
+        timeout_seconds=0,
+    )
+    try:
+        persisted = provider.append_event(
+            "exec-f2-2",
+            _event("evt-load-events", payload={"value": "canonical"}),
+            lock=lock,
+        )
+        loaded = provider.load_events("exec-f2-2", lock=lock)
+    finally:
+        provider.release_execution_lock(lock)
+
+    assert loaded == (persisted,)
+    assert isinstance(loaded, tuple)
+    loaded[0].payload["value"] = "caller-mutated"
+    assert provider.load_events("exec-f2-2")[0].payload == {
+        "value": "canonical"
+    }
+
+    with pytest.raises(ExecutionNotFoundError):
+        provider.load_events("exec-missing")
 
 
 def test_duplicate_event_and_caller_hashes_preserve_journal(tmp_path: Path) -> None:
@@ -715,6 +758,22 @@ def test_recovery_promotes_single_abandoned_journal_before_append(tmp_path: Path
         "evt-before-crash",
         "evt-after-crash",
     ]
+    assert not abandoned.exists()
+
+
+def test_load_events_recovers_single_abandoned_journal_candidate(
+    tmp_path: Path,
+) -> None:
+    provider = AtomicFileStateStorage(tmp_path)
+    provider.create_execution(_record())
+    persisted = provider.append_event("exec-f2-2", _event("evt-load-recovery"))
+    canonical = _journal_path(tmp_path, "exec-f2-2")
+    abandoned = canonical.with_name(f".{canonical.name}.load-events.tmp")
+    abandoned.write_bytes(canonical.read_bytes())
+    canonical.unlink()
+
+    assert provider.load_events("exec-f2-2") == (persisted,)
+    assert canonical.is_file()
     assert not abandoned.exists()
 
 

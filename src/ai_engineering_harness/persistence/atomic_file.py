@@ -23,6 +23,7 @@ from ai_engineering_harness.contracts.execution import (
 
 from .base import (
     DuplicateEventError,
+    EventJournalStateStorageProvider,
     ExecutionAlreadyExistsError,
     ExecutionIdentityMismatchError,
     ExecutionLock,
@@ -31,7 +32,6 @@ from .base import (
     RecoveryConflictError,
     RevisionConflictError,
     StateIntegrityError,
-    StateStorageProvider,
     StateWriteError,
 )
 from .locks import CrossProcessLockManager
@@ -112,7 +112,7 @@ def load_execution_record(project_root: Path, execution_id: str) -> ExecutionRec
     return record
 
 
-class AtomicFileStateStorage(StateStorageProvider):
+class AtomicFileStateStorage(EventJournalStateStorageProvider):
     """OS-locked, compare-and-set state storage rooted in one project."""
 
     def __init__(self, project_root: Path) -> None:
@@ -285,6 +285,23 @@ class AtomicFileStateStorage(StateStorageProvider):
                 execution_id=validated_id,
             )
             return persisted
+
+    def load_events(
+        self,
+        execution_id: str,
+        *,
+        lock: ExecutionLock | None = None,
+    ) -> tuple[ExecutionEvent, ...]:
+        """Recover and load the complete canonical journal under one lock."""
+        validated_id = self._validate_execution_id(execution_id)
+        with self._execution_guard(validated_id, lock):
+            if self._recover_record(validated_id) is None:
+                raise ExecutionNotFoundError(
+                    f"execution {validated_id!r} does not exist",
+                    execution_id=validated_id,
+                )
+            _, events = self._recover_journal(validated_id)
+            return events
 
     def list_executions(self) -> tuple[ExecutionRecord, ...]:
         """Return managed records sorted by ID under the catalog hierarchy."""

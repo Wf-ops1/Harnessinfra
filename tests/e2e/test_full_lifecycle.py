@@ -138,7 +138,10 @@ def test_full_lifecycle_e2e_python(tmp_path: Path):
     )
     assert result.outcome == "success"
     assert result.executed_node_ids == ("step1",)
-    assert storage.load_execution(execution_id).current_node_id == "completed"
+    final_record = storage.load_execution(execution_id)
+    assert final_record.current_node_id == "completed"
+    assert final_record.current_state == ExecutionState.COMPLETED
+    assert final_record.revision == 3
 
     exec_dir = tmp_path / ".harness" / "state" / "executions" / execution_id
     assert (exec_dir / "execution.json").is_file()

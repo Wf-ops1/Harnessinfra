@@ -22,8 +22,15 @@ from ai_engineering_harness.contracts import (
     TerminalStateSpec,
 )
 from ai_engineering_harness.contracts.events import ExecutionEvent
-from ai_engineering_harness.contracts.execution import ExecutionId, ExecutionRecord
-from ai_engineering_harness.persistence import ExecutionLock, StateStorageProvider
+from ai_engineering_harness.contracts.execution import (
+    ExecutionId,
+    ExecutionRecord,
+    ExecutionState,
+)
+from ai_engineering_harness.persistence import (
+    EventJournalStateStorageProvider,
+    ExecutionLock,
+)
 
 from .node_executors import (
     NodeBackendError,
@@ -35,6 +42,11 @@ from .node_executors import (
     NodeExecutorRegistry,
     NodeExecutorResultError,
     _copy_json_object,
+)
+from .state_machine import (
+    EventSourcedStateMachine,
+    InterruptedExecutionError,
+    StateReplayError,
 )
 
 
@@ -125,7 +137,7 @@ class GraphExecutor:
 
     def __init__(
         self,
-        storage: StateStorageProvider,
+        storage: EventJournalStateStorageProvider,
         executors: NodeExecutorRegistry,
         *,
         lock_timeout_seconds: float = 30.0,
@@ -133,8 +145,10 @@ class GraphExecutor:
         event_id_factory: Callable[[], str] | None = None,
         owner_id_factory: Callable[[], str] | None = None,
     ) -> None:
-        if not isinstance(storage, StateStorageProvider):
-            raise TypeError("storage must implement StateStorageProvider")
+        if not isinstance(storage, EventJournalStateStorageProvider):
+            raise TypeError(
+                "storage must implement EventJournalStateStorageProvider"
+            )
         if not isinstance(executors, NodeExecutorRegistry):
             raise TypeError("executors must be a NodeExecutorRegistry")
         if (
@@ -197,11 +211,73 @@ class GraphExecutor:
         terminals = {terminal.id: terminal for terminal in artifact.graph.terminal_states}
         record = self._storage.load_execution(execution_id, lock=lock)
         self._validate_execution_identity(record, artifact)
+        state_machine = EventSourcedStateMachine(
+            self._storage,
+            execution_id,
+            lock_timeout_seconds=self._lock_timeout_seconds,
+            clock=self._clock,
+            event_id_factory=self._event_id_factory,
+            owner_id_factory=self._owner_id_factory,
+            lock=lock,
+        )
+        record = state_machine.recover(lock=lock)
 
         current_payload = initial_input
         visited: set[str] = set()
         executed_node_ids: list[str] = []
         last_failure: NodeExecutionFailure | None = None
+
+        initial_id = record.current_node_id
+        initial_terminal = terminals.get(initial_id)
+        if initial_terminal is not None:
+            expected_state = self._terminal_execution_state(initial_terminal)
+            if record.current_state != expected_state:
+                raise StateReplayError(
+                    "terminal node and execution snapshot state diverge",
+                    execution_id=execution_id,
+                )
+            return self._resolve_terminal(
+                artifact,
+                record,
+                initial_terminal,
+                current_payload,
+                (),
+                None,
+                lock,
+                state_machine=None,
+            )
+
+        initial_node = nodes.get(initial_id)
+        if initial_node is None:
+            raise UnknownCurrentNodeError(
+                f"current node {initial_id!r} is not declared by the artifact",
+                execution_id=execution_id,
+                node_id=initial_id,
+            )
+        self._validate_node_input(
+            artifact,
+            initial_node,
+            current_payload,
+            execution_id,
+        )
+        initial_executor = self._executors.select(initial_node)
+        initial_executor.ensure_available()
+        if (
+            record.current_state != ExecutionState.INITIATED
+            or initial_id != artifact.graph.graph.entrypoint
+        ):
+            raise InterruptedExecutionError(
+                "nonterminal execution requires the F2.5 resume contract",
+                execution_id=execution_id,
+            )
+        initial_attempt = record.attempt_by_node.get(initial_id, 0) + 1
+        record = state_machine.transition_to(
+            ExecutionState.EXECUTING,
+            node_id=initial_id,
+            attempt=initial_attempt,
+            reason="graph_execution_started",
+            lock=lock,
+        )
 
         while True:
             current_id = record.current_node_id
@@ -215,6 +291,7 @@ class GraphExecutor:
                     tuple(executed_node_ids),
                     last_failure,
                     lock,
+                    state_machine=state_machine,
                 )
 
             node = nodes.get(current_id)
@@ -321,6 +398,8 @@ class GraphExecutor:
         executed_node_ids: tuple[str, ...],
         last_failure: NodeExecutionFailure | None,
         lock: ExecutionLock,
+        *,
+        state_machine: EventSourcedStateMachine | None,
     ) -> GraphExecutionResult:
         executor = self._executors.select(terminal)
         executor.ensure_available()
@@ -337,16 +416,38 @@ class GraphExecutor:
         failure = None
         if terminal.outcome == "failure":
             failure = last_failure or terminal_result.failure
+        final_record = record
+        if state_machine is not None:
+            final_state = self._terminal_execution_state(terminal)
+            final_record = state_machine.transition_to(
+                final_state,
+                node_id=terminal.id,
+                attempt=0,
+                reason=(
+                    "graph_completed"
+                    if final_state == ExecutionState.COMPLETED
+                    else "graph_failed"
+                ),
+                lock=lock,
+            )
         return GraphExecutionResult(
             execution_id=record.execution_id,
             terminal_id=terminal.id,
             outcome=terminal.outcome,
             output=terminal_result.output,
             executed_node_ids=executed_node_ids,
-            final_revision=record.revision,
+            final_revision=final_record.revision,
             fencing_token=lock.fencing_token,
             failure=failure,
         )
+
+    @staticmethod
+    def _terminal_execution_state(
+        terminal: TerminalStateSpec,
+    ) -> ExecutionState:
+        if terminal.outcome == "success":
+            return ExecutionState.COMPLETED
+        return ExecutionState.FAILED
 
     @staticmethod
     def _execute_node(

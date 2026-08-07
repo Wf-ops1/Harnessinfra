@@ -191,12 +191,27 @@ def test_linear_three_node_graph_uses_compiled_edges(tmp_path: Path) -> None:
     assert result.output == {"trace": ["collect", "build", "verify"]}
     record = storage.load_execution(execution_id)
     assert record.current_node_id == "completed"
-    assert record.revision == 3
+    assert record.revision == 5
+    assert record.current_state == ExecutionState.COMPLETED
     events = _journal(tmp_path, execution_id)
-    assert [event["payload"].get("next_id") for event in events[1::2]] == [
+    assert [
+        event["payload"].get("next_id")
+        for event in events
+        if event["event_type"] == "NODE_COMPLETED"
+    ] == [
         "build",
         "verify",
         "completed",
+    ]
+    assert [event["event_type"] for event in events] == [
+        "STATE_TRANSITIONED",
+        "NODE_STARTED",
+        "NODE_COMPLETED",
+        "NODE_STARTED",
+        "NODE_COMPLETED",
+        "NODE_STARTED",
+        "NODE_COMPLETED",
+        "STATE_TRANSITIONED",
     ]
 
 
@@ -230,7 +245,10 @@ def test_failure_branch_reaches_only_explicit_failure_terminal(tmp_path: Path) -
     assert result.failure.code == "e2e_failure"
     record = storage.load_execution(execution_id)
     assert record.current_node_id == "failed"
-    assert record.revision == 2
+    assert record.revision == 4
+    assert record.current_state == ExecutionState.FAILED
     events = _journal(tmp_path, execution_id)
-    assert events[-1]["event_type"] == "NODE_FAILED"
-    assert events[-1]["payload"]["next_id"] == "failed"
+    assert events[-2]["event_type"] == "NODE_FAILED"
+    assert events[-2]["payload"]["next_id"] == "failed"
+    assert events[-1]["event_type"] == "STATE_TRANSITIONED"
+    assert events[-1]["payload"]["to_state"] == "FAILED"

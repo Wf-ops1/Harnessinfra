@@ -30,6 +30,7 @@ from ai_engineering_harness.contracts.execution import (
 )
 from ai_engineering_harness.persistence import (
     AtomicFileStateStorage,
+    EventJournalStateStorageProvider,
     ExecutionLock,
     StateStorageProvider,
     StateWriteError,
@@ -39,9 +40,9 @@ from ai_engineering_harness.runtime import (
     ArtifactExecutionMismatchError,
     DeterministicNodeExecutor,
     GraphCycleExecutionError,
-    GraphEventConstructionError,
     GraphExecutor,
     HumanApprovalNodeExecutor,
+    InterruptedExecutionError,
     KnowledgeSyncNodeExecutor,
     NodeBackendError,
     NodeExecutionContext,
@@ -49,6 +50,8 @@ from ai_engineering_harness.runtime import (
     NodeExecutorRegistry,
     NodeExecutorUnavailableError,
     NodeInputValidationError,
+    StateReplayError,
+    StateTransitionIntegrityError,
     TerminalNodeExecutor,
     UnknownCurrentNodeError,
 )
@@ -177,6 +180,14 @@ class _FailingStorage:
         if self.append_count == self.fail_append_number:
             raise StateWriteError("controlled append failure", execution_id=execution_id)
         return self.inner.append_event(execution_id, event, lock=lock)
+
+    def load_events(
+        self,
+        execution_id: str,
+        *,
+        lock: ExecutionLock | None = None,
+    ) -> tuple[ExecutionEvent, ...]:
+        return self.inner.load_events(execution_id, lock=lock)
 
     def list_executions(self) -> tuple[ExecutionRecord, ...]:
         return self.inner.list_executions()
@@ -348,7 +359,7 @@ def _record(
 
 
 def _executor(
-    storage: StateStorageProvider,
+    storage: EventJournalStateStorageProvider,
     registry: NodeExecutorRegistry,
 ) -> GraphExecutor:
     return GraphExecutor(
@@ -455,26 +466,31 @@ def test_linear_execution_persists_events_cas_terminal_and_fencing(tmp_path: Pat
     assert result.outcome == "success"
     assert result.terminal_id == "completed"
     assert result.executed_node_ids == ("first", "second")
-    assert result.final_revision == 2
+    assert result.final_revision == 4
     assert result.output == {"trace": ["first", "second"]}
     persisted = storage.load_execution("exec-linear")
     assert persisted.current_node_id == "completed"
-    assert persisted.revision == 2
+    assert persisted.revision == 4
+    assert persisted.current_state == ExecutionState.COMPLETED
     assert persisted.attempt_by_node == {"first": 1, "second": 1}
     events = _journal(tmp_path, "exec-linear")
     assert [event["event_type"] for event in events] == [
+        "STATE_TRANSITIONED",
         "NODE_STARTED",
         "NODE_COMPLETED",
         "NODE_STARTED",
         "NODE_COMPLETED",
+        "STATE_TRANSITIONED",
     ]
     assert all(event["payload"]["fencing_token"] == result.fencing_token for event in events)
-    assert [event["payload"].get("next_id") for event in events] == [
+    assert [event["payload"].get("next_id") for event in events[1:-1]] == [
         None,
         "second",
         None,
         "completed",
     ]
+    assert events[0]["payload"]["to_state"] == "EXECUTING"
+    assert events[-1]["payload"]["to_state"] == "COMPLETED"
 
 
 def test_valid_input_contract_and_output_contract_complete(tmp_path: Path) -> None:
@@ -493,8 +509,10 @@ def test_valid_input_contract_and_output_contract_complete(tmp_path: Path) -> No
     assert result.outcome == "success"
     assert result.output == {"result": "ok"}
     assert [event["event_type"] for event in _journal(tmp_path, "exec-valid-contracts")] == [
+        "STATE_TRANSITIONED",
         "NODE_STARTED",
         "NODE_COMPLETED",
+        "STATE_TRANSITIONED",
     ]
 
 
@@ -536,8 +554,14 @@ def test_invalid_output_follows_failure_edge(tmp_path: Path) -> None:
     assert result.failure.code == "invalid_node_output"
     assert storage.load_execution("exec-invalid-output").current_node_id == "failed"
     events = _journal(tmp_path, "exec-invalid-output")
-    assert [event["event_type"] for event in events] == ["NODE_STARTED", "NODE_FAILED"]
-    assert events[-1]["payload"]["error_code"] == "invalid_node_output"
+    assert [event["event_type"] for event in events] == [
+        "STATE_TRANSITIONED",
+        "NODE_STARTED",
+        "NODE_FAILED",
+        "STATE_TRANSITIONED",
+    ]
+    assert events[-2]["payload"]["error_code"] == "invalid_node_output"
+    assert events[-1]["payload"]["to_state"] == "FAILED"
 
 
 def test_backend_failure_follows_only_failure_edge(tmp_path: Path) -> None:
@@ -573,7 +597,7 @@ def test_malformed_backend_result_follows_failure_edge(tmp_path: Path) -> None:
     assert result.outcome == "failure"
     assert result.failure is not None
     assert result.failure.code == "invalid_node_result"
-    assert _journal(tmp_path, "exec-malformed")[-1]["event_type"] == "NODE_FAILED"
+    assert _journal(tmp_path, "exec-malformed")[-2]["event_type"] == "NODE_FAILED"
 
 
 def test_invalid_event_id_prevents_backend_and_cas(tmp_path: Path) -> None:
@@ -591,7 +615,7 @@ def test_invalid_event_id_prevents_backend_and_cas(tmp_path: Path) -> None:
         owner_id_factory=lambda: "unit-test-worker",
     )
 
-    with pytest.raises(GraphEventConstructionError):
+    with pytest.raises(StateTransitionIntegrityError):
         executor.execute(artifact, "exec-invalid-event", {})
 
     assert trace == []
@@ -674,8 +698,8 @@ def test_cycle_revisit_is_rejected_before_second_execution(tmp_path: Path) -> No
         executor.execute(artifact, "exec-cycle", {"trace": []})
 
     assert trace == ["loop"]
-    assert storage.load_execution("exec-cycle").revision == 1
-    assert len(_journal(tmp_path, "exec-cycle")) == 2
+    assert storage.load_execution("exec-cycle").revision == 2
+    assert len(_journal(tmp_path, "exec-cycle")) == 3
 
 
 def test_append_failure_prevents_backend_and_cas(tmp_path: Path) -> None:
@@ -684,6 +708,7 @@ def test_append_failure_prevents_backend_and_cas(tmp_path: Path) -> None:
     inner.create_execution(_record(artifact, "exec-append-failure"))
     storage = _FailingStorage(inner, fail_append_number=1)
     assert isinstance(storage, StateStorageProvider)
+    assert isinstance(storage, EventJournalStateStorageProvider)
     trace: list[str] = []
 
     with pytest.raises(StateWriteError):
@@ -715,30 +740,84 @@ def test_cas_failure_is_not_masked_and_preserves_events(tmp_path: Path) -> None:
 
     assert inner.load_execution("exec-cas-failure").revision == 0
     assert [event["event_type"] for event in _journal(tmp_path, "exec-cas-failure")] == [
-        "NODE_STARTED",
-        "NODE_COMPLETED",
+        "STATE_TRANSITIONED",
     ]
 
 
 def test_terminal_worker_does_not_reexecute_node(tmp_path: Path) -> None:
     artifact = _artifact([_deterministic_node("gate", "completed")])
     storage = AtomicFileStateStorage(tmp_path)
-    storage.create_execution(
-        _record(artifact, "exec-terminal-worker", current_node_id="completed")
-    )
+    storage.create_execution(_record(artifact, "exec-terminal-worker"))
     trace: list[str] = []
-    result = _executor(
+    executor = _executor(
         storage,
         NodeExecutorRegistry(
             deterministic=DeterministicNodeExecutor(_TraceBackend(trace)),
         ),
-    ).execute(artifact, "exec-terminal-worker", {"preserved": True})
+    )
+    first = executor.execute(artifact, "exec-terminal-worker", {})
+    journal_before = _journal(tmp_path, "exec-terminal-worker")
+    result = executor.execute(
+        artifact,
+        "exec-terminal-worker",
+        {"preserved": True},
+    )
 
+    assert first.executed_node_ids == ("gate",)
     assert result.outcome == "success"
     assert result.executed_node_ids == ()
-    assert result.final_revision == 0
-    assert trace == []
-    assert _journal(tmp_path, "exec-terminal-worker") == []
+    assert result.final_revision == 3
+    assert trace == ["gate"]
+    assert _journal(tmp_path, "exec-terminal-worker") == journal_before
+
+
+def test_terminal_snapshot_mismatch_is_side_effect_free(tmp_path: Path) -> None:
+    artifact = _artifact([_deterministic_node("gate", "completed")])
+    execution_id = "exec-terminal-mismatch"
+    storage = AtomicFileStateStorage(tmp_path)
+    storage.create_execution(
+        _record(artifact, execution_id, current_node_id="completed")
+    )
+
+    with pytest.raises(StateReplayError, match="terminal node"):
+        _executor(storage, NodeExecutorRegistry()).execute(
+            artifact,
+            execution_id,
+            {},
+        )
+
+    assert storage.load_execution(execution_id).revision == 0
+    assert _journal(tmp_path, execution_id) == []
+
+
+def test_interrupted_execution_does_not_reexecute_backend(tmp_path: Path) -> None:
+    artifact = _artifact(
+        [
+            _deterministic_node(
+                "loop",
+                "loop",
+                retry_policy={"max_iterations": 2, "exit_condition": "later"},
+            )
+        ]
+    )
+    storage = AtomicFileStateStorage(tmp_path)
+    storage.create_execution(_record(artifact, "exec-interrupted"))
+    trace: list[str] = []
+    executor = _executor(
+        storage,
+        NodeExecutorRegistry(
+            deterministic=DeterministicNodeExecutor(_TraceBackend(trace)),
+        ),
+    )
+    with pytest.raises(GraphCycleExecutionError):
+        executor.execute(artifact, "exec-interrupted", {})
+    journal_before = _journal(tmp_path, "exec-interrupted")
+
+    with pytest.raises(InterruptedExecutionError):
+        executor.execute(artifact, "exec-interrupted", {})
+
+    assert trace == ["loop"]
+    assert _journal(tmp_path, "exec-interrupted") == journal_before
 
 
 def test_concurrent_workers_do_not_duplicate_effect(tmp_path: Path) -> None:
@@ -779,4 +858,6 @@ def test_concurrent_workers_do_not_duplicate_effect(tmp_path: Path) -> None:
     assert sorted(result[1] for result in results) == [(), ("gate",)]
     assert len({result[2] for result in results}) == 2
     assert marker.read_text(encoding="utf-8").splitlines() == ["gate"]
-    assert storage.load_execution(execution_id).revision == 1
+    persisted = storage.load_execution(execution_id)
+    assert persisted.revision == 3
+    assert persisted.current_state == ExecutionState.COMPLETED
