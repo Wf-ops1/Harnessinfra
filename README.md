@@ -3,14 +3,15 @@
 > **Status atual: Protótipo / Em desenvolvimento**
 
 O AI Engineering Harness é hoje uma base Python instalável para experimentar um harness de engenharia
-agentic local-first. O repositório já possui empacotamento reproduzível, CLI, contratos, compiladores,
-FSM, verificadores, auditoria e testes. A execução autônoma segura sobre um repositório externo ainda
-não está pronta: integrações de modelo e MCP são simuladas, o isolamento Git não cria um worktree real
-e promoção/rollback não cumprem ainda o contrato operacional do produto.
+agentic local-first. O repositório já possui empacotamento reproduzível, compilador único e
+determinístico, execução dirigida pelas arestas do artefato, persistência concorrente, FSM por eventos
+e retomada canônica com aprovação e cancelamento. A execução autônoma segura sobre um repositório
+externo ainda não está pronta: retry com contexto real, providers, ferramentas, isolamento Git,
+promoção, rollback e governança operacional permanecem incompletos ou simulados.
 
 Não use `harness run`, `harness doctor` ou `harness rollback` como garantia de segurança em um
-repositório valioso. Até os gates F1-F7 serem concluídos, execute esses comandos somente em cópias
-descartáveis.
+repositório valioso. Até a F2.6 e as Fases 3–7 serem concluídas, execute esses comandos somente em
+cópias descartáveis.
 
 ## Objetivo do produto
 
@@ -36,15 +37,25 @@ auditável. Isso é a direção do produto, não uma descrição do estado entre
 |---|---|---|---|
 | Ambiente e pacote | `uv.lock`, build de wheel, metadata e toolchain reproduzível | Bootstrap ainda depende de instalar `uv` | Distribuição e instalação externa suportadas como produto |
 | Versionamento | Package version única e schemas graph/artifact/policy separados | Compatibilidade ainda é comparação exata | Migrações compatíveis e política de evolução |
-| CLI e scaffold | `--help`, `--version` e `init` existem e têm testes | Demais comandos exercitam componentes do protótipo | UX estável para CLI e IDE em repositórios externos |
-| Compilação de grafos | Contratos e validadores existem | Há dois caminhos de compilação e o runtime não é governado integralmente pelas arestas | Compilador único, determinístico e fail-closed na F1 |
-| Runtime/FSM | Estados, contexto, plano, evidência e diário local existem | O fluxo é orquestrado por sequência fixa e pode concluir com efeitos simulados | Execução persistida e retomável dirigida pelo artefato na F2 |
+| CLI e scaffold | `--help`, `--version`, `init`, `compile`, `run`, `resume`, `approve`, `cancel`, `status` e `inspect` possuem contratos e testes | Sem backends reais, `run` falha no preflight; doctor, audit, verify e rollback ainda cobrem componentes incompletos | UX estável para CLI e IDE em repositórios externos |
+| Compilação de grafos | Um único `GraphCompiler` valida contratos/policies e publica artefato 2.0 determinístico, versionado, íntegro e atômico | Capabilities compiladas ainda são declarativas, sem provar adapter disponível ou autorização runtime | Migrações de schema e expansão segura de workflows após o MVP |
+| Runtime/FSM | `GraphExecutor` segue somente arestas compiladas; record/journal usam lock, CAS e fencing; FSM event-sourced e lifecycle retomável suportam aprovação e cancelamento | Efeito interrompido sem outcome exige intervenção; executores dependem de backends injetados ainda indisponíveis no produto | Retry com contexto real na F2.6 e efeitos reais integrados nas Fases 3–6 |
 | Providers LLM | Interfaces, registry e router existem | OpenAI, Anthropic e local fabricam respostas; não fazem chamadas reais | Providers remoto e local reais, com erros tipados, na F3 |
 | Serena e Codebase-Memory | Interfaces/adapters existem | Serena apenas cria/toca arquivo; memória retorna `mock_ast` | Transporte MCP real ou adapter local explicitamente configurado |
 | Verificação e auditoria | Subprocessos de gates e hash chain local possuem testes | Há caminhos de gate vazio e garantias ainda incompletas | Gates fail-closed, redaction e recovery operacional |
 | Doctor | Relatório e modelo de probe existem | Todos os seis estágios retornam saudáveis sem testar componentes | Probes reais de configuração, alcance, autenticação e capacidade |
 | Worktree, promoção e rollback | Estruturas e comandos prototípicos existem | Worktree é diretório comum; promoção usa dry-run/SHA sintético; rollback é parcial | `git worktree`, candidate commit, cherry-pick e `git revert` reais |
 | CI e release | GitHub Actions executa quality/tests/package em Windows e Linux; `main` exige `CI required`, com bloqueio e restauração comprovados | A CI prova o baseline técnico, não as capacidades operacionais ainda simuladas | Distribuição pública e processo de release operacional na F7 |
+
+## Estado do roadmap
+
+- **Fase 0 concluída:** ambiente reproduzível, documentação honesta e CI protegida.
+- **Fase 1 concluída:** contrato de grafo, registries seguros, compilador único e artefato 2.0
+  determinístico.
+- **F2.1–F2.5 concluídas:** record atômico, storage concorrente, execução por grafo, FSM por eventos e
+  retomada vinculada ao artefato/configuração originais.
+- **Próximo marco:** F2.6, retry que consome erro, tool call, outputs redigidos, gates, diff e orçamento
+  reais; depois, providers, tools e worktree das fases seguintes.
 
 ## Dívidas técnicas críticas
 
