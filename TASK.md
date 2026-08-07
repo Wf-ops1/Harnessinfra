@@ -247,8 +247,8 @@ defensibility:
 retomada após interrupção.
 
 **Status da fase:** `in_progress` — F1 e F2.1–F2.5 foram promovidas por merge commits para `main`,
-com os respectivos CIs pós-merge integralmente verdes. A F2.6 está `in_progress`, com gate de
-defensabilidade `READY` e implementação ainda não iniciada neste checkpoint.
+com os respectivos CIs pós-merge integralmente verdes. A F2.6 está concluída e validada localmente;
+promoção por PR, CI remoto pré-merge e CI pós-merge ainda estão pendentes.
 
 ### Coordenação e ambiente observado
 
@@ -257,7 +257,7 @@ defensabilidade `READY` e implementação ainda não iniciada neste checkpoint.
 | **Executor ativo** | `Codex` — responsável por implementar, validar, manter checkpoints e criar commits locais |
 | **Auditor/revisor** | `Antigravity` — somente-leitura por padrão; só edita quando o usuário solicitar explicitamente ou transferir a execução |
 | **Workspace** | `C:\Users\walla\OneDrive\Desktop\ai-engineering-harness` |
-| **Git** | `available` — `task/f2.6-retry-context` foi criada limpa de `main == origin/main == 3596df3ed1c27cc82d31b2beccd6416c8424dd27`, após `git fetch` e comprovação do run pós-merge `31211290100` em `completed/success`; nenhuma mudança de produto precede o gate F2.6 |
+| **Git** | `available` — `task/f2.6-retry-context` foi criada limpa de `main == origin/main == 3596df3ed1c27cc82d31b2beccd6416c8424dd27`, após `git fetch` e comprovação do run pós-merge `31211290100` em `completed/success`; gate `df81516` e implementação F2.6 validada permanecem somente locais até o PR |
 | **python_command** | `& 'C:\Users\walla\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe'` — Python `3.12.13` |
 | **uv_command** | `& '.\build\f0.6-tools\uv\bin\uv.exe'` — uv `0.11.32` restaurado de forma isolada/ignorada, sem PATH ou instalação global; `lock --check` e `sync --all-extras --locked` verdes |
 | **Dependências do projeto** | `.venv` gerida pelo uv 0.11.32 com Python 3.12.13 e `uv.lock`; nenhuma dependência foi adicionada; baseline pós-rollback passa mypy em targets `linux` e `win32`; run 31146423972 do rollback concluiu 11/11 verde |
@@ -2014,10 +2014,10 @@ run pós-merge `31209619778` integralmente verde; branch e checkpoints preservad
 
 | Campo | Detalhe |
 |---|---|
-| **Status** | `in_progress` — gate de defensabilidade `READY`; nenhum Python/teste F2.6 alterado antes deste checkpoint |
+| **Status** | `completed localmente` — gate `READY → COMPLETED`; promoção e CIs remotos pendentes |
 | **Objetivo** | Executar somente retries autorizados pelas arestas compiladas e pelo limite do `retry_policy`, entregando ao backend evidência real, tipada, redigida e retomável da falha anterior, sem repetir a mesma invocação às cegas |
 | **Branch exclusiva** | `task/f2.6-retry-context`, criada limpa de `main == origin/main == 3596df3ed1c27cc82d31b2beccd6416c8424dd27` |
-| **Checkpoint de rollback** | merge `3596df3ed1c27cc82d31b2beccd6416c8424dd27`; tag local `checkpoint/f2.6-ready` será criada no commit deste gate |
+| **Checkpoint de rollback** | `checkpoint/f2.6-ready^{}` → `df81516963fc347b5b13689a1d9dfbadfe05a85c`; tag local `checkpoint/f2.6-complete` será criada no commit de implementação |
 | **Executor** | `Codex`, único escritor, sob autorização explícita do usuário em `continue` às 2026-08-07 16:42 -03:00 |
 | **Dependências** | Nenhuma nova; reutilizar artefato F1, record/attempts F2.1, storage/lock/CAS F2.2, arestas F2.3, estado `FAILED_RETRY_EXHAUSTED` F2.4, bundle/payload/ledger/resume F2.5 e `security.Redactor` existente |
 
@@ -2229,6 +2229,41 @@ defensibility:
 [x] rollback não destrutivo com gatilhos objetivos e verificação executável
 [x] desvio histórico de espera do CI pré-merge reconhecido; F2.6 não será mesclada antes de CI do PR verde
 [x] executor e horário de autorização registrados; gate READY antes do primeiro arquivo de código/teste
+```
+
+#### Resultado verificado da F2.6
+
+| Evidência | Resultado observado |
+|---|---|
+| Contratos | `FailedToolCall`, `RetryBudget`, `RetryEvidence` e `RetryContext` são estritos, congelados e exportados; falha retryable sem evidência acionável é rejeitada |
+| Consumo real | `NodeExecutionContext.retry_context` é `None` na execução inicial e contém origin, tentativa atual, erro/tool, stdout/stderr redigidos, gates, diff, orçamento e instrução nas invocações corretivas |
+| Arestas e ciclo | Falha segue `on_failure`, correção segue `on_success` e contexto multinode permanece até o node de origem concluir; ciclo de sucesso sem episódio continua recusado |
+| Limite | `max_iterations` limita invocações totais por node; tentativa excedente não publica `NODE_STARTED` nem chama backend e transiciona para `FAILED_RETRY_EXHAUSTED`; novo resume é fail-closed e idempotente |
+| Durabilidade | Contexto redigido é payload canônico content-addressed; `NODE_STARTED.retry_context_digest` e outcome `next_retry_context_digest` formam cadeia validada por attempt/origin/edge; tamper falha antes do backend |
+| Crash e resume | E2E interrompe depois da falha e antes do retry; record fica em `code` com attempts 1/1, resume recarrega o contexto e conclui `code:2 → verify:2` sem repetir nodes concluídos |
+| Redaction | Segredo conhecido não aparece no contexto entregue, payloads, journal ou erro; journal contém apenas códigos, booleans, metadados e digests |
+| Focais | `5 passed` no filtro unitário retry/cycle; `7 passed` no conjunto unitário + E2E focal |
+| Regressão Fase 2 | `144 passed` em storage, FSM, graph executor, lifecycle, crash/resume, aprovação, concorrência e todos os E2E F2 |
+| Suíte integral | `446 passed, 6 subtests passed`, sem novo skip/xfail |
+| Qualidade | mypy sem issues em 98 arquivos; Ruff e compileall verdes; `uv lock --check` e `sync --all-extras --locked` verdes |
+| Distribuição | sdist/wheel 0.1.0 construídas; smoke externo da wheel validou metadata/CLI/origem instalada; smoke do artefato 2.0 validou 24 manifest entries e rejeitou tamper/schema incompatível |
+| Documentação | README reconhece a Fase 2 concluída sem promover capacidades F3–F7; `8 passed, 6 subtests passed` em documentação/encoding |
+| Escopo | Exatos sete paths do allowlist; dependências, CI, schemas, YAML, compiler, persistence, FSM, lifecycle/CLI/engine, security, governance, F3–F7 e demais testes permanecem byte-idênticos |
+
+#### Checklist de conclusão local F2.6
+
+```text
+[x] RetryContext recebe todas as evidências exigidas e é redigido antes de persistir/entregar
+[x] retry corrige na segunda tentativa em ciclo multinode declarado pelo artefato
+[x] retry esgotado para sem terceiro efeito e persiste FAILED_RETRY_EXHAUSTED
+[x] crash antes do retry retoma pelo digest sem repetir nodes concluídos
+[x] contexto ausente/adulterado, ciclo cego e crash ambíguo permanecem fail-closed
+[x] 446 testes + 6 subtests; mypy 98; Ruff, compileall, lock/sync, build e smokes verdes
+[x] README/TASK alinhados; sete paths do allowlist e nenhuma fronteira F3–F7 alterada
+[x] commit/tag checkpoint/f2.6-complete criados neste fechamento local
+[ ] branch publicada e PR único aberto
+[ ] CI required do PR concluído e verde antes do merge
+[ ] merge autorizado e CI pós-merge de main concluído e verde
 ```
 
 ---
@@ -4799,13 +4834,13 @@ de `main`.
 Data:              2026-08-07
 Fase:              F2
 Tarefa:            F2.6 — retry com contexto real
-Estado:            IN_PROGRESS; gate de defensabilidade READY; implementação ainda não iniciada
+Estado:            COMPLETED LOCALMENTE; promoção e CI remoto pendentes
 Baseline:          main/origin 3596df3; run pós-merge 31211290100, 11/11 verde
 Escopo:            runtime boundary/travessia/ledger + testes F2.6 + fechamento TASK/README
-Validações:        probe de ausência/rejeição reproduzido; critérios completos congelados no dossiê
-Checkpoint:         tag local `checkpoint/f2.6-ready` será criada no commit deste gate
+Validações:        446 testes + 6 subtests; mypy 98; Ruff, compileall, lock/sync, build e smokes verdes
+Checkpoint:         `checkpoint/f2.6-ready^{}` = df81516; `checkpoint/f2.6-complete` no commit final
 Promoção:          proibida antes de PR CI required=success; merge exige autorização e nova checagem
-Resultado:         pendente — implementar sem antecipar F3–F7
+Resultado:         retry real/redigido/retomável e limitado concluído sem antecipar F3–F7
 ```
 
 ---
@@ -4813,14 +4848,12 @@ Resultado:         pendente — implementar sem antecipar F3–F7
 ## 11. Próxima Ação Exata
 
 ```text
-EXECUTAR SOMENTE F2.6 A PARTIR DO GATE READY:
-1. Criar o commit/tag local `checkpoint/f2.6-ready` contendo apenas este dossiê.
-2. Implementar contratos de evidência/contexto, retry por arestas, limite, ledger/digest e resume
-   estritamente nos sete paths do allowlist.
-3. Executar todos os critérios congelados; registrar resultado e checkpoint completo no TASK.md.
-4. Publicar um único PR somente após validação local; aguardar `CI required=success` do PR antes de
-   qualquer merge. Depois do merge autorizado, confirmar CI pós-merge verde antes de iniciar F3.
-5. Não implementar provider/tool/worktree F3, contexto/gates F4, governança F5,
+PROMOVER SOMENTE A F2.6 VALIDADA:
+1. Publicar somente `task/f2.6-retry-context` e abrir um único PR para `main`; não publicar tags.
+2. Aguardar todos os checks do PR e comprovar `CI required=success` antes de qualquer merge.
+3. Somente após o CI pré-merge verde, executar merge commit autorizado; depois confirmar CI pós-merge
+   verde em `main`. Não iniciar F3 antes dessa comprovação.
+4. Não implementar provider/tool/worktree F3, contexto/gates F4, governança F5,
    observabilidade/recovery F6 ou release F7 como parte da F2.6.
 ```
 

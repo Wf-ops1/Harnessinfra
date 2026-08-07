@@ -5,13 +5,13 @@
 O AI Engineering Harness é hoje uma base Python instalável para experimentar um harness de engenharia
 agentic local-first. O repositório já possui empacotamento reproduzível, compilador único e
 determinístico, execução dirigida pelas arestas do artefato, persistência concorrente, FSM por eventos
-e retomada canônica com aprovação e cancelamento. A execução autônoma segura sobre um repositório
-externo ainda não está pronta: retry com contexto real, providers, ferramentas, isolamento Git,
-promoção, rollback e governança operacional permanecem incompletos ou simulados.
+e retomada canônica com aprovação, cancelamento e retry limitado por contexto real e redigido. A
+execução autônoma segura sobre um repositório externo ainda não está pronta: providers, ferramentas,
+isolamento Git, promoção, rollback e governança operacional permanecem incompletos ou simulados.
 
 Não use `harness run`, `harness doctor` ou `harness rollback` como garantia de segurança em um
-repositório valioso. Até a F2.6 e as Fases 3–7 serem concluídas, execute esses comandos somente em
-cópias descartáveis.
+repositório valioso. Embora a Fase 2 esteja implementada, as Fases 3–7 ainda não estão concluídas;
+execute esses comandos somente em cópias descartáveis.
 
 ## Objetivo do produto
 
@@ -39,7 +39,7 @@ auditável. Isso é a direção do produto, não uma descrição do estado entre
 | Versionamento | Package version única e schemas graph/artifact/policy separados | Compatibilidade ainda é comparação exata | Migrações compatíveis e política de evolução |
 | CLI e scaffold | `--help`, `--version`, `init`, `compile`, `run`, `resume`, `approve`, `cancel`, `status` e `inspect` possuem contratos e testes | Sem backends reais, `run` falha no preflight; doctor, audit, verify e rollback ainda cobrem componentes incompletos | UX estável para CLI e IDE em repositórios externos |
 | Compilação de grafos | Um único `GraphCompiler` valida contratos/policies e publica artefato 2.0 determinístico, versionado, íntegro e atômico | Capabilities compiladas ainda são declarativas, sem provar adapter disponível ou autorização runtime | Migrações de schema e expansão segura de workflows após o MVP |
-| Runtime/FSM | `GraphExecutor` segue somente arestas compiladas; record/journal usam lock, CAS e fencing; FSM event-sourced e lifecycle retomável suportam aprovação e cancelamento | Efeito interrompido sem outcome exige intervenção; executores dependem de backends injetados ainda indisponíveis no produto | Retry com contexto real na F2.6 e efeitos reais integrados nas Fases 3–6 |
+| Runtime/FSM | `GraphExecutor` segue somente arestas compiladas; record/journal usam lock, CAS e fencing; FSM event-sourced e lifecycle retomável suportam aprovação, cancelamento e retry com evidência redigida, limite e resume por digest | Efeito interrompido sem outcome exige intervenção; executores dependem de backends injetados ainda indisponíveis no produto | Efeitos reais e repair loop completo integrados nas Fases 3–6 |
 | Providers LLM | Interfaces, registry e router existem | OpenAI, Anthropic e local fabricam respostas; não fazem chamadas reais | Providers remoto e local reais, com erros tipados, na F3 |
 | Serena e Codebase-Memory | Interfaces/adapters existem | Serena apenas cria/toca arquivo; memória retorna `mock_ast` | Transporte MCP real ou adapter local explicitamente configurado |
 | Verificação e auditoria | Subprocessos de gates e hash chain local possuem testes | Há caminhos de gate vazio e garantias ainda incompletas | Gates fail-closed, redaction e recovery operacional |
@@ -52,10 +52,11 @@ auditável. Isso é a direção do produto, não uma descrição do estado entre
 - **Fase 0 concluída:** ambiente reproduzível, documentação honesta e CI protegida.
 - **Fase 1 concluída:** contrato de grafo, registries seguros, compilador único e artefato 2.0
   determinístico.
-- **F2.1–F2.5 concluídas:** record atômico, storage concorrente, execução por grafo, FSM por eventos e
-  retomada vinculada ao artefato/configuração originais.
-- **Próximo marco:** F2.6, retry que consome erro, tool call, outputs redigidos, gates, diff e orçamento
-  reais; depois, providers, tools e worktree das fases seguintes.
+- **Fase 2 concluída:** record atômico, storage concorrente, execução por grafo, FSM por eventos,
+  retomada vinculada ao artefato/configuração originais e retry que consome erro, tool call,
+  stdout/stderr redigidos, gates, diff, orçamento e instrução de correção.
+- **Próximo marco:** Fase 3, providers, tools, terminal seguro, isolamento por worktree e promoção Git
+  reais, em tarefas separadas após o gate de início da fase.
 
 ## Dívidas técnicas críticas
 
