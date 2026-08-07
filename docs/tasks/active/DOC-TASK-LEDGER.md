@@ -70,6 +70,20 @@ calculado sobre o checkout CRLF, enquanto a extração usa o blob Git LF. O esco
 conteúdo não mudam. O critério passa a validar o hash LF `f0f1a187…`; o hash CRLF permanece registrado
 como evidência do baseline Windows. Nenhum critério foi removido ou enfraquecido.
 
+### Recongelamento R2 — exemplos históricos e regressão de mojibake
+
+O primeiro aceite focado após a extração concluiu `11 passed` e falhou somente em
+`test_source_docs_and_readme_have_no_known_mojibake`: o payload imutável de F0.2 contém os exemplos
+literais `AutÃ´nomo`, `âœ”` e `Ãndice`, já presentes no snapshot fonte e protegidos pelo SHA-256 do
+manifesto. Corrigi-los adulteraria a evidência; deixar o teste varrer esses payloads tornaria a
+migração impossível por uma regra autorreferente.
+
+O escopo passa a incluir somente `tests/unit/test_encoding.py` para excluir da busca semântica de
+mojibake os caminhos legados enumerados em `migration-manifest.json`. A leitura UTF-8 estrita continua
+cobrindo todos os arquivos, inclusive os 19 dossiês, e documentos correntes ou futuros não recebem
+exceção. Nenhum critério foi removido: a separação explicita duas propriedades diferentes — bytes
+históricos íntegros e texto corrente sem corrupção.
+
 ## Escopo congelado
 
 ### Permitido
@@ -79,6 +93,7 @@ como evidência do baseline Windows. Nenhum critério foi removido ou enfraqueci
 - `docs/tasks/README.md` e `docs/tasks/migration-manifest.json` — índice e integridade da migração;
 - `docs/tasks/active/**` e `docs/tasks/completed/**` — dossiê atual e 19 arquivos históricos;
 - `tests/unit/test_documentation.py` — ampliar descoberta de Markdown para `docs/**/*.md`;
+- `tests/unit/test_encoding.py` — isentar da busca de mojibake somente os payloads legados do manifesto;
 - `tests/unit/test_task_ledger.py` — invariantes estruturais e hashes do arquivo de dossiês.
 
 ### Proibido
@@ -122,8 +137,8 @@ acceptance:
     expected: "todos exit 0"
   scope:
     command: >-
-      git diff --name-only checkpoint/docs-task-ledger-ready;
-      git diff --exit-code checkpoint/docs-task-ledger-ready -- src compiler .github README.md
+      git diff --name-only checkpoint/docs-task-ledger-r1-ready;
+      git diff --exit-code checkpoint/docs-task-ledger-r1-ready -- src compiler .github README.md
       docs/plano_implementacao_harness_operacional.md pyproject.toml uv.lock
     expected: "somente o allowlist documental/testes congelado; produto, CI, plano e dependências idênticos"
 ```
