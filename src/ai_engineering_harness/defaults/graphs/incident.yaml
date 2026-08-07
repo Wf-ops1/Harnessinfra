@@ -1,8 +1,10 @@
-# graphs/specs/incident.yaml
+# .harness/graphs/specs/incident.yaml
 graph:
   name: incident
   graph_schema_version: "1.0"
   definition_version: "3.2.0"
+  entrypoint: detect_and_contain
+  status: stable
   description: "Grafo de contenção e resposta rápida a incidentes de produção (Modo 4: Escudo de Emergência)"
 
 policies:
@@ -11,10 +13,11 @@ policies:
   - policies/tool_policy.yaml
 
 contracts:
-  - contracts/events/knowledge_sync.py
+  - contracts/events/knowledge_sync.py#KnowledgeSyncFailed
 
 nodes:
   - id: detect_and_contain
+    type: agent
     role: production_operator
     input_contract: contracts/events/knowledge_sync.py#KnowledgeSyncFailed
     output_contract: contracts/events/knowledge_sync.py#KnowledgeSyncFailed
@@ -22,13 +25,23 @@ nodes:
     on_failure: immediate_human_page
 
   - id: evaluate_rollback
-    role: production_operator
+    type: deterministic
+    executor: deterministic_policy
     policy_ref: policies/production_health.yaml
     on_success: confirm_resolution
     on_failure: escalate_to_human
 
   - id: confirm_resolution
+    type: deterministic
     executor: deterministic_gate
     gate_name: incident_resolved
     on_success: END
     on_failure: escalate_to_human
+
+terminal_states:
+  - id: END
+    outcome: success
+  - id: immediate_human_page
+    outcome: failure
+  - id: escalate_to_human
+    outcome: failure

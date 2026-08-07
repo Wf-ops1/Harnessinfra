@@ -1,8 +1,10 @@
-# graphs/specs/bug-fix.yaml
+# .harness/graphs/specs/bug-fix.yaml
 graph:
   name: bug-fix
   graph_schema_version: "1.0"
   definition_version: "3.2.0"
+  entrypoint: bug_context_retrieval
+  status: stable
   description: "Grafo de diagnóstico rápido e correção de defeitos (Modo 2: Caçador de Bugs)"
 
 policies:
@@ -12,12 +14,14 @@ policies:
   - policies/retry_cost_policy.yaml
 
 contracts:
-  - contracts/nodes/context_sufficiency.py
-  - contracts/nodes/code_generation.py
-  - contracts/nodes/test_generation.py
+  - contracts/nodes/context_sufficiency.py#RetrievalRequest
+  - contracts/nodes/context_sufficiency.py#ContextSufficiencyReport
+  - contracts/nodes/code_generation.py#CodeGenerationInput
+  - contracts/nodes/code_generation.py#CodeGenerationOutput
 
 nodes:
   - id: bug_context_retrieval
+    type: agent
     role: requirement_analyst
     input_contract: contracts/nodes/context_sufficiency.py#RetrievalRequest
     output_contract: contracts/nodes/context_sufficiency.py#ContextSufficiencyReport
@@ -25,14 +29,28 @@ nodes:
     on_failure: escalate_to_human
 
   - id: bug_code_fix
+    type: agent
     role: code_agent
     input_contract: contracts/nodes/code_generation.py#CodeGenerationInput
     output_contract: contracts/nodes/code_generation.py#CodeGenerationOutput
     on_success: test_verification
-    on_failure: retry_bug_fix
+    on_failure: bug_code_fix
+    retry_policy:
+      max_iterations: 2
+      exit_condition: tests_passed
 
   - id: test_verification
+    type: deterministic
     executor: deterministic_policy
     policy_ref: policies/verification_policy.yaml
     on_success: END
-    on_failure: retry_bug_fix
+    on_failure: bug_code_fix
+    retry_policy:
+      max_iterations: 2
+      exit_condition: tests_passed
+
+terminal_states:
+  - id: END
+    outcome: success
+  - id: escalate_to_human
+    outcome: failure

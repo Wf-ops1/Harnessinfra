@@ -9,5 +9,5 @@ PACKAGE_VERSION = version(DISTRIBUTION_NAME)
 
 # Schema versions evolve independently from the package and definition versions.
 GRAPH_SCHEMA_VERSION = "1.0"
-ARTIFACT_SCHEMA_VERSION = "1.0"
+ARTIFACT_SCHEMA_VERSION = "2.0"
 POLICY_SCHEMA_VERSION = "1.0"

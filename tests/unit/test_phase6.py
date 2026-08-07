@@ -9,6 +9,36 @@ from ai_engineering_harness.runtime.engine import RuntimeEngine
 from ai_engineering_harness.runtime.state_machine import WorkflowState, WorkflowStateMachine
 
 
+def _write_runtime_graph(project_root: Path, workflow_name: str) -> Path:
+    graph_path = project_root / "graph.yaml"
+    graph_path.write_text(
+        f"""
+graph:
+  name: {workflow_name}
+  graph_schema_version: "1.0"
+  definition_version: "1.0.0"
+  entrypoint: step1
+  status: stable
+nodes:
+  - id: step1
+    type: deterministic
+    executor: deterministic_gate
+    gate_name: test
+    on_success: completed
+    on_failure: failed
+terminal_states:
+  - id: completed
+    outcome: success
+  - id: failed
+    outcome: failure
+policies: []
+contracts: []
+""",
+        encoding="utf-8",
+    )
+    return graph_path
+
+
 def test_workflow_state_machine_transitions(tmp_path: Path):
     fsm = WorkflowStateMachine(project_root=tmp_path, execution_id="exec-111")
     assert fsm.current_state == WorkflowState.INITIATED
@@ -33,8 +63,7 @@ def test_approval_manager_flow(tmp_path: Path):
 
 def test_runtime_engine_with_approval(tmp_path: Path):
     # Compilar grafo primeiro
-    yaml_spec = tmp_path / "graph.yaml"
-    yaml_spec.write_text("nodes: {step1: {action: 'test'}}", encoding="utf-8")
+    yaml_spec = _write_runtime_graph(tmp_path, "test_flow")
     compiler = GraphCompiler(project_root=tmp_path)
     compiled_maf = compiler.compile_graph(yaml_spec, "test_flow")
 

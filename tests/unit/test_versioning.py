@@ -7,11 +7,16 @@ from typing import Any
 import yaml
 
 from ai_engineering_harness.versioning import (
+    ARTIFACT_SCHEMA_VERSION,
     GRAPH_SCHEMA_VERSION,
     POLICY_SCHEMA_VERSION,
 )
 
 DEFAULTS = importlib.resources.files("ai_engineering_harness.defaults")
+
+
+def test_compiled_artifact_schema_version_is_exactly_2_0() -> None:
+    assert ARTIFACT_SCHEMA_VERSION == "2.0"
 
 
 def _load_yaml(resource: Traversable) -> dict[str, Any]:

@@ -45,6 +45,12 @@ roles_permissions:
     forbidden_tools:
       - production_deployer
 
+  knowledge_updater:
+    allowed_tools:
+      - knowledge_retriever
+      - adr_writer
+      - file_writer
+
   production_operator:
     allowed_tools:
       - ci_cd_pipeline

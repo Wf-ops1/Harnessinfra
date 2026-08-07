@@ -13,6 +13,36 @@ from ai_engineering_harness.runtime.engine import RuntimeEngine
 from ai_engineering_harness.verification.engine import VerificationEngine
 
 
+def _write_runtime_graph(project_root: Path, workflow_name: str) -> Path:
+    graph_path = project_root / "spec.yaml"
+    graph_path.write_text(
+        f"""
+graph:
+  name: {workflow_name}
+  graph_schema_version: "1.0"
+  definition_version: "1.0.0"
+  entrypoint: step1
+  status: stable
+nodes:
+  - id: step1
+    type: deterministic
+    executor: deterministic_gate
+    gate_name: test
+    on_success: completed
+    on_failure: failed
+terminal_states:
+  - id: completed
+    outcome: success
+  - id: failed
+    outcome: failure
+policies: []
+contracts: []
+""",
+        encoding="utf-8",
+    )
+    return graph_path
+
+
 def test_full_lifecycle_e2e_python(tmp_path: Path):
     # 1. Setup projeto fixture
     (tmp_path / "pyproject.toml").touch()
@@ -28,8 +58,7 @@ def test_full_lifecycle_e2e_python(tmp_path: Path):
     assert all(r.is_healthy for r in doctor_results)
 
     # 4. Compile Graph
-    yaml_spec = tmp_path / "spec.yaml"
-    yaml_spec.write_text("nodes: {step1: {action: 'test'}}", encoding="utf-8")
+    yaml_spec = _write_runtime_graph(tmp_path, "new-feature")
     compiler = GraphCompiler(project_root=tmp_path)
     compiled_maf = compiler.compile_graph(yaml_spec, "new-feature")
     assert compiled_maf.is_file()

@@ -1,0 +1,59 @@
+# Declarative capability catalog. Presence here does not assert an operational runtime adapter.
+registry_schema_version: "1.0"
+definition_version: "3.2.0"
+
+tools:
+  - id: adr_writer
+    description: Writes architecture decision record content.
+    capability_status: declared
+  - id: ci_cd_pipeline
+    description: Represents an external continuous-delivery pipeline capability.
+    capability_status: declared
+  - id: codebase_memory_ast
+    description: Retrieves structural codebase memory from an AST index.
+    capability_status: declared
+  - id: dependency_vulnerability_checker
+    description: Checks dependencies for known vulnerabilities.
+    capability_status: declared
+  - id: feature_flag_manager
+    description: Manages declared feature-flag transitions.
+    capability_status: declared
+  - id: file_reader
+    description: Reads files within an authorized workspace.
+    capability_status: declared
+  - id: file_writer
+    description: Writes files within an authorized workspace.
+    capability_status: declared
+  - id: git_committer
+    description: Creates an authorized Git commit.
+    capability_status: declared
+  - id: git_tool
+    description: Names the packaged Git tool configuration.
+    capability_status: declared
+  - id: knowledge_retriever
+    description: Retrieves governed project knowledge.
+    capability_status: declared
+  - id: production_deployer
+    description: Represents a production deployment capability.
+    capability_status: declared
+  - id: rollback_executor
+    description: Executes an authorized rollback plan.
+    capability_status: declared
+  - id: serena_mcp
+    description: Represents semantic code operations through Serena MCP.
+    capability_status: declared
+  - id: static_analysis_scanner
+    description: Runs a declared static-analysis scan.
+    capability_status: declared
+  - id: terminal_executor
+    description: Represents governed terminal execution.
+    capability_status: declared
+  - id: terminal_tool
+    description: Names the packaged terminal tool configuration.
+    capability_status: declared
+  - id: test_generator
+    description: Generates tests from declared acceptance criteria.
+    capability_status: declared
+  - id: test_runner
+    description: Runs the configured test suite.
+    capability_status: declared

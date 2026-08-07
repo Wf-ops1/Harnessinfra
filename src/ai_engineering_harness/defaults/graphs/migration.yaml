@@ -1,8 +1,10 @@
-# graphs/specs/migration.yaml
+# .harness/graphs/specs/migration.yaml
 graph:
   name: migration
   graph_schema_version: "1.0"
   definition_version: "3.2.0"
+  entrypoint: analyze_migration_schema
+  status: stable
   description: "Grafo de alteração de schema e migração de banco com rollback garantido (Modo 5: Migração de Banco)"
 
 policies:
@@ -11,11 +13,14 @@ policies:
   - policies/tool_policy.yaml
 
 contracts:
-  - contracts/nodes/architecture_analysis.py
-  - contracts/nodes/code_generation.py
+  - contracts/nodes/architecture_analysis.py#ArchitectureAnalysisInput
+  - contracts/nodes/architecture_analysis.py#ArchitectureAnalysisOutput
+  - contracts/nodes/code_generation.py#CodeGenerationInput
+  - contracts/nodes/code_generation.py#CodeGenerationOutput
 
 nodes:
   - id: analyze_migration_schema
+    type: agent
     role: architecture_analyst
     input_contract: contracts/nodes/architecture_analysis.py#ArchitectureAnalysisInput
     output_contract: contracts/nodes/architecture_analysis.py#ArchitectureAnalysisOutput
@@ -23,6 +28,7 @@ nodes:
     on_failure: escalate_to_human
 
   - id: generate_migration_script
+    type: agent
     role: code_agent
     input_contract: contracts/nodes/code_generation.py#CodeGenerationInput
     output_contract: contracts/nodes/code_generation.py#CodeGenerationOutput
@@ -30,13 +36,24 @@ nodes:
     on_failure: abort_migration
 
   - id: human_approval_gate
-    executor: human_approval
-    requires_explicit_strategy: true
+    type: human_approval
+    approval_strategy: explicit
     on_success: verify_migration
     on_failure: abort_migration
 
   - id: verify_migration
+    type: deterministic
     executor: deterministic_policy
     policy_ref: policies/verification_policy.yaml
     on_success: END
     on_failure: execute_database_rollback
+
+terminal_states:
+  - id: END
+    outcome: success
+  - id: escalate_to_human
+    outcome: failure
+  - id: abort_migration
+    outcome: failure
+  - id: execute_database_rollback
+    outcome: failure

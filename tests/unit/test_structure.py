@@ -14,6 +14,14 @@ def test_defaults_agents_templates_exist():
     assert (defaults_agents / "_base" / "agent_base.yaml").is_file()
     assert (defaults_agents / "architecture_analyst" / "agent.yaml").is_file()
     assert (defaults_agents / "architecture_analyst" / "system_prompt.md").is_file()
+    assert (defaults_agents / "production_operator" / "agent.yaml").is_file()
+    assert (defaults_agents / "production_operator" / "system_prompt.md").is_file()
+
+
+def test_declarative_tool_registry_template_exists():
+    root = Path(__file__).resolve().parent.parent.parent
+    registry = root / "src" / "ai_engineering_harness" / "defaults" / "tools" / "tool_registry.yaml"
+    assert registry.is_file()
 
 
 def test_defaults_graphs_templates_exist():
@@ -43,3 +51,5 @@ def test_harness_init_copies_templates(tmp_path: Path):
         assert (harness_dir / "graphs" / "specs").is_dir()
         assert (harness_dir / "policies").is_dir()
         assert (harness_dir / "tools").is_dir()
+        assert (harness_dir / "agents" / "production_operator" / "agent.yaml").is_file()
+        assert (harness_dir / "tools" / "tool_registry.yaml").is_file()

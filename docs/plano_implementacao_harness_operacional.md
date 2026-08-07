@@ -38,6 +38,42 @@ Regras de execução:
 11. Não assumir que `python`, `py` ou `uv` existem. O executor deve detectar o ambiente e reutilizar o comando registrado no checkpoint.
 12. Não usar números de linha como referência permanente entre documentos; usar IDs de fase, IDs de tarefa e headings.
 
+### 1.1 Ciclo Git obrigatório por tarefa
+
+A partir da F2.1, cada tarefa de implementação deve percorrer isoladamente o ciclo abaixo. O objetivo
+é manter `main` sempre validada, reduzir o tamanho dos PRs e permitir diagnóstico ou rollback de uma
+tarefa sem reverter a fase inteira.
+
+1. Confirmar que a tarefa anterior foi incorporada à `main`, que `main` está sincronizada com
+   `origin/main` e que o CI obrigatório do HEAD está verde.
+2. Criar uma branch exclusiva a partir dessa `main`, com nome `task/<id>-<descricao-curta>`; nunca
+   iniciar a próxima tarefa a partir de uma branch ainda não incorporada.
+3. Preparar o dossiê de defensabilidade e o checkpoint `READY` na própria branch antes do primeiro
+   arquivo de implementação.
+4. Implementar somente o escopo congelado, em commits pequenos e semanticamente identificáveis;
+   checkpoints não substituem commits nem testes.
+5. Executar aceite focado, regressão aplicável, quality gates, build/smoke exigidos e auditoria de
+   escopo antes de publicar a branch.
+6. Atualizar `TASK.md` com resultado, arquivos, comandos, rollback, checkpoint e estado remoto
+   realmente observado; nunca registrar antecipadamente PR, CI ou merge ainda não realizados.
+7. Publicar uma única branch e abrir um único PR da tarefa para `main`, somente com autorização
+   explícita do usuário. É proibido push direto em `main`, force-push, bypass administrativo ou
+   enfraquecimento de proteção/check obrigatório.
+8. Exigir branch atualizada e `CI required=success`. Preferir merge commit para preservar os commits
+   e permitir revert do merge completo; squash/rebase de histórico exige decisão explícita registrada.
+9. Antes da próxima implementação, confirmar no Git/GitHub que o PR anterior foi mesclado, que o CI
+   pós-merge da `main` está verde e registrar essas evidências no novo checkpoint operacional.
+10. A branch remota concluída pode ser removida após o merge; commits, PR e checkpoints preservam o
+    histórico. Tags remotas, PR, merge, exclusão de branch ou mudança de proteção continuam efeitos
+    externos que exigem autorização explícita.
+
+Mudanças exclusivamente documentais e transversais usam branch `docs/<descricao-curta>` e PR próprio.
+Documentação necessária para preparar ou concluir a tarefa permanece na branch dessa tarefa. A F1,
+já concluída linearmente antes desta regra, será promovida por um único PR e constitui a única exceção
+histórica. O próprio commit documental que adota esta regra acompanha a branch da F1 antes desse PR e
+não cria precedente para fases futuras. Nenhuma tarefa da F2 pode começar antes dessa promoção e do
+CI pós-merge verde.
+
 ---
 
 ## 2. Definição do produto a ser entregue

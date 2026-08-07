@@ -1,5 +1,17 @@
-"""Módulo Compiler: Graph Compiler Arbitrador e validadores de grafos em design-time."""
+"""Public API for the canonical graph compiler."""
 
-from .compiler import GraphCompiler
+from .compiler import (
+    GraphCompiler,
+    GraphCompilerError,
+    GraphSourceError,
+    GraphValidationError,
+    GraphWriteError,
+)
 
-__all__ = ["GraphCompiler"]
+__all__ = [
+    "GraphCompiler",
+    "GraphCompilerError",
+    "GraphSourceError",
+    "GraphValidationError",
+    "GraphWriteError",
+]

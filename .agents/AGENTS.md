@@ -28,6 +28,23 @@ Em caso de conflito, o pedido explícito do usuário prevalece; depois, o plano 
 2. Se `.git` estiver ausente, não executar `git init` automaticamente. Registrar bloqueio e pedir decisão explícita ao usuário.
 3. Quando Git estiver disponível, preservar mudanças existentes e criar checkpoints por tarefa.
 4. Nunca apagar, resetar ou sobrescrever trabalho de outro agente para resolver conflito.
+5. A partir da F2.1, criar uma branch `task/<id>-<descricao-curta>` para cada tarefa, sempre a partir
+   de `main` sincronizada, com a tarefa anterior já incorporada e CI pós-merge verde.
+6. Nunca desenvolver diretamente em `main` nem iniciar a tarefa seguinte sobre branch ainda não
+   incorporada. Uma branch pode conter vários commits da mesma tarefa, mas não acumular tarefas futuras.
+7. Cada tarefa concluída deve ter um único PR para `main`, branch atualizada e `CI required=success`.
+   Preferir merge commit para preservar histórico e permitir revert isolado da tarefa.
+8. Push, abertura de PR, merge, exclusão de branch/tag remota, force-push, bypass ou mudança de
+   proteção exigem autorização explícita do usuário. Force-push e bypass não são o fluxo normal.
+9. Antes do primeiro arquivo da tarefa seguinte, comprovar no Git/GitHub o merge anterior e o CI
+   verde da `main`, registrando PR, merge SHA e run no novo checkpoint de `TASK.md`.
+10. Mudanças documentais transversais usam `docs/<descricao-curta>` e PR próprio; documentos que
+    preparam ou fecham uma tarefa permanecem na branch dessa tarefa.
+
+O ciclo completo e suas exceções estão em `docs/plano_implementacao_harness_operacional.md`, seção
+`Ciclo Git obrigatório por tarefa`. A F1 é a exceção histórica já concluída em uma branch linear;
+o commit que adota esta regra acompanha a branch da F1 antes de seu PR. Nenhuma implementação da F2
+começa antes dessa promoção para `main` e do CI pós-merge verde.
 
 ## Ambiente de execução
 
@@ -43,9 +60,11 @@ Em caso de conflito, o pedido explícito do usuário prevalece; depois, o plano 
 - Políticas distribuídas: `src/ai_engineering_harness/defaults/policies/`.
 - Contratos: `src/ai_engineering_harness/contracts/`.
 - Configuração copiada para projetos-alvo: `.harness/`.
-- Compilador oficial futuro: `src/ai_engineering_harness/compiler/`, conforme Fase 1.
+- Compilador oficial: `src/ai_engineering_harness/compiler/`, concluído na Fase 1.
 
-O compilador duplicado em `compiler/` e paths de raiz como `graphs/specs/`, `contracts/` e `policies/` são legados/inconsistentes. Não tratá-los como fonte de verdade até a Fase 1 unificar o compilador.
+`compiler/compile.py` é somente um wrapper de compatibilidade que delega ao package. Paths de raiz
+como `graphs/specs/`, `contracts/` e `policies/` continuam legados/inconsistentes e não são fonte de
+verdade.
 
 ## Implementação e verificação
 

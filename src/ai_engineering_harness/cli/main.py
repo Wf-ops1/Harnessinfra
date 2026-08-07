@@ -13,7 +13,7 @@ from rich.table import Table
 
 from ai_engineering_harness import __version__
 from ai_engineering_harness.cli.commands.rollback import RollbackManager
-from ai_engineering_harness.compiler.compiler import GraphCompiler
+from ai_engineering_harness.compiler import GraphCompiler, GraphCompilerError
 from ai_engineering_harness.compiler.visualizer import GraphVisualizer
 from ai_engineering_harness.doctor.checker import DoctorChecker
 from ai_engineering_harness.doctor.report import DoctorReport
@@ -79,18 +79,20 @@ def doctor():
     results = checker.check_all()
     DoctorReport.render(results)
 
-@main.command(help="Compila um grafo YAML em artefato MAF JSON executável.")
-@click.argument("graph_spec_path", type=click.Path(exists=True))
-@click.option("--workflow", default="new-feature", help="Nome do workflow.")
+@main.command(help="Compila um grafo YAML no artefato tipado canônico.")
+@click.argument("graph_spec_path", type=click.Path(exists=True, path_type=Path))
+@click.option("--workflow", default=None, help="Nome do workflow; deve coincidir com graph.name.")
 @click.option("--render", is_flag=True, help="Exibe o diagrama Mermaid visual do grafo.")
 def compile(graph_spec_path, workflow, render):
-    path_obj = Path(graph_spec_path)
-    compiler = GraphCompiler(project_root=Path.cwd())
-    out_file = compiler.compile_graph(path_obj, workflow)
+    try:
+        compiler = GraphCompiler(project_root=Path.cwd())
+        out_file = compiler.compile_graph(graph_spec_path, workflow)
+    except GraphCompilerError as exc:
+        raise click.ClickException(str(exc)) from exc
     console.print(f"[green]{_get_symbol(True)}[/green]Grafo compilado com sucesso em: [bold]{out_file}[/bold]")
 
     if render:
-        mermaid_code = GraphVisualizer.render_mermaid(path_obj)
+        mermaid_code = GraphVisualizer.render_mermaid(graph_spec_path)
         console.print("\n[bold magenta]Diagrama Mermaid do Grafo:[/bold magenta]")
         console.print(f"```mermaid\n{mermaid_code}\n```")
 
@@ -105,30 +107,25 @@ def index():
 @click.option("--approval-required", is_flag=True, help="Requer aprovação humana prévia para promoção.")
 def run(workflow_name, approval_required):
     project_root = Path.cwd()
+    try:
+        compiler = GraphCompiler(project_root=project_root)
+        compiled_file = compiler.compiled_path(workflow_name)
+        if not compiled_file.is_file():
+            spec_path = project_root / ".harness" / "graphs" / "specs" / f"{workflow_name}.yaml"
+            if not spec_path.is_file():
+                raise click.ClickException(
+                    f"Workflow '{workflow_name}' não possui artefato compilado nem spec em "
+                    f".harness/graphs/specs/{workflow_name}.yaml"
+                )
+            compiled_file = compiler.compile_graph(spec_path, workflow_name)
+    except GraphCompilerError as exc:
+        raise click.ClickException(str(exc)) from exc
+
     timestamp_str = datetime.now(UTC).strftime("%Y%m%d%H%M%S")
     short_hash = uuid.uuid4().hex[:6]
     execution_id = f"exec-{timestamp_str}-{short_hash}"
 
     console.print(f"[bold green]harness run {workflow_name}[/bold green] - Execução iniciada. ID: [bold cyan]{execution_id}[/bold cyan]")
-
-    # Verificar se a especificação compilada existe ou auto-compilar
-    compiled_dir = project_root / ".harness" / "state" / "compiled"
-    compiled_dir.mkdir(parents=True, exist_ok=True)
-    compiled_file = compiled_dir / f"{workflow_name}.json"
-
-    if not compiled_file.exists():
-        spec_path = project_root / "graphs" / "specs" / f"{workflow_name}.yaml"
-        if spec_path.exists():
-            compiler = GraphCompiler(project_root=project_root)
-            compiler.compile_graph(spec_path, workflow_name)
-        else:
-            # Fallback: criar especificação temporária mínima e compilar
-            spec_temp = compiled_dir / f"temp_{workflow_name}.yaml"
-            spec_temp.write_text(f"name: {workflow_name}\nnodes:\n  - id: step_1\n    agent: Amelia\n", encoding="utf-8")
-            compiler = GraphCompiler(project_root=project_root)
-            compiler.compile_graph(spec_temp, workflow_name)
-            if spec_temp.exists():
-                spec_temp.unlink()
 
     # Executar RuntimeEngine
     engine = RuntimeEngine(project_root=project_root, execution_id=execution_id, allowed_providers=["local", "openai", "anthropic", "google"])
