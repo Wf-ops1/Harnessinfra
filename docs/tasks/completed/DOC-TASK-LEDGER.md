@@ -192,6 +192,19 @@ documentais/encoding do baseline.
 | Qualidade | Ruff, compileall, `uv lock --check` e `git diff --check` com exit `0` |
 | Escopo | somente o allowlist congelado; zero diff em produto, CI, README, plano e dependências |
 
-O checkpoint de implementação será `checkpoint/docs-task-ledger-complete`, ancorado pelo commit desta
-mudança e mantido apenas localmente. Branch, PR, checks, merge e CI pós-merge continuam pendentes e
-serão registrados somente depois de observados. Nenhuma tarefa da Fase 3 foi iniciada.
+O checkpoint de implementação `checkpoint/docs-task-ledger-complete` está ancorado em
+`7f880e6f9f226c107253b6dab55ae8c8b3ebf7b7` e permanece somente local. Nenhuma tarefa da Fase 3 foi
+iniciada.
+
+## Promoção remota comprovada
+
+| Evidência | Resultado observado |
+|---|---|
+| Branch | `docs/refactor-task-ledger` publicada sem tags |
+| Pull request | [#16](https://github.com/Wf-ops1/Harnessinfra/pull/16), 4 commits e 28 arquivos no allowlist |
+| CI pré-merge | run `31218206768`; 4 quality + 4 tests + 2 package + `CI required`, 11/11 verdes |
+| Merge | merge commit `fafbf627804f1a2a23d988c06dd123a3eee01348`, sem bypass e após os checks |
+| CI pós-merge | run `31218399437`, evento `push`, branch `main`, mesmo merge SHA, 11/11 verdes |
+
+Estado final: `COMPLETED E PROMOVIDA`. O arquivo foi movido de `active/` para `completed/` pela branch
+documental de fechamento, sem reabrir o escopo, alterar os 19 payloads migrados ou iniciar F3.
