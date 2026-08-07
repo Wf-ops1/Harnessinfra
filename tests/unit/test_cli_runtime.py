@@ -6,6 +6,7 @@ from click.testing import CliRunner
 
 from ai_engineering_harness.cli.main import main
 from ai_engineering_harness.compiler.visualizer import GraphVisualizer
+from ai_engineering_harness.runtime import RuntimeGraphConfigurationError
 
 
 def test_graph_visualizer(tmp_path: Path):
@@ -89,31 +90,9 @@ def test_cli_run_status_inspect_lifecycle():
 
         # 2. Run
         res_run = runner.invoke(main, ["run", "new-feature"])
-        assert res_run.exit_code == 0
+        assert res_run.exit_code != 0
+        assert isinstance(res_run.exception, RuntimeGraphConfigurationError)
         assert "Execução iniciada" in res_run.output
-
-        # Extrair o ID da execução
-        output_lines = res_run.output.split("\n")
-        exec_line = next(line for line in output_lines if "ID:" in line or "exec-" in line)
-        exec_id = exec_line.split("ID:")[-1].strip()
-
-        # 3. Status
-        res_status = runner.invoke(main, ["status", exec_id])
-        assert res_status.exit_code == 0
-        assert "FSM State" in res_status.output
-        assert "COMPLETED" in res_status.output
-
-        # 4. Inspect
-        res_inspect = runner.invoke(main, ["inspect", exec_id])
-        assert res_inspect.exit_code == 0
-        assert "Inspeção Detalhada" in res_inspect.output
-
-        # 5. Audit Export JSON
-        res_audit_json = runner.invoke(main, ["audit", exec_id, "--export", "json"])
-        assert res_audit_json.exit_code == 0
-        assert '"events"' in res_audit_json.output
-
-        # 6. Audit Export SARIF
-        res_audit_sarif = runner.invoke(main, ["audit", exec_id, "--export", "sarif"])
-        assert res_audit_sarif.exit_code == 0
-        assert '"version": "2.1.0"' in res_audit_sarif.output
+        assert "finalizado" not in res_run.output
+        execution_root = Path(".harness/state/executions")
+        assert list(execution_root.iterdir()) == []
