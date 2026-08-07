@@ -246,9 +246,9 @@ defensibility:
 **Objetivo:** executar cada nó do artefato compilado, persistir todas as transições e permitir
 retomada após interrupção.
 
-**Status da fase:** `pending com gate preparado` — a F1 foi promovida por merge commit para `main`,
-o CI pós-merge está verde e a branch exclusiva da F2.1 foi criada. O gate F2.1 está `READY`, mas
-nenhum arquivo de implementação da Fase 2 foi alterado.
+**Status da fase:** `in_progress` — a F1 foi promovida por merge commit para `main`, o CI pós-merge
+está verde e a F2.1 foi implementada e validada integralmente na branch exclusiva. A publicação da
+branch/PR ainda depende de autorização explícita; a F2.2 não foi iniciada.
 
 ### Coordenação e ambiente observado
 
@@ -260,7 +260,7 @@ nenhum arquivo de implementação da Fase 2 foi alterado.
 | **Git** | `available` — `main...origin/main` em `6c994b425bcd805db96bf1092c0569f503b55cd2`; branch ativa `task/f2.1-execution-record`, criada desse merge; `checkpoint/pre-f2.1-defensibility^{}` ancora o baseline; checkpoints permanecem somente locais |
 | **python_command** | `& 'C:\Users\walla\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe'` — Python `3.12.13` |
 | **uv_command** | `& '.\build\f0.6-tools\uv\bin\uv.exe'` — uv `0.11.32` restaurado de forma isolada/ignorada, sem PATH ou instalação global; `lock --check` e `sync --all-extras --locked` verdes |
-| **Dependências do projeto** | `.venv` gerida pelo uv 0.11.32 com Python 3.12.13 e `uv.lock`; 229 testes + 6 subtests, mypy em 90 arquivos, Ruff, compileall, lock/sync, build e dois smokes isolados verdes no fechamento da F1.5 |
+| **Dependências do projeto** | `.venv` gerida pelo uv 0.11.32 com Python 3.12.13 e `uv.lock`; 299 testes + 6 subtests, mypy em 93 arquivos, Ruff, compileall, lock/sync, build e dois smokes isolados verdes no fechamento local da F2.1 |
 | **Regra de escrita** | apenas um agente escreve por vez |
 
 ---
@@ -284,11 +284,12 @@ nenhum arquivo de implementação da Fase 2 foi alterado.
 
 | Campo | Detalhe |
 |---|---|
-| **Status** | `pending` — gate `READY`; implementação ainda não iniciada |
+| **Status** | `completed localmente` — gate `READY → COMPLETED`; implementação e critérios congelados aprovados |
 | **Objetivo** | Definir o contrato versionado da execução e persistir `execution.json` atomicamente, sem integrar ainda runtime, CLI, FSM, journal, worktree ou governança |
 | **Branch exclusiva** | `task/f2.1-execution-record`, criada de `main` pós-merge verde em `6c994b4` |
 | **Checkpoint de rollback** | `checkpoint/pre-f2.1-defensibility^{}` → `6c994b425bcd805db96bf1092c0569f503b55cd2` |
-| **Próximo passo permitido** | Implementar somente o escopo F2.1 congelado abaixo, após confirmar este gate e o baseline limpo |
+| **Checkpoint do gate** | `checkpoint/f2.1-ready^{}` → `bc558998fe9be2a1c221f7bbba9e3d6a5360a271`; checkpoint local de conclusão será `checkpoint/f2.1-complete` no commit deste fechamento |
+| **Próximo passo permitido** | Somente com autorização explícita, publicar esta branch e abrir um PR F2.1 para `main`; F2.2 exige merge e CI pós-merge verde antes de seu próprio gate |
 
 #### Auditoria concreta da F2.1
 
@@ -349,7 +350,7 @@ nenhum arquivo de implementação da Fase 2 foi alterado.
 ```yaml
 defensibility:
   task_id: "F2.1"
-  gate: "READY"
+  gate: "READY -> COMPLETED"
   executor: "Codex"
   authorized_at: "2026-08-06T22:32:34-03:00"
   problem_statement: >-
@@ -465,11 +466,30 @@ defensibility:
 [x] Escopo permitido/proibido e fronteiras F2.2–F2.6/F3/F5 congelados
 [x] Aceite positivo/negativo, regressão, build/smoke, escopo e rollback congelados
 [x] Executor único e horário de autorização registrados
-[x] Nenhum Python, teste de implementação, YAML, schema F1, dependência ou runtime alterado
+[x] Gate READY e checkpoint criados antes de qualquer alteração em Python ou teste de implementação
+[x] Implementação permaneceu nos seis arquivos do allowlist; YAML, schema F1, dependência e runtime byte-idênticos
+[x] Critérios focais, negativos, regressão, suíte integral, qualidade, lock/sync, build e smokes aprovados
 ```
 
-**Estado de parada obrigatório:** o gate F2.1 está `READY`, mas a implementação da F2.1 não foi
-iniciada. Não avançar para F2.2 nem alterar código fora do allowlist congelado.
+#### Resultado verificado da F2.1
+
+| Evidência | Resultado observado |
+|---|---|
+| Contrato | `ExecutionRecord` possui exatamente os 18 campos congelados, modelos estritos/congelados, enums fechados, falha redaction-safe, UTC monotônico, digests/SHA exatos, revisão não negativa e ID confinado inclusive contra nomes reservados do Windows |
+| Serialização e leitura | JSON UTF-8 determinístico com newline final; loader exige bytes canônicos exatos, rejeita CRLF, UTF-8 inválido, versão divergente, extras, adulteração e identidade diferente da solicitada |
+| Persistência | Destino único `.harness/state/executions/<execution_id>/execution.json`; temp exclusivo no mesmo diretório, write/flush/fsync/close/replace e fsync de diretório quando suportado; falhas controladas preservam bytes anteriores e removem o temp |
+| Testes focais | `70 passed` em `tests/unit/test_execution_record.py`; filtro negativo congelado: `56 passed, 14 deselected` |
+| Regressão F1 | `53 passed` em graph contracts, artifact determinism e imports públicos |
+| Suíte integral | `299 passed, 6 subtests passed` em `tests/unit tests/e2e` |
+| Qualidade e ambiente | mypy: `Success: no issues found in 93 source files`; Ruff: `All checks passed`; compileall exit 0; `uv lock --check` e `uv sync --all-extras --locked` verdes |
+| Distribuição | wheel e sdist 0.1.0 reconstruídos; smoke isolado confirmou metadata/package/CLI 0.1.0 e origem em `site-packages`; probe adicional importou `ExecutionRecord`, `ExecutionState`, save/load do wheel |
+| Observação do smoke | A primeira chamada do script falhou antes do probe porque `uv` não estava no `PATH`; sem alterar o script, o uv empacotado foi adicionado somente ao ambiente do processo e o mesmo smoke passou |
+| Escopo | `TASK.md` e os cinco arquivos Python/teste congelados são as únicas mudanças desde `checkpoint/pre-f2.1-defensibility`; `.github`, compiler, runtime, CLI, defaults, `pyproject.toml` e `uv.lock` permanecem byte-idênticos |
+| Consumidores | Nenhum consumidor atual foi alterado; RuntimeEngine, FSM, CLI, journal, approval, worktree e ConfigResolver não adotam o record nesta tarefa |
+| Fronteiras | Nenhum provider/CAS/lock/recovery F2.2, executor F2.3, FSM F2.4, CLI F2.5, retry F2.6, F3 ou F5 foi antecipado |
+
+**Estado de parada obrigatório:** a F2.1 está concluída localmente e a implementação da F2.2 não foi
+iniciada. Não publicar, abrir PR ou iniciar F2.2 sem cumprir a autorização e a promoção abaixo.
 
 ---
 
@@ -3038,13 +3058,13 @@ de `main`.
 ```
 Data:              2026-08-06
 Fase:              F2
-Tarefa:            F2.1 — preparar contrato e gate defensável do ExecutionRecord
-Estado:            pending — gate READY; implementação Python ainda não iniciada
-Arquivos alterados: TASK.md apenas; zero produto/teste/dependência/runtime
-Validações:         12 testes documentais + 6 subtests; UTF-8/Markdown/CI docs, regras cruzadas, git diff --check e auditoria de escopo verdes
-Checkpoint:         `checkpoint/pre-f2.1-defensibility^{}` em 6c994b425bcd805db96bf1092c0569f503b55cd2; `checkpoint/f2.1-ready` será criado no commit deste gate
-Observação:         PR #6 mesclado em 6c994b4; CI do PR 31133897345 e CI pós-merge 31134295999 verdes; main local/remota alinhadas antes da branch F2.1
-Resultado:          contrato, compatibilidade, aceite, rollback e fronteiras F2.1 congelados; nenhum código F2 iniciado
+Tarefa:            F2.1 — criar ExecutionRecord e persistência atômica estreita
+Estado:            completed localmente — gate READY → COMPLETED; publicação remota pendente de autorização
+Arquivos alterados: TASK.md; contracts/execution.py e export; persistence/atomic_file.py e export; teste unitário focal
+Validações:         70 focais; 56 negativos; 53 regressões F1; 299 testes + 6 subtests; mypy 93 arquivos; Ruff; compileall; lock/sync; build; dois smokes; escopo verdes
+Checkpoint:         `checkpoint/pre-f2.1-defensibility^{}` em 6c994b4; `checkpoint/f2.1-ready^{}` em bc55899; `checkpoint/f2.1-complete` será a tag local deste fechamento
+Observação:         branch task/f2.1-execution-record; nenhum push/PR/tag remoto; consumidores atuais e fronteiras F2.2–F5 permanecem inalterados
+Resultado:          record 1.0 canônico/fail-closed e save/load atômico concluídos; F2.2 ainda não iniciada
 ```
 
 ---
@@ -3052,13 +3072,13 @@ Resultado:          contrato, compatibilidade, aceite, rollback e fronteiras F2.
 ## 11. Próxima Ação Exata
 
 ```text
-IMPLEMENTAR SOMENTE A F2.1 — NÃO ANTECIPAR F2.2/F2.3/F2.4/F2.5/F3/F5:
-1. Confirmar task/f2.1-execution-record em checkpoint/f2.1-ready, worktree limpa e baseline 6c994b4 ancestral.
-2. Criar somente ExecutionRecord/enums/failure tipado, exports, persistência atômica estreita e testes do allowlist congelado.
-3. Não integrar RuntimeEngine, FSM, CLI, journal, approval, worktree, ConfigResolver ou qualquer consumidor atual.
-4. Executar todos os critérios positivos/negativos, regressão integral, mypy, Ruff, compileall, build, smoke e auditoria de escopo congelados.
-5. Atualizar TASK.md com resultados reais, commit/checkpoint e rollback; não antecipar PR, CI ou merge remotos.
-6. Somente com autorização explícita, publicar a branch e abrir um único PR F2.1 para main; exigir CI required verde antes de qualquer merge.
+PROMOVER SOMENTE A F2.1 — NÃO INICIAR F2.2 AINDA:
+1. Confirmar `checkpoint/f2.1-complete`, branch `task/f2.1-execution-record` limpa e baseline `6c994b4` ancestral.
+2. Não alterar produto, teste, runtime, dependência, YAML, schema ou o contrato congelado durante a promoção.
+3. Somente com autorização explícita do usuário, publicar a branch e abrir um único PR F2.1 para `main`.
+4. Exigir o check agregado `CI required` verde e todos os jobs concluídos antes de qualquer merge.
+5. O usuário efetua/confirma o merge; depois sincronizar `main`, comprovar o merge commit e o CI pós-merge verde.
+6. Somente então criar branch exclusiva da F2.2 e preparar sua auditoria/gate; nenhuma implementação F2.2 é autorizada por este checkpoint.
 ```
 
 ---

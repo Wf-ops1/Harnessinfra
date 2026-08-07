@@ -1,5 +1,13 @@
 """Schemas Pydantic executáveis nativos do motor (Core Contracts)."""
 
+from .execution import (
+    EXECUTION_RECORD_SCHEMA_VERSION,
+    ApprovalStatus,
+    ExecutionFailure,
+    ExecutionId,
+    ExecutionRecord,
+    ExecutionState,
+)
 from .graph import (
     AgentNodeSpec,
     CompiledGraphArtifact,
@@ -43,8 +51,10 @@ from .registry import (
 )
 
 __all__ = [
+    "EXECUTION_RECORD_SCHEMA_VERSION",
     "AgentNodeSpec",
     "AgentRoleSpec",
+    "ApprovalStatus",
     "CompiledGraphArtifact",
     "ContractCompatibilityError",
     "ContractDigestSpec",
@@ -53,6 +63,10 @@ __all__ = [
     "ContractRegistryError",
     "DeterministicNodeSpec",
     "EffectiveNodeToolPolicySpec",
+    "ExecutionFailure",
+    "ExecutionId",
+    "ExecutionRecord",
+    "ExecutionState",
     "GraphMetadata",
     "GraphSpec",
     "HumanApprovalNodeSpec",
