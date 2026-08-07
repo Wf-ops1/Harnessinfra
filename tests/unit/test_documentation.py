@@ -5,7 +5,17 @@ from pathlib import Path
 from urllib.parse import unquote, urlparse
 
 ROOT = Path(__file__).resolve().parents[2]
-MARKDOWN_FILES = (ROOT / "README.md", *sorted((ROOT / "docs").glob("*.md")))
+MARKDOWN_FILES = (
+    ROOT / "README.md",
+    ROOT / "TASK.md",
+    ROOT / ".agents" / "AGENTS.md",
+    *sorted((ROOT / "docs").rglob("*.md")),
+)
+CURRENT_CLAIM_FILES = tuple(
+    document
+    for document in MARKDOWN_FILES
+    if "docs/tasks/completed" not in document.relative_to(ROOT).as_posix()
+)
 MARKDOWN_LINK = re.compile(r"!?\[[^\]]*\]\((?P<target>[^)]+)\)")
 FORBIDDEN_CURRENT_CLAIMS = (
     re.compile(r"(?im)^.*\bstatus\b.*\bem produção\b"),
@@ -29,7 +39,7 @@ def test_readme_contains_frozen_capability_matrix() -> None:
 
 
 def test_documents_do_not_claim_current_operational_readiness() -> None:
-    for document in MARKDOWN_FILES:
+    for document in CURRENT_CLAIM_FILES:
         content = _read(document)
         assert "Em Produção" not in content, document
         for pattern in FORBIDDEN_CURRENT_CLAIMS:

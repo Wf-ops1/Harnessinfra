@@ -1,0 +1,129 @@
+{
+  "entries": [
+    {
+      "path": "docs/tasks/completed/F0.0.md",
+      "payload_sha256": "3c48795a5936152fe859c59a036f06a8679644762089930603c3d9f7ccb6917d",
+      "source_heading": "### F0.0 — Preflight do workspace e coordenação dos agentes",
+      "task_id": "F0.0"
+    },
+    {
+      "path": "docs/tasks/completed/F0.1.md",
+      "payload_sha256": "948d47b523d3d5e37ba4504976240f3dfce9569bd3a4ae78a1b96cfec8450064",
+      "source_heading": "### F0.1 — Corrigir erros bloqueantes de código",
+      "task_id": "F0.1"
+    },
+    {
+      "path": "docs/tasks/completed/F0.2.md",
+      "payload_sha256": "a77e32d393eb75ee11ee05de2f3ea30069ff96511f44a24a1907ac51e8e99338",
+      "source_heading": "### F0.2 — Padronizar encoding",
+      "task_id": "F0.2"
+    },
+    {
+      "path": "docs/tasks/completed/F0.3.md",
+      "payload_sha256": "01df9a82891d915cbb497555611d4467ef4dce349f13221698a8b2b9fca7238f",
+      "source_heading": "### F0.3 — Tornar o ambiente reproduzível",
+      "task_id": "F0.3"
+    },
+    {
+      "path": "docs/tasks/completed/F0.4.md",
+      "payload_sha256": "680c822e89eed756ddd0043f47973ca66f354a3011e4bbd69577964a03858946",
+      "source_heading": "### F0.4 — Unificar versionamento",
+      "task_id": "F0.4"
+    },
+    {
+      "path": "docs/tasks/completed/F0.5.md",
+      "payload_sha256": "298b6f8743c24a71c6199b440eda9d74acf199908617ef199a62380c7800ebf5",
+      "source_heading": "### F0.5 — Corrigir documentação de estado",
+      "task_id": "F0.5"
+    },
+    {
+      "path": "docs/tasks/completed/F0.6.md",
+      "payload_sha256": "79800af126b6aac643a79f32f78a3c2c40fe4a176794afdf27a4bfbd1c2a4de3",
+      "source_heading": "### F0.6 — Criar CI mínima",
+      "task_id": "F0.6"
+    },
+    {
+      "path": "docs/tasks/completed/F1.1.md",
+      "payload_sha256": "4b2b5e9a3bf5d311bda86ca026be11e6d667e66effdb63048d26fca7b1f90a04",
+      "source_heading": "### F1.1 — Definir schema tipado do grafo",
+      "task_id": "F1.1"
+    },
+    {
+      "path": "docs/tasks/completed/F1.2.md",
+      "payload_sha256": "4e8f83af78388635402419cc1627491b70ff5a92744538abb0e778cf5c6dd04f",
+      "source_heading": "### F1.2 — Criar registry seguro de contratos",
+      "task_id": "F1.2"
+    },
+    {
+      "path": "docs/tasks/completed/F1.3.md",
+      "payload_sha256": "5d5fa05648c0af3c6e3bf4d994bfac7e22336b4c4257ed21d68b4ea58725336a",
+      "source_heading": "### F1.3 — Validar políticas e ferramentas",
+      "task_id": "F1.3"
+    },
+    {
+      "path": "docs/tasks/completed/F1.4.md",
+      "payload_sha256": "2b9fdb3659ce3d9ac1ba1ceb68347ae7285f04edd30608d48ead5fa779005d77",
+      "source_heading": "### F1.4 — Unificar os compiladores",
+      "task_id": "F1.4"
+    },
+    {
+      "path": "docs/tasks/completed/F1.5.md",
+      "payload_sha256": "2446f4208bca22e3030f438a607c701b80e41352b4f555f84c901e61238ad098",
+      "source_heading": "### F1.5 — Artefato determinístico e versionado",
+      "task_id": "F1.5"
+    },
+    {
+      "path": "docs/tasks/completed/DOC-F2-STATUS.md",
+      "payload_sha256": "5ed7a17ceaa53e0c8b30653f7f616aca80225b64497b80652d8996cd5e1f5183",
+      "source_heading": "### DOC-F2-STATUS — Alinhar documentação pública pós-F2.5",
+      "task_id": "DOC-F2-STATUS"
+    },
+    {
+      "path": "docs/tasks/completed/F2.1.md",
+      "payload_sha256": "4b98509f0380fce221bbe371a2391f14ae528cdeb8790dbcd0b69283893878bf",
+      "source_heading": "### F2.1 — Criar `ExecutionRecord`",
+      "task_id": "F2.1"
+    },
+    {
+      "path": "docs/tasks/completed/F2.2.md",
+      "payload_sha256": "8756fbf307b51cd26f9b0315851d12a12122c7fc615ab8e7b60be3523513fef4",
+      "source_heading": "### F2.2 — Criar abstração de persistência",
+      "task_id": "F2.2"
+    },
+    {
+      "path": "docs/tasks/completed/F2.3.md",
+      "payload_sha256": "bd17b174ba927e65b5d24e3a0cac67bf5cd4bbee05f0c967812a3b177b120bb4",
+      "source_heading": "### F2.3 — Implementar executor de grafo",
+      "task_id": "F2.3"
+    },
+    {
+      "path": "docs/tasks/completed/F2.4.md",
+      "payload_sha256": "d9d14e2a86a4d8a19899462dfa424fa8b4c4060210f18c3ab4034e52758ef007",
+      "source_heading": "### F2.4 — Implementar FSM por evento",
+      "task_id": "F2.4"
+    },
+    {
+      "path": "docs/tasks/completed/F2.5.md",
+      "payload_sha256": "3893d12c4473f96a835c9aff3d5ad300de3aab90bbb97219d0f63832ecac3171",
+      "source_heading": "### F2.5 — Implementar retomada",
+      "task_id": "F2.5"
+    },
+    {
+      "path": "docs/tasks/completed/F2.6.md",
+      "payload_sha256": "7ce69a093ae8f2e8f6af20955697676362846357f2b1e8ceda1ed43ab58f3529",
+      "source_heading": "### F2.6 — Retry com contexto real",
+      "task_id": "F2.6"
+    }
+  ],
+  "payload_markers": {
+    "end": "<!-- TASK_LEDGER_PAYLOAD_END -->",
+    "start": "<!-- TASK_LEDGER_PAYLOAD_START -->"
+  },
+  "schema_version": "1.0",
+  "source": {
+    "commit": "d48151b752aa373756c46bfee58932fa5abf4bf5",
+    "normalization": "section payload rstrip followed by one LF",
+    "path": "TASK.md",
+    "sha256": "f0f1a18751c0e730f7e6c4b6335192e0a655e06bba88e6996f9419270112d309"
+  }
+}
