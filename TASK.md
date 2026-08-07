@@ -256,7 +256,7 @@ com os respectivos CIs pós-merge integralmente verdes. A F2.6 não foi iniciada
 | **Executor ativo** | `Codex` — responsável por implementar, validar, manter checkpoints e criar commits locais |
 | **Auditor/revisor** | `Antigravity` — somente-leitura por padrão; só edita quando o usuário solicitar explicitamente ou transferir a execução |
 | **Workspace** | `C:\Users\walla\OneDrive\Desktop\ai-engineering-harness` |
-| **Git** | `available` — branch documental ativa `docs/readme-f2-status`, criada de `main == origin/main == 2aa324b394d9ffcfa0b8d0f9ba011f02f5a96727`; F2.5 promovida pelo PR #11 e CI pós-merge verde; branches anteriores preservadas |
+| **Git** | `available` — F2.5 integra `main` pelo PR #11 e DOC-F2-STATUS pelo PR #12; ambos possuem CI pós-merge verde. A branch `docs/close-f2-status-alignment` foi criada de `main == origin/main == f23d74d0ccc9f377628e0358a527836ee99aba27` somente para registrar este fechamento; nenhuma branch F2.6 existe |
 | **python_command** | `& 'C:\Users\walla\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe'` — Python `3.12.13` |
 | **uv_command** | `& '.\build\f0.6-tools\uv\bin\uv.exe'` — uv `0.11.32` restaurado de forma isolada/ignorada, sem PATH ou instalação global; `lock --check` e `sync --all-extras --locked` verdes |
 | **Dependências do projeto** | `.venv` gerida pelo uv 0.11.32 com Python 3.12.13 e `uv.lock`; nenhuma dependência foi adicionada; baseline pós-rollback passa mypy em targets `linux` e `win32`; run 31146423972 do rollback concluiu 11/11 verde |
@@ -353,10 +353,12 @@ com os respectivos CIs pós-merge integralmente verdes. A F2.6 não foi iniciada
 
 | Campo | Detalhe |
 |---|---|
-| **Status** | `completed localmente` — gate documental `READY → COMPLETED`; promoção remota pendente |
+| **Status** | `completed e promovida` — gate documental `READY → COMPLETED`; PR #12 mesclado e CI pós-merge verde |
 | **Objetivo** | Corrigir a matriz pública que ainda descreve o compilador e o runtime como estavam antes das entregas F1/F2, preservando os limites reais de F2.6–F7 |
 | **Branch exclusiva** | `docs/readme-f2-status`, criada de `main == origin/main == 2aa324b` após CI pós-merge verde da F2.5 |
 | **Executor** | `Codex`, único escritor, sob autorização explícita do usuário `execute` |
+| **Checkpoints** | `checkpoint/docs-f2-status-ready^{}` → `283a33ea06fa4253c29861f461989f6d800bdb40`; `checkpoint/docs-f2-status-complete^{}` → `9d679a5d978806048b0056a42becdae92f174e29` |
+| **Promoção** | [PR #12](https://github.com/Wf-ops1/Harnessinfra/pull/12) → merge `f23d74d0ccc9f377628e0358a527836ee99aba27`; runs `31210284986` e `31210521957`, ambos `completed/success` com 11/11 checks |
 
 ```yaml
 defensibility:
@@ -416,6 +418,10 @@ defensibility:
 | Encoding e estrutura | README/TASK decodificam em UTF-8 estrito; links, newline, fences e matriz aprovados |
 | Escopo | Somente `README.md` e `TASK.md` diferem de `2aa324b`; `src`, `compiler`, `tests`, `.github`, dependências e lockfile permanecem byte-idênticos |
 | Qualidade do diff | `git diff --check` exit 0; nenhuma implementação F2.6 ou capacidade operacional nova foi adicionada |
+
+**Fechamento remoto comprovado:** PR #12 mesclado por merge commit `f23d74d`; o run de PR
+`31210284986` e o run pós-merge `31210521957` concluíram os 10 jobs de matriz e `CI required` com
+`success`. A branch remota documental foi preservada e a F2.6 não foi iniciada.
 
 ---
 
@@ -4571,12 +4577,13 @@ de `main`.
 Data:              2026-08-07
 Fase:              F2
 Tarefa:            DOC-F2-STATUS — alinhamento documental pós-F2.5
-Estado:            COMPLETED localmente; promoção remota autorizada nesta execução; F2.6 não iniciada
-Baseline:          main/origin/main 2aa324b; PR #11 mesclado; run pós-merge 31209619778, 11/11 verde
+Estado:            COMPLETED E PROMOVIDA; F2.6 não iniciada
+Baseline:          F2.5 em main por PR #11/merge 2aa324b/run 31209619778; docs por PR #12/merge f23d74d
 Escopo:            somente README.md e TASK.md; zero mudança de produto/dependência/CI
 Validações:        8 testes + 6 subtests; UTF-8, links/Markdown, busca negativa, diff check e fronteiras verdes
-Checkpoint:         `checkpoint/docs-f2-status-ready^{}` = 283a33e; complete identificará o commit final
-Resultado:          matriz pública alinhada à F1/F2.1–F2.5 sem promover capacidades F2.6–F7
+Checkpoint:         `checkpoint/docs-f2-status-ready^{}` = 283a33e; `checkpoint/docs-f2-status-complete^{}` = 9d679a5
+Promoção:          PR #12; merge f23d74d; runs 31210284986/31210521957, ambos 11/11 verdes
+Resultado:         matriz pública alinhada à F1/F2.1–F2.5 sem promover capacidades F2.6–F7
 ```
 
 ---
@@ -4584,13 +4591,13 @@ Resultado:          matriz pública alinhada à F1/F2.1–F2.5 sem promover capa
 ## 11. Próxima Ação Exata
 
 ```text
-PROMOVER SOMENTE DOC-F2-STATUS; NÃO INICIAR F2.6:
-1. Criar o commit final e `checkpoint/docs-f2-status-complete` somente locais.
-2. Publicar `docs/readme-f2-status`, abrir um único PR para `main`, exigir `CI required=success` e
-   mesclar por merge commit sob a autorização explícita vigente.
-3. Confirmar `main == origin/main` e CI pós-merge integralmente verde; preservar branches e tags locais.
-4. Depois desse gate, parar. Qualquer F2.6 exige auditoria/dossiê próprios em nova branch criada da
-   `main` sincronizada; nenhuma implementação futura está incluída nesta tarefa documental.
+PARAR — F2.5 E DOC-F2-STATUS CONCLUÍDAS E PROMOVIDAS; NÃO INICIAR F2.6:
+1. Preservar branches remotas e checkpoints locais; nenhuma exclusão ou publicação de tag foi autorizada.
+2. Em uma próxima execução explicitamente autorizada, auditar primeiro o contrato de retry da F2.6,
+   comprovar a lacuna e preparar dossiê/checkpoint READY em branch exclusiva criada da `main` verde.
+3. Não implementar provider/tool/worktree F3, contexto/verificação F4, governança F5,
+   observabilidade/recovery F6 ou release F7 como parte da retomada da F2.6.
+4. Não alterar runtime, CLI, schemas, dependências ou CI antes do novo gate de defensabilidade.
 ```
 
 ---
