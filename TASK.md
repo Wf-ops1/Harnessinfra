@@ -661,10 +661,11 @@ Baseline local antes do gate: `74 passed` em `test_execution_record.py` +
 ```yaml
 defensibility:
   task_id: "F2.2"
-  gate: "READY"
+  gate: "READY -> COMPLETED"
   executor: "Codex"
   gate_prepared_at: "2026-08-06T23:58:42-03:00"
-  implementation_started: false
+  implementation_started: true
+  implementation_completed: true
   baseline:
     branch: "task/f2.2-state-storage"
     head: "34d00a5cadb3ca0b5690420b8ffb5026e207af93"
@@ -768,7 +769,10 @@ defensibility:
 [x] Compatibilidade, allowlist, escopo proibido e fronteiras F2.3–F2.6/F3/F5/F6 congelados
 [x] Aceite positivo/negativo, concorrência cross-process, regressão, build/wheel e escopo planejados
 [x] Rollback e gatilhos fail-closed definidos
-[x] Somente TASK.md alterado; implementação Python/teste permanece não iniciada
+[x] Implementação permaneceu nos sete arquivos Python/teste do allowlist e neste TASK.md
+[x] Create/load/list, CAS, lock/fencing, journal, recovery e erros públicos foram provados
+[x] Provas positivas, negativas, multiprocess, atomicidade e recovery passaram sem skip/xfail novo
+[x] Regressão F2.1, suíte integral, qualidade, lock/sync, build, wheel e escopo passaram
 ```
 
 #### Falha de promoção e rollback da F2.2
