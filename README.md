@@ -6,8 +6,8 @@ O AI Engineering Harness é hoje uma base Python instalável para experimentar u
 agentic local-first. O repositório já possui empacotamento reproduzível, compilador único e
 determinístico, execução dirigida pelas arestas do artefato, persistência concorrente, FSM por eventos
 e retomada canônica com aprovação, cancelamento e retry limitado por contexto real e redigido. A
-execução autônoma segura sobre um repositório externo ainda não está pronta: providers, ferramentas,
-isolamento Git, promoção, rollback e governança operacional permanecem incompletos ou simulados.
+execução autônoma segura sobre um repositório externo ainda não está pronta: roteamento de modelos,
+ferramentas, isolamento Git, promoção, rollback e governança operacional permanecem incompletos ou simulados.
 
 Não use `harness run`, `harness doctor` ou `harness rollback` como garantia de segurança em um
 repositório valioso. Embora a Fase 2 esteja implementada, as Fases 3–7 ainda não estão concluídas;
@@ -40,7 +40,7 @@ auditável. Isso é a direção do produto, não uma descrição do estado entre
 | CLI e scaffold | `--help`, `--version`, `init`, `compile`, `run`, `resume`, `approve`, `cancel`, `status` e `inspect` possuem contratos e testes | Sem backends reais, `run` falha no preflight; doctor, audit, verify e rollback ainda cobrem componentes incompletos | UX estável para CLI e IDE em repositórios externos |
 | Compilação de grafos | Um único `GraphCompiler` valida contratos/policies e publica artefato 2.0 determinístico, versionado, íntegro e atômico | Capabilities compiladas ainda são declarativas, sem provar adapter disponível ou autorização runtime | Migrações de schema e expansão segura de workflows após o MVP |
 | Runtime/FSM | `GraphExecutor` segue somente arestas compiladas; record/journal usam lock, CAS e fencing; FSM event-sourced e lifecycle retomável suportam aprovação, cancelamento e retry com evidência redigida, limite e resume por digest | Efeito interrompido sem outcome exige intervenção; executores dependem de backends injetados ainda indisponíveis no produto | Efeitos reais e repair loop completo integrados nas Fases 3–6 |
-| Providers LLM | Interfaces, registry e router existem | OpenAI, Anthropic e local fabricam respostas; não fazem chamadas reais | Providers remoto e local reais, com erros tipados, na F3 |
+| Providers LLM | OpenAI Responses API e endpoint local Chat Completions executam HTTP real, com timeout/cancelamento, retry transitório, erros/usage/tool calls tipados e structured output validado | Integração live é opt-in; Anthropic falha como não implementado; registry/router ainda não usam configuração efetiva, budget ou node events | Roteamento, fallback autorizado, budget e persistência operacional em F3.2 |
 | Serena e Codebase-Memory | Interfaces/adapters existem | Serena apenas cria/toca arquivo; memória retorna `mock_ast` | Transporte MCP real ou adapter local explicitamente configurado |
 | Verificação e auditoria | Subprocessos de gates e hash chain local possuem testes | Há caminhos de gate vazio e garantias ainda incompletas | Gates fail-closed, redaction e recovery operacional |
 | Doctor | Relatório e modelo de probe existem | Todos os seis estágios retornam saudáveis sem testar componentes | Probes reais de configuração, alcance, autenticação e capacidade |
@@ -55,16 +55,17 @@ auditável. Isso é a direção do produto, não uma descrição do estado entre
 - **Fase 2 concluída:** record atômico, storage concorrente, execução por grafo, FSM por eventos,
   retomada vinculada ao artefato/configuração originais e retry que consome erro, tool call,
   stdout/stderr redigidos, gates, diff, orçamento e instrução de correção.
-- **Próximo marco:** Fase 3, providers, tools, terminal seguro, isolamento por worktree e promoção Git
-  reais, em tarefas separadas após o gate de início da fase.
+- **Fase 3 em andamento:** F3.1 entrega providers remoto/local reais e falha explícita para Anthropic;
+  F3.2–F3.8 ainda cobrem roteamento, tools, terminal seguro, worktree, promoção e edição.
 
 ## Dívidas técnicas críticas
 
 As seguintes implementações são deliberadamente tratadas como dívida técnica, não como capacidades
 operacionais:
 
-- [adapters de modelos](src/ai_engineering_harness/models/adapters/) retornam conteúdo e contagens de
-  tokens fabricados;
+- [roteamento de modelos](src/ai_engineering_harness/models/router.py) ainda usa registry estático,
+  não conecta usage ao budget nem persiste provider/modelo nos node events; Anthropic permanece
+  explicitamente não implementado;
 - [SerenaAdapter](src/ai_engineering_harness/tools/adapters/serena.py) não abre conexão MCP nem aplica
   edição semântica;
 - [CodebaseMemoryAdapter](src/ai_engineering_harness/indexer/codebase_memory_adapter.py) persiste uma
