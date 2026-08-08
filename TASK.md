@@ -33,7 +33,7 @@ devem ser corrigidos para refletir a decisão. Nunca depender somente do histór
 | **Fase concluída** | Fase 2 — F2.1–F2.6 implementadas e promovidas |
 | **Fase ativa** | Fase 3 — realinhamento obrigatório antes de F3.4 (DEC-012) |
 | **Tarefa ativa** | `F3.C2` — execução durável de tools e policy |
-| **Gate** | `READY`; `ACTIVE` |
+| **Gate** | `READY`; `COMPLETED_LOCAL / PROMOTION_PENDING` |
 | **Executor ativo** | `Codex`, único escritor |
 | **Workspace** | `C:\Users\walla\OneDrive\Desktop\ai-engineering-harness` |
 | **Branch** | `task/f3.c2-tool-effect-durability`, criada de `5616fc548716acb3561dd67d3905eb008130b58c` |
@@ -64,23 +64,23 @@ F3.C2 exige nova autorização explícita; essa pausa foi cumprida e a autoriza�
 | **Objetivo** | gravar tool call antes do dispatch, persistir outcome depois do efeito e bloquear retomada ambígua sem reexecução |
 | **Escopo** | tool loop/router, recorder sob lock/fencing, policy no dispatch, replay, documentação e testes focados |
 | **Proibido** | path guard, terminal, worktree, promoção e edição F3.4–F3.8; dependências, schemas, adapters e CI |
-| **Estado local** | gate documental `READY`; implementação ainda não iniciada |
+| **Estado local** | implementação e todos os gates congelados verdes; commits locais `8187158` e `93e6a03`; fechamento documental/tag complete neste checkpoint |
 | **Estado remoto** | branch F3.C2 somente local; nenhum push, PR, CI ou merge antecipado |
 
 ## 6. Bloqueios atuais
 
-Nenhum bloqueio ativo para a implementação F3.C2 após o checkpoint `READY`. F3.4 e qualquer efeito
-real de path, processo, worktree, promoção ou edição continuam bloqueados.
+Não há implementação ativa. Push e abertura do PR único da F3.C2 aguardam autorização explícita do
+usuário. F3.4 e qualquer efeito real de path, processo, worktree, promoção ou edição continuam bloqueados.
 
 ## 7. Próxima ação exata
 
 ```text
-EXECUTAR SOMENTE F3.C2:
-1. Criar o commit documental do gate e a tag local `checkpoint/f3.c2-ready`.
-2. Implementar write-ahead/outcome duráveis, recovery fail-closed, deny-wins, aprovação e registry vazio.
-3. Executar focais, compatibilidade, documentação, regressão, quality, package e auditoria de escopo.
-4. Registrar `COMPLETED_LOCAL / PROMOTION_PENDING` e pausar antes de push/PR.
-5. F3.4 exige promoção completa da F3.C2, auditoria e nova autorização explícita; não avançar automaticamente.
+PAUSAR EM `COMPLETED_LOCAL / PROMOTION_PENDING`:
+1. Concluir o commit documental e a tag local `checkpoint/f3.c2-complete`.
+2. Não executar push nem abrir PR sem autorização explícita separada do usuário.
+3. Após autorização, publicar a branch, abrir um único PR para `main` e validar todos os checks do head.
+4. Merge exige autorização explícita própria depois da CI verde.
+5. F3.4 exige promoção completa da F3.C2, CI pós-merge verde, sincronização e nova autorização; não avançar automaticamente.
 ```
 
 ## 8. Retomada após perda de contexto
