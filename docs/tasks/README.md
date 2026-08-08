@@ -44,6 +44,7 @@ em [`TASK.md`](../../TASK.md); requisitos normativos permanecem no
 | Governança | DOC-TASK-LEDGER | [Painel e arquivo](completed/DOC-TASK-LEDGER.md) | PR #16 / merge `fafbf62` / pós-merge `31218399437` |
 | Governança | DOC-PROTOCOL-ALIGN | [Protocolo operacional](completed/DOC-PROTOCOL-ALIGN.md) | PR #19 / merge `1d08602` / pós-merge `31228310847` |
 | F3 | F3.1 | [Provider real de modelo](completed/F3.1.md) | PR #20 / merge `acace94` / pós-merge `31230376744` |
+| F3 | F3.2 | [Configuração e roteamento de modelos](completed/F3.2.md) | PR #21 / merge `3956f16` / pós-merge `31231730863` |
 
 Fechamentos documentais adicionais preservados no Git: PR #13 / merge `3596df3` / run
 `31211290100` e PR #15 / merge `d48151b` / run `31215944126`.
