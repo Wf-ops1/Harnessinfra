@@ -1,0 +1,223 @@
+"""Focused F3.2 tests for config-driven routing, fallback and budget."""
+
+from __future__ import annotations
+
+from collections.abc import Mapping
+
+import pytest
+
+from ai_engineering_harness.core.config import ConfigResolver
+from ai_engineering_harness.governance import BudgetExceededError, BudgetTracker
+from ai_engineering_harness.models import (
+    LLMResponse,
+    ModelEgressDeniedError,
+    ModelRouter,
+    ModelRoutingConfigurationError,
+    ModelRoutingIntegrityError,
+    ProviderAuthError,
+    ProviderCancelledError,
+    ProviderConfiguration,
+    ProviderError,
+    ProviderInvalidRequestError,
+    ProviderNotImplementedError,
+    ProviderRegistry,
+    ProviderResponseError,
+    ProviderTimeoutError,
+)
+
+
+class _StaticProvider:
+    def __init__(self, provider_id: str, outcomes: list[LLMResponse | Exception]) -> None:
+        self.provider_id = provider_id
+        self.outcomes = outcomes
+        self.prompts: list[str] = []
+
+    def complete(self, prompt: str, **_: object) -> LLMResponse:
+        self.prompts.append(prompt)
+        outcome = self.outcomes.pop(0)
+        if isinstance(outcome, Exception):
+            raise outcome
+        return outcome
+
+
+class _StaticRegistry:
+    def __init__(self, providers: Mapping[str, _StaticProvider]) -> None:
+        self.providers = dict(providers)
+        self.created: list[str] = []
+
+    def is_configured(self, provider_id: str) -> bool:
+        return provider_id in self.providers
+
+    def create_provider(self, provider_id: str) -> _StaticProvider:
+        self.created.append(provider_id)
+        return self.providers[provider_id]
+
+
+def _response(
+    provider: str,
+    *,
+    model: str | None = None,
+    total_tokens: int = 5,
+) -> LLMResponse:
+    return LLMResponse(
+        content="ok",
+        provider=provider,
+        model_name=model or f"{provider}-server-model",
+        prompt_tokens=3,
+        completion_tokens=2,
+        total_tokens=total_tokens,
+        request_id=f"req-{provider}",
+        response_id=f"resp-{provider}",
+    )
+
+
+def _router(
+    registry: _StaticRegistry,
+    *,
+    allowed: tuple[str, ...] = ("openai", "local"),
+    budget: BudgetTracker | None = None,
+) -> ModelRouter:
+    return ModelRouter(
+        allowed_providers=allowed,
+        provider_registry=registry,  # type: ignore[arg-type]
+        budget_tracker=budget,
+        default_primary_provider="openai",
+        default_fallback_providers=(
+            ("local",) if "local" in registry.providers and "local" in allowed else ()
+        ),
+    )
+
+
+def test_effective_config_builds_immutable_registry_and_default_route(tmp_path) -> None:
+    effective = ConfigResolver(project_root=tmp_path).resolve()
+    router = ModelRouter.from_effective_config(effective)
+
+    assert router.validate_route() == ("local",)
+    assert router.provider_registry is not None
+    assert router.provider_registry.provider_ids == ("openai", "anthropic", "local")
+    assert router.provider_registry.create_provider("local").model_name == "llama3"
+
+
+def test_registry_detaches_provider_mapping() -> None:
+    providers = {
+        "local": ProviderConfiguration(
+            adapter="local",
+            model="configured-model",
+            base_url="http://127.0.0.1:9999/v1",
+        )
+    }
+    registry = ProviderRegistry(providers)
+    providers.clear()
+
+    assert registry.provider_ids == ("local",)
+    assert registry.create_provider("local").model_name == "configured-model"
+
+
+def test_transient_failure_falls_back_once_and_preserves_real_identity() -> None:
+    primary = _StaticProvider(
+        "openai",
+        [ProviderTimeoutError("timeout", provider_id="openai")],
+    )
+    fallback = _StaticProvider("local", [_response("local", model="actual-local")])
+    registry = _StaticRegistry({"openai": primary, "local": fallback})
+
+    response = _router(registry).complete_with_fallback("sentinel")
+
+    assert registry.created == ["openai", "local"]
+    assert primary.prompts == ["sentinel"]
+    assert fallback.prompts == ["sentinel"]
+    assert (response.provider, response.model_name) == ("local", "actual-local")
+
+
+@pytest.mark.parametrize(
+    "error_type",
+    [
+        ProviderAuthError,
+        ProviderInvalidRequestError,
+        ProviderResponseError,
+        ProviderCancelledError,
+        ProviderNotImplementedError,
+    ],
+)
+def test_auth_invalid_response_cancel_and_not_implemented_never_fall_back(
+    error_type: type[ProviderError],
+) -> None:
+    primary = _StaticProvider(
+        "openai",
+        [error_type("permanent", provider_id="openai")],
+    )
+    fallback = _StaticProvider("local", [_response("local")])
+    registry = _StaticRegistry({"openai": primary, "local": fallback})
+
+    with pytest.raises(error_type):
+        _router(registry).complete_with_fallback("sentinel")
+
+    assert registry.created == ["openai"]
+    assert fallback.prompts == []
+
+
+def test_entire_route_is_validated_before_provider_creation() -> None:
+    primary = _StaticProvider("openai", [_response("openai")])
+    registry = _StaticRegistry({"openai": primary})
+
+    with pytest.raises(ModelRoutingConfigurationError, match="não registrado"):
+        _router(registry).complete_with_fallback(
+            "must-not-leave",
+            fallback_provider_ids=("local",),
+        )
+
+    assert registry.created == []
+    assert primary.prompts == []
+
+
+def test_egress_denial_happens_before_provider_creation() -> None:
+    local = _StaticProvider("local", [_response("local")])
+    registry = _StaticRegistry({"local": local})
+
+    with pytest.raises(ModelEgressDeniedError):
+        ModelRouter(
+            allowed_providers=("openai",),
+            provider_registry=registry,  # type: ignore[arg-type]
+            default_primary_provider="local",
+        )
+
+    assert registry.created == []
+    assert local.prompts == []
+
+
+def test_budget_records_real_usage_and_blocks_next_transport() -> None:
+    provider = _StaticProvider("openai", [_response("openai"), _response("openai")])
+    registry = _StaticRegistry({"openai": provider})
+    budget = BudgetTracker(max_tokens=5)
+    router = _router(registry, allowed=("openai",), budget=budget)
+
+    router.complete_with_fallback("first", fallback_provider_ids=())
+    with pytest.raises(BudgetExceededError):
+        router.complete_with_fallback("second", fallback_provider_ids=())
+
+    assert budget.consumed_tokens == 5
+    assert provider.prompts == ["first"]
+
+
+def test_provider_identity_mismatch_fails_closed() -> None:
+    provider = _StaticProvider("openai", [_response("local")])
+    registry = _StaticRegistry({"openai": provider})
+
+    with pytest.raises(ModelRoutingIntegrityError):
+        _router(registry, allowed=("openai",)).complete_with_fallback(
+            "sentinel",
+            fallback_provider_ids=(),
+        )
+
+
+@pytest.mark.parametrize(
+    "override",
+    [
+        {"models": {"routing": {"primary_provider": "missing"}}},
+        {"data_egress": {"allowed_providers": ["local", "local"]}},
+        {"budget": {"max_tokens": 0}},
+    ],
+)
+def test_invalid_effective_route_configuration_fails_resolution(tmp_path, override) -> None:
+    with pytest.raises((ModelRoutingConfigurationError, ModelEgressDeniedError)):
+        ConfigResolver(project_root=tmp_path).resolve(cli_overrides=override)

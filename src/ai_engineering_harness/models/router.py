@@ -1,48 +1,191 @@
-"""Roteador inteligente de LLMs com controle de Data Egress e Fallback Seguro."""
+"""Roteamento de modelos por configuração efetiva, egress e budget."""
 
-import time
+from __future__ import annotations
 
-from ai_engineering_harness.models.provider import LLMResponse
-from ai_engineering_harness.models.registry import ProviderRegistry
+from collections.abc import Mapping
+from typing import Annotated
+
+from pydantic import BaseModel, ConfigDict, StringConstraints, field_validator
+
+from ai_engineering_harness.governance.budget import BudgetTracker
+from ai_engineering_harness.models.provider import (
+    BaseLLMProvider,
+    CancellationToken,
+    LLMResponse,
+    ProviderError,
+)
+from ai_engineering_harness.models.registry import ProviderConfiguration, ProviderRegistry
+
+_NonEmptyStr = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+
+
+class ModelRoutingConfigurationError(ValueError):
+    """A configuração efetiva de modelos não forma uma rota válida."""
+
+
+class ModelEgressDeniedError(PermissionError):
+    """Um candidato não está autorizado pela política de data egress."""
+
+
+class ModelRoutingIntegrityError(RuntimeError):
+    """O provider respondeu com identidade incompatível com a rota selecionada."""
+
+
+class ModelRouteConfiguration(BaseModel):
+    model_config = ConfigDict(strict=True, frozen=True, extra="forbid")
+
+    primary_provider: _NonEmptyStr
+    fallback_providers: tuple[_NonEmptyStr, ...] = ()
+
+    @field_validator("fallback_providers", mode="before")
+    @classmethod
+    def freeze_fallbacks(cls, value: object) -> object:
+        return tuple(value) if isinstance(value, list) else value
+
+
+class ModelsConfiguration(BaseModel):
+    model_config = ConfigDict(strict=True, frozen=True, extra="forbid")
+
+    providers: dict[str, ProviderConfiguration]
+    routing: ModelRouteConfiguration
 
 
 class ModelRouter:
-    """Roteador com checagem de Data Egress e política de Fallback."""
+    """Roteador fail-closed com egress pré-prompt, fallback transitório e budget."""
 
-    def __init__(self, allowed_providers: list[str]):
-        self.allowed_providers = allowed_providers
+    def __init__(
+        self,
+        allowed_providers: list[str] | tuple[str, ...],
+        *,
+        provider_registry: ProviderRegistry | None = None,
+        budget_tracker: BudgetTracker | None = None,
+        default_primary_provider: str | None = None,
+        default_fallback_providers: tuple[str, ...] = (),
+    ) -> None:
+        if not allowed_providers:
+            raise ModelRoutingConfigurationError("allowed_providers não pode ser vazio")
+        if len(set(allowed_providers)) != len(allowed_providers):
+            raise ModelRoutingConfigurationError("allowed_providers contém duplicatas")
+        self.allowed_providers = tuple(allowed_providers)
+        self.provider_registry = provider_registry
+        self.budget_tracker = budget_tracker or BudgetTracker()
+        self.default_primary_provider = default_primary_provider or self.allowed_providers[0]
+        self.default_fallback_providers = tuple(default_fallback_providers)
+        self.validate_route()
 
-    def _validate_egress(self, provider_id: str) -> None:
-        """Verifica se o provedor está autorizado pelas regras de data egress."""
-        if provider_id not in self.allowed_providers:
-            raise PermissionError(
-                f"[SECURITY VIOLATION] Provedor '{provider_id}' não está autorizado na política de data egress: {self.allowed_providers}"
-            )
+    @classmethod
+    def from_effective_config(cls, config: Mapping[str, object]) -> ModelRouter:
+        """Constrói o router exclusivamente da configuração já resolvida."""
+        models_raw = config.get("models")
+        if not isinstance(models_raw, dict):
+            raise ModelRoutingConfigurationError("configuração efetiva não contém models")
+        try:
+            models = ModelsConfiguration.model_validate(models_raw)
+        except (TypeError, ValueError) as exc:
+            raise ModelRoutingConfigurationError(
+                f"configuração efetiva de models inválida: {exc}"
+            ) from exc
+
+        data_egress = config.get("data_egress")
+        if not isinstance(data_egress, dict):
+            raise ModelRoutingConfigurationError("configuração efetiva não contém data_egress")
+        allowed_raw = data_egress.get("allowed_providers")
+        if not isinstance(allowed_raw, list) or not all(
+            isinstance(item, str) and item for item in allowed_raw
+        ):
+            raise ModelRoutingConfigurationError("allowed_providers deve ser lista não vazia")
+
+        budget_raw = config.get("budget", {})
+        if not isinstance(budget_raw, dict):
+            raise ModelRoutingConfigurationError("budget deve ser objeto")
+        max_tokens = budget_raw.get("max_tokens", 100_000)
+        if type(max_tokens) is not int or max_tokens <= 0:
+            raise ModelRoutingConfigurationError("budget.max_tokens deve ser inteiro positivo")
+
+        registry = ProviderRegistry(models.providers)
+        return cls(
+            allowed_providers=allowed_raw,
+            provider_registry=registry,
+            budget_tracker=BudgetTracker(max_tokens=max_tokens),
+            default_primary_provider=models.routing.primary_provider,
+            default_fallback_providers=models.routing.fallback_providers,
+        )
+
+    @classmethod
+    def validate_effective_config(cls, config: Mapping[str, object]) -> None:
+        cls.from_effective_config(config)
+
+    def validate_route(
+        self,
+        primary_provider_id: str | None = None,
+        fallback_provider_ids: list[str] | tuple[str, ...] | None = None,
+    ) -> tuple[str, ...]:
+        """Valida todos os candidatos antes de prompt, provider ou transporte."""
+        primary = primary_provider_id or self.default_primary_provider
+        fallbacks = (
+            self.default_fallback_providers
+            if fallback_provider_ids is None
+            else tuple(fallback_provider_ids)
+        )
+        candidates = (primary, *fallbacks)
+        if len(set(candidates)) != len(candidates):
+            raise ModelRoutingConfigurationError("rota contém provider duplicado")
+        for provider_id in candidates:
+            self._validate_egress(provider_id)
+            if not self._is_registered(provider_id):
+                raise ModelRoutingConfigurationError(
+                    f"provider não registrado/configurado: {provider_id}"
+                )
+        return candidates
 
     def complete_with_fallback(
         self,
         prompt: str,
-        primary_provider_id: str,
-        fallback_provider_ids: list[str] | None = None,
-        max_retries: int = 2
+        primary_provider_id: str | None = None,
+        fallback_provider_ids: list[str] | tuple[str, ...] | None = None,
+        *,
+        cancellation_token: CancellationToken | None = None,
     ) -> LLMResponse:
-        """Executa a conclusão no provedor primário com fallback seguro."""
-        candidates = [primary_provider_id] + (fallback_provider_ids or [])
-
-        # Validação estrita de Data Egress de TODOS os candidatos ANTES de iniciar qualquer execução
+        """Executa uma vez por candidato e só avança após falha transitória."""
+        candidates = self.validate_route(primary_provider_id, fallback_provider_ids)
+        last_transient_error: ProviderError | None = None
         for provider_id in candidates:
-            self._validate_egress(provider_id)
+            self.budget_tracker.ensure_available()
+            provider = self._create_provider(provider_id)
+            try:
+                response = provider.complete(
+                    prompt,
+                    cancellation_token=cancellation_token,
+                )
+            except ProviderError as exc:
+                if not exc.retryable:
+                    raise
+                last_transient_error = exc
+                continue
 
-        last_error = None
-        for provider_id in candidates:
-            provider = ProviderRegistry.get_provider(provider_id)
+            if response.provider != provider_id:
+                raise ModelRoutingIntegrityError(
+                    "provider retornado não corresponde ao candidato selecionado"
+                )
+            self.budget_tracker.add_tokens(response.total_tokens)
+            return response
 
-            for attempt in range(max_retries + 1):
-                try:
-                    return provider.complete(prompt)
-                except (OSError, RuntimeError, TimeoutError, TypeError, ValueError) as e:
-                    last_error = e
-                    if attempt < max_retries:
-                        time.sleep(0.1 * (2 ** attempt))  # Exponential backoff
+        assert last_transient_error is not None
+        raise last_transient_error
 
-        raise RuntimeError(f"Todos os provedores de modelo falharam: {last_error}")
+    def _validate_egress(self, provider_id: str) -> None:
+        if provider_id not in self.allowed_providers:
+            raise ModelEgressDeniedError(
+                f"[SECURITY VIOLATION] Provedor '{provider_id}' não está autorizado "
+                f"na política de data egress: {list(self.allowed_providers)}"
+            )
+
+    def _is_registered(self, provider_id: str) -> bool:
+        if self.provider_registry is not None:
+            return self.provider_registry.is_configured(provider_id)
+        return ProviderRegistry.is_registered(provider_id)
+
+    def _create_provider(self, provider_id: str) -> BaseLLMProvider:
+        if self.provider_registry is not None:
+            return self.provider_registry.create_provider(provider_id)
+        return ProviderRegistry.get_provider(provider_id)

@@ -6,7 +6,7 @@
 ## 1. Fontes de verdade
 
 1. Este painel: fase, coordenação, tarefa ativa, bloqueios e próxima ação.
-2. [Dossiê ativo](docs/tasks/active/F3.1.md): problema, evidência, escopo, aceite e rollback.
+2. [Dossiê ativo](docs/tasks/active/F3.2.md): problema, evidência, escopo, aceite e rollback.
 3. [Plano principal](docs/plano_implementacao_harness_operacional.md): requisitos e dependências das fases.
 4. [Regras dos agentes](.agents/AGENTS.md): protocolo obrigatório de execução e Git.
 5. [Índice histórico](docs/tasks/README.md): dossiês concluídos, PRs, merges e runs.
@@ -32,12 +32,12 @@ devem ser corrigidos para refletir a decisão. Nunca depender somente do histór
 |---|---|
 | **Fase concluída** | Fase 2 — F2.1–F2.6 implementadas e promovidas |
 | **Fase ativa** | Fase 3 — modelos, ferramentas e workspace reais |
-| **Tarefa ativa** | `F3.1` — implementar provider real de modelo |
+| **Tarefa ativa** | `F3.2` — configuração e roteamento de modelos |
 | **Gate** | `READY`; `COMPLETED_LOCAL / PROMOTION_PENDING` |
 | **Executor ativo** | `Codex`, único escritor |
 | **Workspace** | `C:\Users\walla\OneDrive\Desktop\ai-engineering-harness` |
-| **Branch** | `task/f3.1-model-provider`, criada de `1d08602dab90edc7eb9f8a72509fa5548abd80e3` |
-| **Última main comprovada** | `1d08602dab90edc7eb9f8a72509fa5548abd80e3`; run `31228310847`, 11/11 verde |
+| **Branch** | `task/f3.2-model-routing`, criada de `acace943c3acd585cbc83cd047f294c02875b922` |
+| **Última main comprovada** | `acace943c3acd585cbc83cd047f294c02875b922`; run `31230376744`, 11/11 verde |
 | **Python** | `C:\Users\walla\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe` — 3.12.13 |
 | **uv** | `.\build\f0.6-tools\uv\bin\uv.exe` — 0.11.32; nenhuma dependência nova nesta tarefa |
 
@@ -45,23 +45,23 @@ devem ser corrigidos para refletir a decisão. Nunca depender somente do histór
 
 | Evidência | Resultado |
 |---|---|
-| Tarefa anterior | `DOC-PROTOCOL-ALIGN`, agora `PROMOTED` e arquivada |
-| PR | #19; head `01f47ec911868765cdd4e6b537bf2c58769a634c`; merge `1d08602dab90edc7eb9f8a72509fa5548abd80e3` |
-| CI do PR | run `31228197660`, evento `pull_request`, 11/11 jobs verdes incluindo `CI required` |
-| CI pós-merge | run `31228310847`, evento `push` em `main`, SHA do merge, 11/11 jobs verdes |
-| Linha comprovada | `main == origin/main == 1d08602dab90edc7eb9f8a72509fa5548abd80e3` antes desta branch |
+| Tarefa anterior | `F3.1`, agora `PROMOTED` e arquivada |
+| PR | #20; head `ea108a83c35d1b44eab5de5fa6f604668a07a001`; merge `acace943c3acd585cbc83cd047f294c02875b922` |
+| CI do PR | run `31230242232`, evento `pull_request`, 11/11 jobs verdes incluindo `CI required` |
+| CI pós-merge | run `31230376744`, evento `push` em `main`, SHA do merge, 11/11 jobs verdes |
+| Linha comprovada | `main == origin/main == acace943c3acd585cbc83cd047f294c02875b922` antes desta branch |
 
 ## 5. Tarefa ativa
 
-Leia integralmente: [F3.1](docs/tasks/active/F3.1.md).
+Leia integralmente: [F3.2](docs/tasks/active/F3.2.md).
 
 | Campo | Valor |
 |---|---|
-| **Objetivo** | substituir respostas fabricadas por provider remoto e local reais, tipados e fail-closed |
-| **Escopo** | contratos/model adapters, testes determinísticos, teste live condicionado e documentação da tarefa |
-| **Proibido** | roteamento F3.2, loop F3.3, outras tarefas/fases, dependências, lockfile e CI |
-| **Estado local** | `472 passed, 1 skip live condicionado, 6 subtests`; mypy/Ruff/compileall/lock/diff/escopo verdes |
-| **Estado remoto** | branch F3.1 ainda não publicada; nenhum PR/CI/merge antecipado |
+| **Objetivo** | rotear somente providers autorizados/configurados, com fallback transitório, budget e metadata durável |
+| **Escopo** | config/registry/router/budget, preflight do AgentExecutor e metadata de model call no journal |
+| **Proibido** | transporte F3.1, loop de tools F3.3, backend de agente novo, demais tarefas/fases, dependências e CI |
+| **Estado local** | `492 passed, 1 skip live condicionado, 6 subtests`; mypy/Ruff/compileall/lock/diff/escopo verdes |
+| **Estado remoto** | branch F3.2 ainda não publicada; nenhum PR/CI/merge antecipado |
 
 ## 6. Bloqueios atuais
 
@@ -70,13 +70,13 @@ Nenhum bloqueio ativo.
 ## 7. Próxima ação exata
 
 ```text
-PROMOVER SOMENTE F3.1 EM SEU ÚNICO PR:
-1. Publicar somente task/f3.1-model-provider; não publicar tags.
-2. Abrir um único PR para main e aguardar explicitamente todos os jobs, incluindo CI required.
-3. Nunca mesclar com check pendente, ausente, ignorado ou falho, nem com conflito.
-4. Com todos os jobs verdes e branch atualizada, executar merge commit autorizado.
-5. Aguardar a CI de push da main, confirmar o SHA e os 11 jobs; sincronizar main local.
-6. Não abrir PR de fechamento; certificar/arquivar F3.1 no primeiro commit do gate F3.2.
+PUBLICAR E PROMOVER SOMENTE F3.2:
+1. Criar o commit de fechamento e a tag local checkpoint/f3.2-complete.
+2. Publicar a branch e abrir o único PR F3.2.
+3. Inspecionar todos os jobs, inclusive CI required; não fazer merge com check pendente/ausente/falho.
+4. Com todos os checks verdes e PR sem conflitos, fazer o merge único.
+5. Aguardar o CI push em main, conferir SHA/matriz/CI required e sincronizar main local.
+6. Não abrir PR de fechamento; certificar/arquivar F3.2 no primeiro commit do gate F3.3.
 ```
 
 ## 8. Retomada após perda de contexto

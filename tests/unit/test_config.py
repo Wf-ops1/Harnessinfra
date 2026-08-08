@@ -2,7 +2,10 @@
 
 from pathlib import Path
 
+import pytest
+
 from ai_engineering_harness.core.config import ConfigResolver
+from ai_engineering_harness.models.router import ModelEgressDeniedError
 
 
 def test_config_resolver_hierarchy(tmp_path: Path):
@@ -32,3 +35,21 @@ def test_config_resolver_hierarchy(tmp_path: Path):
     # Test CLI Override wins over User Override
     cli_config = resolver.resolve(cli_overrides={"context_sufficiency_threshold": 0.95})
     assert cli_config["context_sufficiency_threshold"] == 0.95
+
+
+def test_config_resolver_exposes_validated_model_route_and_budget(tmp_path: Path):
+    config = ConfigResolver(project_root=tmp_path).resolve()
+
+    assert config["models"]["routing"] == {
+        "primary_provider": "local",
+        "fallback_providers": [],
+    }
+    assert config["models"]["providers"]["local"]["model"] == "llama3"
+    assert config["budget"]["max_tokens"] == 100_000
+
+
+def test_config_resolver_rejects_model_route_outside_egress(tmp_path: Path):
+    with pytest.raises(ModelEgressDeniedError):
+        ConfigResolver(project_root=tmp_path).resolve(
+            cli_overrides={"data_egress": {"allowed_providers": ["openai"]}}
+        )

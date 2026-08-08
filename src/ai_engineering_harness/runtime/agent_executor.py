@@ -3,7 +3,7 @@
 from pathlib import Path
 from typing import Any
 
-from ai_engineering_harness.models.provider import LLMResponse
+from ai_engineering_harness.models.provider import CancellationToken, LLMResponse
 from ai_engineering_harness.models.router import ModelRouter
 from ai_engineering_harness.tools.router import ToolRouter
 
@@ -40,12 +40,25 @@ class AgentExecutor:
 
         return f"Você é {self.agent_name}, executando uma etapa do grafo agentic do BMad Method."
 
-    def execute_node(self, prompt: str, primary_provider: str = "local") -> LLMResponse:
-        full_prompt = f"{self.system_prompt}\n\n{prompt}"
+    def execute_node(
+        self,
+        prompt: str,
+        primary_provider: str | None = None,
+        fallback_providers: list[str] | tuple[str, ...] | None = None,
+        *,
+        cancellation_token: CancellationToken | None = None,
+    ) -> LLMResponse:
+        candidates = self.router.validate_route(primary_provider, fallback_providers)
+        full_prompt = self._compose_prompt(prompt)
         return self.router.complete_with_fallback(
             prompt=full_prompt,
-            primary_provider_id=primary_provider
+            primary_provider_id=candidates[0],
+            fallback_provider_ids=candidates[1:],
+            cancellation_token=cancellation_token,
         )
+
+    def _compose_prompt(self, prompt: str) -> str:
+        return f"{self.system_prompt}\n\n{prompt}"
 
     def execute_tool(self, tool_name: str, payload: dict[str, Any]) -> Any:
         if not self.tool_router:

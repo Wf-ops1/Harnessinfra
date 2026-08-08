@@ -51,6 +51,7 @@ from ai_engineering_harness.runtime import (
     InterruptedExecutionError,
     InterruptedNodeExecutionError,
     KnowledgeSyncNodeExecutor,
+    ModelCallMetadata,
     NodeBackendError,
     NodeExecutionContext,
     NodeExecutionResult,
@@ -684,6 +685,57 @@ def test_valid_input_contract_and_output_contract_complete(tmp_path: Path) -> No
         "NODE_COMPLETED",
         "STATE_TRANSITIONED",
     ]
+
+
+def test_model_metadata_and_usage_are_journaled_only_on_node_outcome(
+    tmp_path: Path,
+) -> None:
+    artifact = _agent_artifact()
+    storage = AtomicFileStateStorage(tmp_path)
+    execution_id = "exec-model-metadata"
+    storage.create_execution(_record(artifact, execution_id))
+    metadata = ModelCallMetadata(
+        provider_id="openai",
+        model_name="server-model",
+        prompt_tokens=11,
+        completion_tokens=7,
+        total_tokens=18,
+        request_id="req-123",
+        response_id="resp-123",
+    )
+
+    _executor(
+        storage,
+        NodeExecutorRegistry(
+            agent=AgentNodeExecutor(
+                _StaticBackend(
+                    NodeExecutionResult.completed(
+                        {"result": "ok"},
+                        model_call=metadata,
+                    )
+                )
+            )
+        ),
+    ).execute(artifact, execution_id, {"value": 1})
+
+    events = _journal(tmp_path, execution_id)
+    started = next(event for event in events if event["event_type"] == "NODE_STARTED")
+    outcome = next(event for event in events if event["event_type"] == "NODE_COMPLETED")
+    assert not any(key.startswith("model_") for key in started["payload"])
+    assert {
+        key: value
+        for key, value in outcome["payload"].items()
+        if key.startswith("model_")
+    } == {
+        "model_provider": "openai",
+        "model_name": "server-model",
+        "model_prompt_tokens": 11,
+        "model_completion_tokens": 7,
+        "model_total_tokens": 18,
+        "model_response_id": "resp-123",
+        "model_request_id": "req-123",
+    }
+    assert "sensitive prompt" not in json.dumps(events)
 
 
 def test_invalid_input_contract_rejection_is_side_effect_free(tmp_path: Path) -> None:
@@ -1419,6 +1471,73 @@ def test_resume_tampered_ledger_attempt_next_digest_or_gap_fails_closed(
             artifact,
             execution_id,
         )
+
+    assert storage.load_events(execution_id) == journal_before
+    assert storage.load_execution(execution_id) == record_before
+
+
+def test_resume_rejects_partial_model_metadata_without_backend(tmp_path: Path) -> None:
+    artifact = _artifact([_deterministic_node("gate", "completed")])
+    storage = AtomicFileStateStorage(tmp_path)
+    execution_id = "exec-ledger-partial-model-metadata"
+    initial_input = {"trace": []}
+    _create_resume_execution(storage, artifact, execution_id, initial_input)
+    machine = EventSourcedStateMachine(
+        storage,
+        execution_id,
+        clock=_Clock(),
+        event_id_factory=_EventIds(),
+    )
+    machine.transition_to(
+        ExecutionState.EXECUTING,
+        node_id="gate",
+        attempt=1,
+        reason="graph_execution_started",
+    )
+    input_digest = storage.load_execution_bundle(execution_id).initial_input_digest
+    output_digest = storage.store_payload(execution_id, {"trace": ["gate"]})
+    fencing_token = storage.load_events(execution_id)[0].payload["fencing_token"]
+    storage.append_event(
+        execution_id,
+        ExecutionEvent(
+            event_id="started-partial-model-metadata",
+            execution_id=execution_id,
+            event_type="NODE_STARTED",
+            timestamp=_BASE_TIME + timedelta(seconds=2),
+            payload={
+                "attempt": 1,
+                "fencing_token": fencing_token,
+                "input_digest": input_digest,
+                "node_id": "gate",
+                "node_type": "deterministic",
+            },
+        ),
+    )
+    storage.append_event(
+        execution_id,
+        ExecutionEvent(
+            event_id="outcome-partial-model-metadata",
+            execution_id=execution_id,
+            event_type="NODE_COMPLETED",
+            timestamp=_BASE_TIME + timedelta(seconds=3),
+            payload={
+                "attempt": 1,
+                "fencing_token": fencing_token,
+                "input_digest": input_digest,
+                "next_id": "completed",
+                "node_id": "gate",
+                "node_type": "deterministic",
+                "output_digest": output_digest,
+                "record_revision": 2,
+                "model_provider": "openai",
+            },
+        ),
+    )
+    journal_before = storage.load_events(execution_id)
+    record_before = storage.load_execution(execution_id)
+
+    with pytest.raises(InterruptedNodeExecutionError, match="outcome ledger is malformed"):
+        _resume_executor(storage, NodeExecutorRegistry()).resume(artifact, execution_id)
 
     assert storage.load_events(execution_id) == journal_before
     assert storage.load_execution(execution_id) == record_before

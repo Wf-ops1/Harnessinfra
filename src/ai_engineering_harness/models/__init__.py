@@ -16,20 +16,35 @@ from .provider import (
     ProviderUnavailableError,
     ToolCall,
 )
-from .router import ModelRouter
+from .registry import ProviderConfiguration, ProviderRegistry
+from .router import (
+    ModelEgressDeniedError,
+    ModelRouteConfiguration,
+    ModelRouter,
+    ModelRoutingConfigurationError,
+    ModelRoutingIntegrityError,
+    ModelsConfiguration,
+)
 
 __all__ = [
     "BaseLLMProvider",
     "CancellationToken",
     "LLMResponse",
+    "ModelEgressDeniedError",
+    "ModelRouteConfiguration",
     "ModelRouter",
+    "ModelRoutingConfigurationError",
+    "ModelRoutingIntegrityError",
+    "ModelsConfiguration",
     "OpenAICompatibleHTTPProvider",
     "ProviderAuthError",
     "ProviderCancelledError",
+    "ProviderConfiguration",
     "ProviderError",
     "ProviderInvalidRequestError",
     "ProviderNotImplementedError",
     "ProviderRateLimitError",
+    "ProviderRegistry",
     "ProviderResponseError",
     "ProviderTimeoutError",
     "ProviderUnavailableError",
