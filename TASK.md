@@ -33,7 +33,7 @@ devem ser corrigidos para refletir a decisão. Nunca depender somente do histór
 | **Fase concluída** | Fase 2 — F2.1–F2.6 implementadas e promovidas |
 | **Fase ativa** | Fase 3 — modelos, ferramentas e workspace reais |
 | **Tarefa ativa** | `F3.3` — loop de tool calls |
-| **Gate** | `READY`; contrato congelado antes do primeiro arquivo de implementação |
+| **Gate** | `READY`; `COMPLETED_LOCAL / PROMOTION_PENDING` |
 | **Executor ativo** | `Codex`, único escritor |
 | **Workspace** | `C:\Users\walla\OneDrive\Desktop\ai-engineering-harness` |
 | **Branch** | `task/f3.3-tool-loop`, criada de `3956f16fb3046e1eb3721d76f544d6502329cb29` |
@@ -60,7 +60,7 @@ Leia integralmente: [F3.3](docs/tasks/active/F3.3.md).
 | **Objetivo** | executar tool calls autorizadas em loop limitado, devolver resultados ao modelo e persistir evidência redigida |
 | **Escopo** | policy compilada, schemas/registry do ToolRouter, loop, budget/cancelamento e tool events/replay |
 | **Proibido** | adapters reais novos, path guard/terminal/worktree/edição F3.4–F3.8, transports, dependências e CI |
-| **Estado local** | gate documental `READY`; implementação ainda não iniciada |
+| **Estado local** | `508 passed, 1 skip live condicionado, 6 subtests`; mypy/Ruff/compileall/lock/diff/escopo verdes |
 | **Estado remoto** | branch F3.3 ainda não publicada; nenhum PR/CI/merge antecipado |
 
 ## 6. Bloqueios atuais
@@ -70,13 +70,13 @@ Nenhum bloqueio ativo.
 ## 7. Próxima ação exata
 
 ```text
-IMPLEMENTAR SOMENTE F3.3 A PARTIR DE checkpoint/f3.3-ready:
-1. Extrair a allowlist exclusivamente da política efetiva compilada do node.
-2. Registrar schemas/handlers operacionais explícitos e validar todo o lote antes do primeiro efeito.
-3. Executar o loop limitado, budgetado e cancelável; devolver resultados canônicos ao modelo.
-4. Persistir tool records redigidos em pares de eventos e validar sua sequência no replay.
-5. Executar focais, negativos, journal/replay, compatibilidade, suíte integral e quality gates.
-6. Revisar escopo/diff, registrar evidências e publicar o único PR F3.3.
+PUBLICAR E PROMOVER SOMENTE F3.3:
+1. Criar commit de fechamento e tag local checkpoint/f3.3-complete.
+2. Publicar a branch e abrir o único PR F3.3.
+3. Inspecionar todos os jobs, inclusive CI required; merge proibido com pendência/ausência/falha.
+4. Com 100% verde e PR sem conflitos, fazer o merge único.
+5. Aguardar CI push em main, conferir SHA/matriz/CI required e sincronizar main local.
+6. Certificar/arquivar F3.3 somente no primeiro commit do gate F3.4; sem PR de fechamento.
 ```
 
 ## 8. Retomada após perda de contexto
