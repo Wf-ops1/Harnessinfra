@@ -6,7 +6,7 @@
 ## 1. Fontes de verdade
 
 1. Este painel: fase, coordenação, tarefa ativa, bloqueios e próxima ação.
-2. [Dossiê ativo](docs/tasks/active/DOC-PROTOCOL-ALIGN.md): problema, evidência, escopo, aceite e rollback.
+2. [Dossiê ativo](docs/tasks/active/F3.1.md): problema, evidência, escopo, aceite e rollback.
 3. [Plano principal](docs/plano_implementacao_harness_operacional.md): requisitos e dependências das fases.
 4. [Regras dos agentes](.agents/AGENTS.md): protocolo obrigatório de execução e Git.
 5. [Índice histórico](docs/tasks/README.md): dossiês concluídos, PRs, merges e runs.
@@ -31,13 +31,13 @@ devem ser corrigidos para refletir a decisão. Nunca depender somente do histór
 | Campo | Estado observado |
 |---|---|
 | **Fase concluída** | Fase 2 — F2.1–F2.6 implementadas e promovidas |
-| **Próxima fase** | Fase 3 — ainda não iniciada; bloqueada até promover `DOC-PROTOCOL-ALIGN` |
-| **Tarefa ativa** | `DOC-PROTOCOL-ALIGN` — alinhar fontes normativas e ciclo de um PR |
-| **Gate** | `READY`; aceite local concluído, promoção remota pendente |
+| **Fase ativa** | Fase 3 — modelos, ferramentas e workspace reais |
+| **Tarefa ativa** | `F3.1` — implementar provider real de modelo |
+| **Gate** | `READY`; contrato congelado antes do primeiro arquivo de implementação |
 | **Executor ativo** | `Codex`, único escritor |
 | **Workspace** | `C:\Users\walla\OneDrive\Desktop\ai-engineering-harness` |
-| **Branch** | `docs/align-operational-protocol`, criada de `87373ec4ac91e2565e5f78b60bf2a669c121c381` |
-| **Última main comprovada** | `87373ec4ac91e2565e5f78b60bf2a669c121c381`; run `31219589499`, 11/11 verde |
+| **Branch** | `task/f3.1-model-provider`, criada de `1d08602dab90edc7eb9f8a72509fa5548abd80e3` |
+| **Última main comprovada** | `1d08602dab90edc7eb9f8a72509fa5548abd80e3`; run `31228310847`, 11/11 verde |
 | **Python** | `C:\Users\walla\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe` — 3.12.13 |
 | **uv** | `.\build\f0.6-tools\uv\bin\uv.exe` — 0.11.32; nenhuma dependência nova nesta tarefa |
 
@@ -45,28 +45,23 @@ devem ser corrigidos para refletir a decisão. Nunca depender somente do histór
 
 | Evidência | Resultado |
 |---|---|
-| Implementação F2.6 | PR #14; merge `2dac824684b541c0b3ae4d6caf08ec9161524d91` |
-| CI F2.6 | PR run `31214724386` e pós-merge `31215162155`, 11/11 verdes |
-| Fechamento F2 | PR #15; merge `d48151b752aa373756c46bfee58932fa5abf4bf5` |
-| CI do fechamento | PR run `31215674969`; pós-merge run `31215944126`, evento `push` em `main`, 11/11 verdes |
-| Refatoração do ledger | PR #16; checks run `31218206768`, 11/11 verdes antes do merge |
-| Promoção do ledger | merge `fafbf627804f1a2a23d988c06dd123a3eee01348`; pós-merge `31218399437`, 11/11 verdes |
-| Fechamento do ledger | PR #17; checks run `31218768354`, 11/11 verdes antes do merge |
-| Promoção do fechamento | merge `ff2d9e5035423844e8098757e0c6a9f689e8cab1`; pós-merge `31218998232`, 11/11 verdes |
-| Painel terminal | PR #18; merge `87373ec4ac91e2565e5f78b60bf2a669c121c381`; pós-merge `31219589499`, 11/11 verdes |
-| Linha comprovada | `main == origin/main == 87373ec4ac91e2565e5f78b60bf2a669c121c381` antes desta branch |
+| Tarefa anterior | `DOC-PROTOCOL-ALIGN`, agora `PROMOTED` e arquivada |
+| PR | #19; head `01f47ec911868765cdd4e6b537bf2c58769a634c`; merge `1d08602dab90edc7eb9f8a72509fa5548abd80e3` |
+| CI do PR | run `31228197660`, evento `pull_request`, 11/11 jobs verdes incluindo `CI required` |
+| CI pós-merge | run `31228310847`, evento `push` em `main`, SHA do merge, 11/11 jobs verdes |
+| Linha comprovada | `main == origin/main == 1d08602dab90edc7eb9f8a72509fa5548abd80e3` antes desta branch |
 
 ## 5. Tarefa ativa
 
-Leia integralmente: [DOC-PROTOCOL-ALIGN](docs/tasks/active/DOC-PROTOCOL-ALIGN.md).
+Leia integralmente: [F3.1](docs/tasks/active/F3.1.md).
 
 | Campo | Valor |
 |---|---|
-| **Objetivo** | restaurar o contrato exato do gate e eliminar contradições de localização/ciclo |
-| **Escopo** | plano, `AGENTS.md`, painel, dossiê ativo e teste estrutural |
-| **Proibido** | produto, CI, dependências, dossiês históricos e qualquer implementação F3 |
-| **Estado local** | `COMPLETED_LOCAL / PROMOTION_PENDING`; 452 testes + 6 subtestes e quality gates verdes |
-| **Estado remoto** | branch/PR ainda não publicados; nenhum fato remoto antecipado |
+| **Objetivo** | substituir respostas fabricadas por provider remoto e local reais, tipados e fail-closed |
+| **Escopo** | contratos/model adapters, testes determinísticos, teste live condicionado e documentação da tarefa |
+| **Proibido** | roteamento F3.2, loop F3.3, outras tarefas/fases, dependências, lockfile e CI |
+| **Estado local** | gate documental `READY`; implementação ainda não iniciada |
+| **Estado remoto** | branch F3.1 ainda não publicada; nenhum PR/CI/merge antecipado |
 
 ## 6. Bloqueios atuais
 
@@ -75,13 +70,12 @@ Nenhum bloqueio ativo.
 ## 7. Próxima ação exata
 
 ```text
-PROMOVER SOMENTE DOC-PROTOCOL-ALIGN EM SEU ÚNICO PR:
-1. Publicar somente `docs/align-operational-protocol`; não publicar tags.
-2. Abrir um único PR documental para main e aguardar todos os checks, incluindo `CI required`.
-3. Somente com todos os checks verdes, executar merge commit autorizado e confirmar CI pós-merge.
-4. Não abrir PR de fechamento. Manter este dossiê `PROMOTION_PENDING` para certificação/arquivo no
-   primeiro commit do próximo gate, conforme DEC-011.
-5. Parar após a CI pós-merge verde; não iniciar nem preparar código da Fase 3 nesta execução.
+IMPLEMENTAR SOMENTE F3.1 A PARTIR DE checkpoint/f3.1-ready:
+1. Implementar providers HTTP remoto/local, contratos tipados, falhas seguras e redaction do allowlist.
+2. Executar aceite focado/negativo/live condicionado, compatibilidade, suíte integral e quality gates.
+3. Revisar diff e escopo; registrar resultados reais no dossiê sem antecipar fatos remotos.
+4. Publicar somente task/f3.1-model-provider e abrir seu único PR para main.
+5. Nunca mesclar antes de todos os jobs, inclusive CI required, concluírem verdes e o PR estar sem conflitos.
 ```
 
 ## 8. Retomada após perda de contexto

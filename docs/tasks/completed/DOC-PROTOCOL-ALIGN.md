@@ -1,7 +1,7 @@
 # DOC-PROTOCOL-ALIGN — Alinhar o protocolo operacional
 
 > **Gate:** `READY`
-> **Lifecycle:** `COMPLETED_LOCAL / PROMOTION_PENDING`
+> **Lifecycle:** `PROMOTED`
 > **Executor:** `Codex`
 > **Autorizado em:** `2026-08-07T20:36:12-03:00`
 > **Fronteira:** governança documental anterior à Fase 3; nenhum código de produto ou tarefa F3.
@@ -157,7 +157,29 @@ os testes documentais/estruturais do baseline.
 | Qualidade | mypy sem issues em 98 arquivos; Ruff, compileall, `uv lock --check` e `git diff --check` verdes |
 | Escopo | somente os seis paths permitidos; zero diff em produto, CI, README raiz e dependências |
 
-O checkpoint local final será `checkpoint/doc-protocol-align-complete`, ancorado pelo commit desta
-mudança e mantido sem publicação. A branch e o PR ainda não existem remotamente. Depois de checks,
-merge e CI pós-merge verdes, não será aberto PR de fechamento: este dossiê permanecerá em `active/`
-como `PROMOTION_PENDING` e será certificado/arquivado no primeiro commit do próximo gate.
+O checkpoint local final `checkpoint/doc-protocol-align-complete` aponta para
+`01f47ec911868765cdd4e6b537bf2c58769a634c`. A promoção remota foi observada e certificada no
+primeiro commit do gate F3.1, sem PR recursivo de fechamento.
+
+## Promoção remota certificada no gate F3.1
+
+| Evidência | Resultado observado |
+|---|---|
+| Branch e PR | `docs/align-operational-protocol`; [PR #19](https://github.com/Wf-ops1/Harnessinfra/pull/19), base `main`, head `01f47ec911868765cdd4e6b537bf2c58769a634c`, mesclado em `2026-08-07T23:49:24Z` |
+| CI do PR | [run 31228197660](https://github.com/Wf-ops1/Harnessinfra/actions/runs/31228197660), evento `pull_request`, 4 quality + 4 tests + 2 package + `CI required`, todos `completed/success` |
+| Merge | merge commit `1d08602dab90edc7eb9f8a72509fa5548abd80e3`; o head do PR é ancestral direto da linha oficial |
+| CI pós-merge | [run 31228310847](https://github.com/Wf-ops1/Harnessinfra/actions/runs/31228310847), evento `push`, branch `main`, head `1d08602dab90edc7eb9f8a72509fa5548abd80e3`, 11/11 jobs `completed/success` |
+| Linha oficial | após `git fetch`, `main == origin/main == 1d08602dab90edc7eb9f8a72509fa5548abd80e3`; worktree limpa antes da branch F3.1 |
+| Protocolo | nenhum check pendente, ausente, ignorado ou falho foi aceito; nenhum PR de fechamento foi criado |
+
+### Checklist de promoção
+
+```text
+[x] PR único #19 observado como merged
+[x] todos os 11 jobs do PR, incluindo CI required, concluídos com success
+[x] merge SHA coincide com o baseline esperado
+[x] CI de push em main corresponde exatamente ao merge SHA
+[x] todos os 11 jobs pós-merge, incluindo CI required, concluídos com success
+[x] main local sincronizada e limpa antes do gate F3.1
+[x] dossiê marcado PROMOTED e arquivado no primeiro commit do gate seguinte
+```
