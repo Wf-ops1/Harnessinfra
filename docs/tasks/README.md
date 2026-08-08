@@ -45,6 +45,7 @@ em [`TASK.md`](../../TASK.md); requisitos normativos permanecem no
 | Governança | DOC-PROTOCOL-ALIGN | [Protocolo operacional](completed/DOC-PROTOCOL-ALIGN.md) | PR #19 / merge `1d08602` / pós-merge `31228310847` |
 | F3 | F3.1 | [Provider real de modelo](completed/F3.1.md) | PR #20 / merge `acace94` / pós-merge `31230376744` |
 | F3 | F3.2 | [Configuração e roteamento de modelos](completed/F3.2.md) | PR #21 / merge `3956f16` / pós-merge `31231730863` |
+| F3 | F3.3 | [Loop de tool calls](completed/F3.3.md) | PR #22 / merge `0e64a88` / pós-merge `31232731611` |
 
 Fechamentos documentais adicionais preservados no Git: PR #13 / merge `3596df3` / run
 `31211290100` e PR #15 / merge `d48151b` / run `31215944126`.
@@ -64,3 +65,4 @@ Fechamentos documentais adicionais preservados no Git: PR #13 / merge `3596df3` 
 | DEC-009 | Uma branch e um PR por tarefa, partindo de `main` pós-merge verde. |
 | DEC-010 | Painel curto; dossiê detalhado por tarefa; histórico concluído imutável e indexado. |
 | DEC-011 | Gate detalhado no plano; promoção certificada no gate seguinte, sem PR recursivo de fechamento. |
+| DEC-012 | Realinhamento da Fase 3 em F3.C1/F3.C2, com pausa humana obrigatória e autorização nova entre tarefas. |

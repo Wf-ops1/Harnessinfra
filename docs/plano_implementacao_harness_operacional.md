@@ -883,6 +883,25 @@ Substituir integrações simuladas por providers reais e garantir que qualquer e
 - erro não reparável;
 - cancelamento da execução.
 
+### Realinhamento corretivo obrigatório antes de F3.4 — DEC-012
+
+A auditoria pós-merge de F3.3 identificou lacunas de protocolo e de durabilidade que os testes então
+vigentes não cobriam, além de avanço operacional sem a pausa humana explícita entre F3.1–F3.3. Antes
+de F3.4, executar isoladamente:
+
+1. **F3.C1 — Integridade de modelo e model-turn:** continuação nativa provider-neutral para Responses
+   e Chat Completions, JSON e usage estritos, cancelamento entre candidatos e evidência de todos os
+   model calls em sucesso/falha/journal com replay histórico compatível.
+2. **F3.C2 — Execução durável de tools e policy:** chamada write-ahead antes do dispatch, recuperação
+   fail-closed de efeito ambíguo, deny-wins, aprovação requerida preservada e ausência de registrations
+   tratada como registry vazio.
+
+O contrato completo, dependências protegidas e modo de operação estão em
+[`fase3_realignamento_operacional.md`](fase3_realignamento_operacional.md). Cada corretiva usa branch,
+dossiê e PR próprios. Após o merge, CI pós-merge e sincronização de cada uma, há uma **pausa humana
+obrigatória**; a próxima tarefa só começa por autorização explícita nova. Autorização ampla anterior,
+`COMPLETED_LOCAL / PROMOTION_PENDING`, merge ou CI verde não autorizam avanço automático.
+
 ### Tarefa F3.4 — Criar path guard
 
 Toda ferramenta que recebe path deverá:
@@ -1585,6 +1604,9 @@ Requisitos:
 | 13 | F6.1–F6.7 | operação, auditoria e recovery | F2–F5 |
 | 14 | F7.1–F7.5 | E2E e release candidate | F0–F6 |
 | 15 | F8 | expansão de infraestrutura | F7 |
+
+DEC-012 impõe uma precedência operacional adicional: F3.C1 → F3.C2 → F3.4. A ordem conceitual da
+tabela não autoriza executar nenhuma tarefa restante da Fase 3 antes das duas corretivas promovidas.
 
 ---
 
