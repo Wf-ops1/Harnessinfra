@@ -33,7 +33,7 @@ devem ser corrigidos para refletir a decisão. Nunca depender somente do histór
 | **Fase concluída** | Fase 2 — F2.1–F2.6 implementadas e promovidas |
 | **Fase ativa** | Fase 3 — modelos, ferramentas e workspace reais |
 | **Tarefa ativa** | `F3.2` — configuração e roteamento de modelos |
-| **Gate** | `READY`; contrato congelado antes do primeiro arquivo de implementação |
+| **Gate** | `READY`; `COMPLETED_LOCAL / PROMOTION_PENDING` |
 | **Executor ativo** | `Codex`, único escritor |
 | **Workspace** | `C:\Users\walla\OneDrive\Desktop\ai-engineering-harness` |
 | **Branch** | `task/f3.2-model-routing`, criada de `acace943c3acd585cbc83cd047f294c02875b922` |
@@ -60,7 +60,7 @@ Leia integralmente: [F3.2](docs/tasks/active/F3.2.md).
 | **Objetivo** | rotear somente providers autorizados/configurados, com fallback transitório, budget e metadata durável |
 | **Escopo** | config/registry/router/budget, preflight do AgentExecutor e metadata de model call no journal |
 | **Proibido** | transporte F3.1, loop de tools F3.3, backend de agente novo, demais tarefas/fases, dependências e CI |
-| **Estado local** | gate documental `READY`; implementação ainda não iniciada |
+| **Estado local** | `492 passed, 1 skip live condicionado, 6 subtests`; mypy/Ruff/compileall/lock/diff/escopo verdes |
 | **Estado remoto** | branch F3.2 ainda não publicada; nenhum PR/CI/merge antecipado |
 
 ## 6. Bloqueios atuais
@@ -70,12 +70,13 @@ Nenhum bloqueio ativo.
 ## 7. Próxima ação exata
 
 ```text
-IMPLEMENTAR SOMENTE F3.2 A PARTIR DE checkpoint/f3.2-ready:
-1. Resolver rota/registry da configuração efetiva e validar egress antes de montar prompt.
-2. Permitir fallback somente por ProviderError transitório e conectar usage real ao BudgetTracker.
-3. Persistir metadata tipada no outcome do node sem conteúdo, prompt ou segredo.
-4. Executar focais, negativos, journal/replay, compatibilidade, suíte integral e quality gates.
-5. Revisar escopo/diff, registrar evidências e publicar o único PR F3.2.
+PUBLICAR E PROMOVER SOMENTE F3.2:
+1. Criar o commit de fechamento e a tag local checkpoint/f3.2-complete.
+2. Publicar a branch e abrir o único PR F3.2.
+3. Inspecionar todos os jobs, inclusive CI required; não fazer merge com check pendente/ausente/falho.
+4. Com todos os checks verdes e PR sem conflitos, fazer o merge único.
+5. Aguardar o CI push em main, conferir SHA/matriz/CI required e sincronizar main local.
+6. Não abrir PR de fechamento; certificar/arquivar F3.2 no primeiro commit do gate F3.3.
 ```
 
 ## 8. Retomada após perda de contexto
