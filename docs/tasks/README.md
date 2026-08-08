@@ -46,6 +46,7 @@ em [`TASK.md`](../../TASK.md); requisitos normativos permanecem no
 | F3 | F3.1 | [Provider real de modelo](completed/F3.1.md) | PR #20 / merge `acace94` / pós-merge `31230376744` |
 | F3 | F3.2 | [Configuração e roteamento de modelos](completed/F3.2.md) | PR #21 / merge `3956f16` / pós-merge `31231730863` |
 | F3 | F3.3 | [Loop de tool calls](completed/F3.3.md) | PR #22 / merge `0e64a88` / pós-merge `31232731611` |
+| F3 | F3.C1 | [Integridade de modelo e model-turn](completed/F3.C1.md) | PR #23 / merge `5616fc5` / pós-merge `31240455344` |
 
 Fechamentos documentais adicionais preservados no Git: PR #13 / merge `3596df3` / run
 `31211290100` e PR #15 / merge `d48151b` / run `31215944126`.
