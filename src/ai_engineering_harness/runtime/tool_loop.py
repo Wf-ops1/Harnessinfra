@@ -6,16 +6,35 @@ import hashlib
 import json
 from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StringConstraints,
+    field_validator,
+    model_validator,
+)
 
 from ai_engineering_harness.contracts import AgentNodeSpec, CompiledGraphArtifact
 from ai_engineering_harness.contracts.policies import EffectiveNodeToolPolicySpec
+from ai_engineering_harness.governance import BudgetError
 from ai_engineering_harness.models.provider import (
     CancellationToken,
     LLMResponse,
+    ModelToolConversation,
+    ModelToolConversationTurn,
+    ModelToolResult,
+    ProviderError,
     ToolCall,
 )
-from ai_engineering_harness.models.router import ModelRouter
+from ai_engineering_harness.models.router import (
+    ModelEgressDeniedError,
+    ModelResponseBudgetExceededError,
+    ModelResponseCancelledError,
+    ModelRouter,
+    ModelRoutingConfigurationError,
+    ModelRoutingIntegrityError,
+)
 from ai_engineering_harness.security.redaction import Redactor
 from ai_engineering_harness.tools import ToolRouter, ToolRouterError
 
@@ -33,9 +52,11 @@ class ToolLoopError(RuntimeError):
         message: str,
         *,
         tool_executions: tuple[ToolExecutionRecord, ...] = (),
+        model_call_records: tuple[ModelCallMetadata, ...] = (),
     ) -> None:
         super().__init__(message)
         self.tool_executions = tool_executions
+        self.model_call_records = model_call_records
 
 
 class ToolPolicyConfigurationError(ToolLoopError):
@@ -124,9 +145,30 @@ class ToolLoopResult(BaseModel):
     model_config = ConfigDict(strict=True, frozen=True, extra="forbid")
 
     final_response: LLMResponse
-    model_call: ModelCallMetadata
+    model_call_records: tuple[ModelCallMetadata, ...]
     tool_executions: tuple[ToolExecutionRecord, ...]
     model_calls: int = Field(ge=1)
+
+    @field_validator("model_call_records", "tool_executions", mode="before")
+    @classmethod
+    def freeze_records(cls, value: object) -> object:
+        return tuple(value) if isinstance(value, list) else value
+
+    @model_validator(mode="after")
+    def require_complete_model_call_evidence(self) -> ToolLoopResult:
+        if len(self.model_call_records) != self.model_calls:
+            raise ValueError("model_calls must match model_call_records")
+        if self.model_call_records[-1].response_id != self.final_response.response_id:
+            raise ValueError("final response must match the last model call record")
+        response_ids = tuple(record.response_id for record in self.model_call_records)
+        if len(set(response_ids)) != len(response_ids):
+            raise ValueError("model call response IDs must be unique")
+        return self
+
+    @property
+    def model_call(self) -> ModelCallMetadata:
+        """Compatibility accessor for the last completed model call."""
+        return self.model_call_records[-1]
 
 
 class ToolLoopExecutor:
@@ -155,46 +197,106 @@ class ToolLoopExecutor:
         cancellation_token: CancellationToken | None = None,
     ) -> ToolLoopResult:
         records: list[ToolExecutionRecord] = []
-        transcript: list[dict[str, object]] = []
+        model_call_records: list[ModelCallMetadata] = []
+        conversation_turns: list[ModelToolConversationTurn] = []
         seen_call_ids: set[str] = set()
         model_calls = 0
-        current_prompt = prompt
 
         while True:
-            self._raise_if_cancelled(cancellation_token, records)
-            response = self._model_router.call_tools_with_fallback(
-                current_prompt,
-                list(tool_schemas),
-                primary_provider_id=model_candidates[0],
-                fallback_provider_ids=model_candidates[1:],
-                cancellation_token=cancellation_token,
+            self._raise_if_cancelled(
+                cancellation_token,
+                records,
+                model_call_records,
             )
+            try:
+                if conversation_turns:
+                    response = self._model_router.continue_tools_with_fallback(
+                        ModelToolConversation(
+                            initial_prompt=prompt,
+                            turns=tuple(conversation_turns),
+                        ),
+                        list(tool_schemas),
+                        primary_provider_id=model_candidates[0],
+                        fallback_provider_ids=model_candidates[1:],
+                        cancellation_token=cancellation_token,
+                    )
+                else:
+                    response = self._model_router.call_tools_with_fallback(
+                        prompt,
+                        list(tool_schemas),
+                        primary_provider_id=model_candidates[0],
+                        fallback_provider_ids=model_candidates[1:],
+                        cancellation_token=cancellation_token,
+                    )
+            except ModelResponseBudgetExceededError as exc:
+                model_call_records.append(ModelCallMetadata.from_response(exc.response))
+                raise ToolLoopError(
+                    str(exc),
+                    tool_executions=tuple(records),
+                    model_call_records=tuple(model_call_records),
+                ) from exc
+            except (ModelResponseCancelledError, ModelRoutingIntegrityError) as exc:
+                model_call_records.append(ModelCallMetadata.from_response(exc.response))
+                raise ToolLoopError(
+                    "model tool call rejected after response",
+                    tool_executions=tuple(records),
+                    model_call_records=tuple(model_call_records),
+                ) from exc
+            except (
+                ProviderError,
+                BudgetError,
+                ModelEgressDeniedError,
+                ModelRoutingConfigurationError,
+            ) as exc:
+                raise ToolLoopError(
+                    "model tool call failed",
+                    tool_executions=tuple(records),
+                    model_call_records=tuple(model_call_records),
+                ) from exc
             model_calls += 1
+            model_call_records.append(ModelCallMetadata.from_response(response))
             if not response.tool_calls:
                 if not response.content.strip():
                     raise ToolLoopError(
                         "final model response must contain non-empty content",
                         tool_executions=tuple(records),
+                        model_call_records=tuple(model_call_records),
                     )
                 return ToolLoopResult(
                     final_response=response,
-                    model_call=ModelCallMetadata.from_response(response),
+                    model_call_records=tuple(model_call_records),
                     tool_executions=tuple(records),
                     model_calls=model_calls,
                 )
 
-            self._model_router.budget_tracker.ensure_available()
-            self._raise_if_cancelled(cancellation_token, records)
+            try:
+                self._model_router.budget_tracker.ensure_available()
+            except BudgetError as exc:
+                raise ToolLoopError(
+                    str(exc),
+                    tool_executions=tuple(records),
+                    model_call_records=tuple(model_call_records),
+                ) from exc
+            self._raise_if_cancelled(
+                cancellation_token,
+                records,
+                model_call_records,
+            )
             self._validate_batch(
                 response.tool_calls,
                 policy,
                 seen_call_ids=seen_call_ids,
                 completed_steps=len(records),
                 records=records,
+                model_call_records=model_call_records,
             )
-            tool_results: list[dict[str, object]] = []
+            tool_results: list[ModelToolResult] = []
             for call in response.tool_calls:
-                self._raise_if_cancelled(cancellation_token, records)
+                self._raise_if_cancelled(
+                    cancellation_token,
+                    records,
+                    model_call_records,
+                )
                 step = len(records) + 1
                 arguments_json = _canonical_json(call.arguments)
                 try:
@@ -219,6 +321,7 @@ class ToolLoopExecutor:
                     raise ToolLoopExecutionError(
                         "tool execution failed",
                         tool_executions=tuple(records),
+                        model_call_records=tuple(model_call_records),
                     ) from exc
 
                 result_json = _canonical_json(result)
@@ -234,27 +337,20 @@ class ToolLoopExecutor:
                     )
                 )
                 tool_results.append(
-                    {
-                        "call_id": call.call_id,
-                        "name": call.name,
-                        "result": result,
-                    }
+                    ModelToolResult(
+                        call_id=call.call_id,
+                        name=call.name,
+                        result=result,
+                    )
                 )
                 seen_call_ids.add(call.call_id)
 
-            transcript.append(
-                {
-                    "assistant": {
-                        "response_id": response.response_id,
-                        "content": response.content,
-                        "tool_calls": [
-                            call.model_dump(mode="json") for call in response.tool_calls
-                        ],
-                    },
-                    "tool_results": tool_results,
-                }
+            conversation_turns.append(
+                ModelToolConversationTurn(
+                    response=response,
+                    tool_results=tuple(tool_results),
+                )
             )
-            current_prompt = _continuation_prompt(prompt, transcript)
 
     def _validate_batch(
         self,
@@ -264,16 +360,19 @@ class ToolLoopExecutor:
         seen_call_ids: set[str],
         completed_steps: int,
         records: list[ToolExecutionRecord],
+        model_call_records: list[ModelCallMetadata],
     ) -> None:
         if completed_steps + len(calls) > self._max_tool_steps:
             raise ToolStepLimitExceededError(
                 "tool call batch exceeds max_tool_steps",
                 tool_executions=tuple(records),
+                model_call_records=tuple(model_call_records),
             )
         if any(call.call_id in seen_call_ids for call in calls):
             raise ToolLoopError(
                 "tool call ID was reused across model turns",
                 tool_executions=tuple(records),
+                model_call_records=tuple(model_call_records),
             )
         try:
             self._tool_router.validate_calls(calls, policy.allowed_tools)
@@ -281,30 +380,21 @@ class ToolLoopExecutor:
             raise ToolLoopError(
                 "tool call batch failed preflight",
                 tool_executions=tuple(records),
+                model_call_records=tuple(model_call_records),
             ) from exc
 
     @staticmethod
     def _raise_if_cancelled(
         token: CancellationToken | None,
         records: list[ToolExecutionRecord],
+        model_call_records: list[ModelCallMetadata],
     ) -> None:
         if token is not None and token.is_cancelled:
             raise ToolLoopCancelledError(
                 "tool loop cancelled",
                 tool_executions=tuple(records),
+                model_call_records=tuple(model_call_records),
             )
-
-
-def _continuation_prompt(
-    initial_prompt: str,
-    transcript: list[dict[str, object]],
-) -> str:
-    return (
-        f"{initial_prompt}\n\n"
-        "<tool_loop_transcript>\n"
-        f"{_canonical_json(transcript)}\n"
-        "</tool_loop_transcript>"
-    )
 
 
 def _canonical_json(value: object) -> str:

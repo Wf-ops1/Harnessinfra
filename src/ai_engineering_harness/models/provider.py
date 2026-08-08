@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 import queue
 import threading
 import time
@@ -13,7 +14,7 @@ from typing import Any, ClassVar, Literal
 import httpx
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import SchemaError, ValidationError
-from pydantic import BaseModel, ConfigDict, Field, JsonValue
+from pydantic import BaseModel, ConfigDict, Field, JsonValue, field_validator, model_validator
 
 from ai_engineering_harness.security.redaction import Redactor
 
@@ -39,6 +40,38 @@ class ToolCall(BaseModel):
     name: str = Field(min_length=1)
     arguments: dict[str, JsonValue]
 
+    @model_validator(mode="after")
+    def require_strict_json_arguments(self) -> ToolCall:
+        _ensure_strict_json_value(self.arguments, path="tool arguments")
+        return self
+
+
+class ProviderContinuationState(BaseModel):
+    """Provider-native response items retained only in memory for continuation."""
+
+    model_config = ConfigDict(strict=True, frozen=True, extra="forbid")
+
+    api_style: APIStyle
+    output_items: tuple[dict[str, JsonValue], ...] = Field(
+        min_length=1,
+        exclude=True,
+        repr=False,
+    )
+
+    @field_validator("output_items", mode="before")
+    @classmethod
+    def freeze_output_items(cls, value: object) -> object:
+        return tuple(value) if isinstance(value, list) else value
+
+    @model_validator(mode="after")
+    def require_strict_json_items(self) -> ProviderContinuationState:
+        for index, item in enumerate(self.output_items):
+            _ensure_strict_json_value(
+                item,
+                path=f"provider continuation[{index}]",
+            )
+        return self
+
 
 class LLMResponse(BaseModel):
     """Resposta normalizada; todos os metadados vêm do servidor."""
@@ -55,6 +88,88 @@ class LLMResponse(BaseModel):
     request_id: str | None = None
     response_id: str = Field(min_length=1)
     structured_output: JsonValue | None = None
+    continuation_state: ProviderContinuationState | None = Field(
+        default=None,
+        exclude=True,
+        repr=False,
+    )
+
+    @model_validator(mode="after")
+    def require_consistent_usage_and_json(self) -> LLMResponse:
+        if self.total_tokens != self.prompt_tokens + self.completion_tokens:
+            raise ValueError(
+                "total_tokens must equal prompt_tokens + completion_tokens"
+            )
+        if self.structured_output is not None:
+            _ensure_strict_json_value(
+                self.structured_output,
+                path="structured output",
+            )
+        return self
+
+
+class ModelToolResult(BaseModel):
+    """JSON-native result bound to one provider tool-call identity."""
+
+    model_config = ConfigDict(strict=True, frozen=True, extra="forbid")
+
+    call_id: str = Field(min_length=1)
+    name: str = Field(min_length=1)
+    result: JsonValue
+
+    @model_validator(mode="after")
+    def require_strict_json_result(self) -> ModelToolResult:
+        _ensure_strict_json_value(self.result, path="tool result")
+        return self
+
+
+class ModelToolConversationTurn(BaseModel):
+    """One completed model turn and all results returned for its tool calls."""
+
+    model_config = ConfigDict(strict=True, frozen=True, extra="forbid")
+
+    response: LLMResponse
+    tool_results: tuple[ModelToolResult, ...]
+
+    @field_validator("tool_results", mode="before")
+    @classmethod
+    def freeze_tool_results(cls, value: object) -> object:
+        return tuple(value) if isinstance(value, list) else value
+
+    @model_validator(mode="after")
+    def require_exact_tool_results(self) -> ModelToolConversationTurn:
+        calls = tuple((call.call_id, call.name) for call in self.response.tool_calls)
+        results = tuple((result.call_id, result.name) for result in self.tool_results)
+        if not calls:
+            raise ValueError("a conversation turn requires at least one tool call")
+        if calls != results:
+            raise ValueError("tool results must match model tool calls in order")
+        return self
+
+
+class ModelToolConversation(BaseModel):
+    """Provider-neutral in-memory conversation used for native tool continuation."""
+
+    model_config = ConfigDict(strict=True, frozen=True, extra="forbid")
+
+    initial_prompt: str = Field(min_length=1)
+    turns: tuple[ModelToolConversationTurn, ...] = Field(min_length=1)
+
+    @field_validator("turns", mode="before")
+    @classmethod
+    def freeze_turns(cls, value: object) -> object:
+        return tuple(value) if isinstance(value, list) else value
+
+    @model_validator(mode="after")
+    def require_unique_call_ids(self) -> ModelToolConversation:
+        call_ids = tuple(
+            call.call_id
+            for turn in self.turns
+            for call in turn.response.tool_calls
+        )
+        if len(set(call_ids)) != len(call_ids):
+            raise ValueError("tool call IDs must be unique across conversation turns")
+        return self
 
 
 class CancellationToken:
@@ -157,6 +272,19 @@ class BaseLLMProvider(ABC):
     ) -> LLMResponse:
         raise NotImplementedError
 
+    def continue_tools(
+        self,
+        conversation: ModelToolConversation,
+        tools: list[dict[str, Any]],
+        *,
+        cancellation_token: CancellationToken | None = None,
+    ) -> LLMResponse:
+        """Continue a typed tool conversation or fail explicitly when unsupported."""
+        raise ProviderNotImplementedError(
+            "provider não implementa continuação nativa de tools",
+            provider_id=self.provider_id,
+        )
+
     @abstractmethod
     def structured_output(
         self,
@@ -227,15 +355,19 @@ class OpenAICompatibleHTTPProvider(BaseLLMProvider):
         cancellation_token: CancellationToken | None = None,
     ) -> LLMResponse:
         body = self._base_body(prompt, system_prompt)
-        body["tools"] = [self._normalise_tool(tool) for tool in tools]
-        if self.api_style == "chat_completions":
-            body["tools"] = [
-                {
-                    "type": "function",
-                    "function": {key: value for key, value in tool.items() if key != "type"},
-                }
-                for tool in body["tools"]
-            ]
+        self._attach_tools(body, tools)
+        response, request_id = self._request(body, cancellation_token)
+        return self._parse_response(response, request_id=request_id)
+
+    def continue_tools(
+        self,
+        conversation: ModelToolConversation,
+        tools: list[dict[str, Any]],
+        *,
+        cancellation_token: CancellationToken | None = None,
+    ) -> LLMResponse:
+        body = self._continuation_body(conversation)
+        self._attach_tools(body, tools)
         response, request_id = self._request(body, cancellation_token)
         return self._parse_response(response, request_id=request_id)
 
@@ -274,9 +406,10 @@ class OpenAICompatibleHTTPProvider(BaseLLMProvider):
         response, request_id = self._request(body, cancellation_token)
         parsed = self._parse_response(response, request_id=request_id)
         try:
-            structured = json.loads(parsed.content)
+            structured = _strict_json_loads(parsed.content)
             Draft202012Validator(response_schema).validate(structured)
-        except (json.JSONDecodeError, ValidationError) as exc:
+            _ensure_strict_json_value(structured, path="structured output")
+        except (json.JSONDecodeError, ValidationError, ValueError) as exc:
             raise ProviderResponseError(
                 self._redact(f"structured output inválido: {exc}"),
                 provider_id=self.provider_id,
@@ -305,6 +438,106 @@ class OpenAICompatibleHTTPProvider(BaseLLMProvider):
             messages.append({"role": "system", "content": system_prompt})
         messages.append({"role": "user", "content": prompt})
         return {"model": self.model_name, "messages": messages}
+
+    def _continuation_body(
+        self,
+        conversation: ModelToolConversation,
+    ) -> dict[str, Any]:
+        if self.api_style == "responses":
+            input_items: list[dict[str, Any]] = [
+                {"role": "user", "content": conversation.initial_prompt}
+            ]
+            for turn in conversation.turns:
+                continuation_state = turn.response.continuation_state
+                if (
+                    continuation_state is not None
+                    and continuation_state.api_style == "responses"
+                    and turn.response.provider == self.provider_id
+                ):
+                    input_items.extend(
+                        _copy_strict_json_object(
+                            item,
+                            path="provider continuation",
+                        )
+                        for item in continuation_state.output_items
+                    )
+                else:
+                    if turn.response.content:
+                        input_items.append(
+                            {"role": "assistant", "content": turn.response.content}
+                        )
+                    input_items.extend(
+                        {
+                            "type": "function_call",
+                            "call_id": call.call_id,
+                            "name": call.name,
+                            "arguments": _strict_json_dumps(call.arguments),
+                        }
+                        for call in turn.response.tool_calls
+                    )
+                input_items.extend(
+                    {
+                        "type": "function_call_output",
+                        "call_id": result.call_id,
+                        "output": _strict_json_dumps(result.result),
+                    }
+                    for result in turn.tool_results
+                )
+            return {
+                "model": self.model_name,
+                "input": input_items,
+                "store": False,
+            }
+
+        messages: list[dict[str, Any]] = [
+            {"role": "user", "content": conversation.initial_prompt}
+        ]
+        for turn in conversation.turns:
+            messages.append(
+                {
+                    "role": "assistant",
+                    "content": turn.response.content or None,
+                    "tool_calls": [
+                        {
+                            "id": call.call_id,
+                            "type": "function",
+                            "function": {
+                                "name": call.name,
+                                "arguments": _strict_json_dumps(call.arguments),
+                            },
+                        }
+                        for call in turn.response.tool_calls
+                    ],
+                }
+            )
+            messages.extend(
+                {
+                    "role": "tool",
+                    "tool_call_id": result.call_id,
+                    "content": _strict_json_dumps(result.result),
+                }
+                for result in turn.tool_results
+            )
+        return {"model": self.model_name, "messages": messages}
+
+    def _attach_tools(
+        self,
+        body: dict[str, Any],
+        tools: list[dict[str, Any]],
+    ) -> None:
+        normalised = [self._normalise_tool(tool) for tool in tools]
+        if self.api_style == "chat_completions":
+            body["tools"] = [
+                {
+                    "type": "function",
+                    "function": {
+                        key: value for key, value in tool.items() if key != "type"
+                    },
+                }
+                for tool in normalised
+            ]
+            return
+        body["tools"] = normalised
 
     def _normalise_tool(self, tool: dict[str, Any]) -> dict[str, Any]:
         candidate = tool.get("function") if tool.get("type") == "function" else tool
@@ -358,7 +591,7 @@ class OpenAICompatibleHTTPProvider(BaseLLMProvider):
                 if not response.is_success:
                     raise self._http_error(response, request_id=request_id)
                 try:
-                    payload = response.json()
+                    payload = _strict_json_loads(response.text)
                 except ValueError as exc:
                     raise ProviderResponseError(
                         "provider retornou JSON inválido",
@@ -557,6 +790,13 @@ class OpenAICompatibleHTTPProvider(BaseLLMProvider):
             total_tokens=total_tokens,
             request_id=request_id,
             response_id=response_id,
+            continuation_state=ProviderContinuationState(
+                api_style="responses",
+                output_items=tuple(
+                    _copy_strict_json_object(item, path="response output")
+                    for item in output
+                ),
+            ),
         )
 
     def _parse_chat_completions(
@@ -623,9 +863,10 @@ class OpenAICompatibleHTTPProvider(BaseLLMProvider):
     def _parse_tool_arguments(raw_arguments: Any) -> dict[str, JsonValue]:
         if not isinstance(raw_arguments, str):
             raise TypeError("arguments da tool call não são JSON textual")
-        arguments = json.loads(raw_arguments)
+        arguments = _strict_json_loads(raw_arguments)
         if not isinstance(arguments, dict):
             raise TypeError("arguments da tool call não são objeto JSON")
+        _ensure_strict_json_value(arguments, path="tool arguments")
         return arguments
 
     @staticmethod
@@ -652,3 +893,65 @@ class OpenAICompatibleHTTPProvider(BaseLLMProvider):
     def _redact(self, text: str) -> str:
         dynamic = {"PROVIDER_API_KEY": self._api_key} if self._api_key else None
         return Redactor.redact_text(text[: self._MAX_ERROR_CHARS], dynamic_secrets=dynamic)
+
+
+def _strict_json_loads(raw: str) -> JsonValue:
+    def reject_constant(value: str) -> None:
+        raise ValueError(f"non-finite JSON constant is forbidden: {value}")
+
+    def reject_duplicate_keys(pairs: list[tuple[str, JsonValue]]) -> dict[str, JsonValue]:
+        result: dict[str, JsonValue] = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError(f"duplicate JSON object key is forbidden: {key}")
+            result[key] = value
+        return result
+
+    return json.loads(
+        raw,
+        parse_constant=reject_constant,
+        object_pairs_hook=reject_duplicate_keys,
+    )
+
+
+def _strict_json_dumps(value: object) -> str:
+    _ensure_strict_json_value(value, path="JSON value")
+    return json.dumps(
+        value,
+        ensure_ascii=False,
+        allow_nan=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+
+
+def _copy_strict_json_object(
+    value: object,
+    *,
+    path: str,
+) -> dict[str, JsonValue]:
+    _ensure_strict_json_value(value, path=path)
+    copied = _strict_json_loads(_strict_json_dumps(value))
+    if not isinstance(copied, dict):
+        raise TypeError(f"{path} is not an object")
+    return copied
+
+
+def _ensure_strict_json_value(value: object, *, path: str) -> None:
+    if value is None or type(value) in {bool, int, str}:
+        return
+    if type(value) is float:
+        if not math.isfinite(value):
+            raise ValueError(f"{path} contains a non-finite number")
+        return
+    if type(value) is list:
+        for index, item in enumerate(value):
+            _ensure_strict_json_value(item, path=f"{path}[{index}]")
+        return
+    if type(value) is dict:
+        for key, item in value.items():
+            if type(key) is not str:
+                raise ValueError(f"{path} contains a non-string object key")
+            _ensure_strict_json_value(item, path=f"{path}.{key}")
+        return
+    raise ValueError(f"{path} contains non-JSON-native value {type(value).__name__}")

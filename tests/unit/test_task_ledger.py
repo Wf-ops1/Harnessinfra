@@ -11,6 +11,7 @@ ROOT = Path(__file__).resolve().parents[2]
 TASK_PANEL = ROOT / "TASK.md"
 AGENT_RULES = ROOT / ".agents" / "AGENTS.md"
 IMPLEMENTATION_PLAN = ROOT / "docs" / "plano_implementacao_harness_operacional.md"
+PHASE3_REALIGNMENT = ROOT / "docs" / "fase3_realignamento_operacional.md"
 TASKS_ROOT = ROOT / "docs" / "tasks"
 TASKS_INDEX = TASKS_ROOT / "README.md"
 ACTIVE_ROOT = TASKS_ROOT / "active"
@@ -179,3 +180,18 @@ def test_normative_sources_agree_on_gate_and_single_pr_lifecycle() -> None:
     assert "proibido" in rules and "PR recursivo" in rules
     assert "DEC-011" in task_index
     assert "sem PR recursivo de fechamento" in task_index
+
+
+def test_phase3_realignment_requires_two_isolated_gates_and_human_pauses() -> None:
+    panel = _read(TASK_PANEL)
+    plan = _read(IMPLEMENTATION_PLAN)
+    task_index = _read(TASKS_INDEX)
+    realignment = _read(PHASE3_REALIGNMENT)
+
+    assert "DEC-012" in panel
+    assert "DEC-012" in plan
+    assert "DEC-012" in task_index
+    assert "F3.C1 → F3.C2 → F3.4" in plan
+    assert "PAUSA HUMANA OBRIGATÓRIA" in realignment
+    assert "autorização explícita nova" in realignment
+    assert "F3.C2 exige nova autorização explícita" in panel

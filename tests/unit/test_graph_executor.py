@@ -236,6 +236,50 @@ class _FailOutcomeAppendStorage(AtomicFileStateStorage):
         return super().append_event(execution_id, event, lock=lock)
 
 
+class _ModelEventShapeStorage(AtomicFileStateStorage):
+    def __init__(self, project_root: Path, *, mode: str) -> None:
+        super().__init__(project_root)
+        self.mode = mode
+
+    def append_event(
+        self,
+        execution_id: str,
+        event: ExecutionEvent,
+        *,
+        lock: ExecutionLock | None = None,
+    ) -> ExecutionEvent:
+        model_calls = event.payload.get("model_calls")
+        if event.event_type in {"NODE_COMPLETED", "NODE_FAILED"} and isinstance(
+            model_calls, list
+        ):
+            assert len(model_calls) == 1
+            call = model_calls[0]
+            assert isinstance(call, dict)
+            legacy = {
+                "model_provider": call["provider_id"],
+                "model_name": call["model_name"],
+                "model_prompt_tokens": call["prompt_tokens"],
+                "model_completion_tokens": call["completion_tokens"],
+                "model_total_tokens": call["total_tokens"],
+                "model_response_id": call["response_id"],
+            }
+            if call["request_id"] is not None:
+                legacy["model_request_id"] = call["request_id"]
+            payload = dict(event.payload)
+            if self.mode == "legacy":
+                payload.pop("model_calls")
+            payload.update(legacy)
+            event = ExecutionEvent.model_validate(
+                {
+                    **event.model_dump(),
+                    "payload": payload,
+                    "previous_hash": None,
+                    "current_hash": None,
+                }
+            )
+        return super().append_event(execution_id, event, lock=lock)
+
+
 class _FailToolOutcomeAppendStorage(AtomicFileStateStorage):
     def append_event(
         self,
@@ -744,15 +788,155 @@ def test_model_metadata_and_usage_are_journaled_only_on_node_outcome(
         for key, value in outcome["payload"].items()
         if key.startswith("model_")
     } == {
-        "model_provider": "openai",
-        "model_name": "server-model",
-        "model_prompt_tokens": 11,
-        "model_completion_tokens": 7,
-        "model_total_tokens": 18,
-        "model_response_id": "resp-123",
-        "model_request_id": "req-123",
+        "model_calls": [
+            {
+                "provider_id": "openai",
+                "model_name": "server-model",
+                "prompt_tokens": 11,
+                "completion_tokens": 7,
+                "total_tokens": 18,
+                "request_id": "req-123",
+                "response_id": "resp-123",
+            }
+        ]
     }
     assert "sensitive prompt" not in json.dumps(events)
+
+
+def test_all_model_calls_are_journaled_in_order_and_replayed(tmp_path: Path) -> None:
+    artifact = _agent_artifact()
+    storage = _FailOutcomeCasStorage(tmp_path)
+    execution_id = "exec-multi-model-metadata"
+    initial_input = {"value": 1}
+    _create_resume_execution(storage, artifact, execution_id, initial_input)
+    calls = (
+        ModelCallMetadata(
+            provider_id="openai",
+            model_name="model-a",
+            prompt_tokens=3,
+            completion_tokens=2,
+            total_tokens=5,
+            request_id="req-a",
+            response_id="resp-a",
+        ),
+        ModelCallMetadata(
+            provider_id="local",
+            model_name="model-b",
+            prompt_tokens=4,
+            completion_tokens=1,
+            total_tokens=5,
+            response_id="resp-b",
+        ),
+    )
+    executor = _resume_executor(
+        storage,
+        NodeExecutorRegistry(
+            agent=AgentNodeExecutor(
+                _StaticBackend(
+                    NodeExecutionResult.completed(
+                        {"result": "ok"},
+                        model_calls=calls,
+                    )
+                )
+            )
+        ),
+    )
+
+    with pytest.raises(StateWriteError, match="outcome CAS"):
+        executor.execute(artifact, execution_id, initial_input)
+    result = executor.resume(artifact, execution_id)
+
+    assert result.outcome == "success"
+    outcome = next(
+        event
+        for event in storage.load_events(execution_id)
+        if event.event_type == "NODE_COMPLETED"
+    )
+    assert [item["response_id"] for item in outcome.payload["model_calls"]] == [
+        "resp-a",
+        "resp-b",
+    ]
+
+
+def test_legacy_single_model_call_event_remains_replay_compatible(
+    tmp_path: Path,
+) -> None:
+    artifact = _agent_artifact()
+    storage = _ModelEventShapeStorage(tmp_path, mode="legacy")
+    execution_id = "exec-legacy-model-metadata"
+    initial_input = {"value": 1}
+    _create_resume_execution(storage, artifact, execution_id, initial_input)
+    metadata = ModelCallMetadata(
+        provider_id="openai",
+        model_name="legacy-model",
+        prompt_tokens=2,
+        completion_tokens=1,
+        total_tokens=3,
+        response_id="legacy-response",
+    )
+    executor = _resume_executor(
+        storage,
+        NodeExecutorRegistry(
+            agent=AgentNodeExecutor(
+                _StaticBackend(
+                    NodeExecutionResult.completed(
+                        {"result": "ok"},
+                        model_call=metadata,
+                    )
+                )
+            )
+        ),
+    )
+
+    executor.execute(artifact, execution_id, initial_input)
+    result = executor.resume(artifact, execution_id)
+
+    assert result.outcome == "success"
+    outcome = next(
+        event
+        for event in storage.load_events(execution_id)
+        if event.event_type == "NODE_COMPLETED"
+    )
+    assert "model_calls" not in outcome.payload
+    assert outcome.payload["model_response_id"] == "legacy-response"
+
+
+def test_replay_rejects_mixed_legacy_and_canonical_model_call_evidence(
+    tmp_path: Path,
+) -> None:
+    artifact = _agent_artifact()
+    storage = _ModelEventShapeStorage(tmp_path, mode="mixed")
+    execution_id = "exec-mixed-model-metadata"
+    initial_input = {"value": 1}
+    _create_resume_execution(storage, artifact, execution_id, initial_input)
+    metadata = ModelCallMetadata(
+        provider_id="openai",
+        model_name="mixed-model",
+        prompt_tokens=2,
+        completion_tokens=1,
+        total_tokens=3,
+        response_id="mixed-response",
+    )
+    executor = _resume_executor(
+        storage,
+        NodeExecutorRegistry(
+            agent=AgentNodeExecutor(
+                _StaticBackend(
+                    NodeExecutionResult.completed(
+                        {"result": "ok"},
+                        model_call=metadata,
+                    )
+                )
+            )
+        ),
+    )
+
+    executor.execute(artifact, execution_id, initial_input)
+    journal_before = storage.load_events(execution_id)
+    with pytest.raises(InterruptedNodeExecutionError, match="cannot mix"):
+        executor.resume(artifact, execution_id)
+
+    assert storage.load_events(execution_id) == journal_before
 
 
 def test_tool_events_are_paired_redacted_and_precede_node_outcome(tmp_path: Path) -> None:
