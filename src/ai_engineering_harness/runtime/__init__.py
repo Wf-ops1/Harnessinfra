@@ -55,6 +55,7 @@ from .node_executors import (
     RetryContext,
     RetryEvidence,
     TerminalNodeExecutor,
+    ToolExecutionRecord,
     UnsupportedNodeTypeError,
 )
 from .state_machine import (
@@ -69,6 +70,16 @@ from .state_machine import (
     WorkflowState,
     WorkflowStateMachine,
 )
+from .tool_loop import (
+    EffectiveToolPolicy,
+    ToolLoopCancelledError,
+    ToolLoopError,
+    ToolLoopExecutionError,
+    ToolLoopExecutor,
+    ToolLoopResult,
+    ToolPolicyConfigurationError,
+    ToolStepLimitExceededError,
+)
 
 __all__ = [
     "APPROVAL_INVALIDATED",
@@ -81,6 +92,7 @@ __all__ = [
     "ApprovalSubjectMismatchError",
     "ArtifactExecutionMismatchError",
     "DeterministicNodeExecutor",
+    "EffectiveToolPolicy",
     "EventSourcedStateMachine",
     "ExecutionApprovalRequiredError",
     "ExecutionCancellationError",
@@ -129,6 +141,14 @@ __all__ = [
     "StateReplayResult",
     "StateTransitionIntegrityError",
     "TerminalNodeExecutor",
+    "ToolExecutionRecord",
+    "ToolLoopCancelledError",
+    "ToolLoopError",
+    "ToolLoopExecutionError",
+    "ToolLoopExecutor",
+    "ToolLoopResult",
+    "ToolPolicyConfigurationError",
+    "ToolStepLimitExceededError",
     "UnknownCurrentNodeError",
     "UnsupportedNodeTypeError",
     "WorkflowState",

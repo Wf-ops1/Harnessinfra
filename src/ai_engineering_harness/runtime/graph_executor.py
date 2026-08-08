@@ -48,6 +48,7 @@ from .node_executors import (
     NodeExecutorResultError,
     RetryContext,
     RetryEvidence,
+    ToolExecutionRecord,
     _copy_json_object,
 )
 from .state_machine import (
@@ -617,7 +618,17 @@ class GraphExecutor:
                         message="node output did not satisfy its declared contract",
                         retryable=False,
                         model_call=result.model_call,
+                        tool_executions=result.tool_executions,
                     )
+
+            last_tool_event_at = self._append_tool_events(
+                execution_id,
+                node,
+                attempt,
+                lock,
+                started_at,
+                result.tool_executions,
+            )
 
             next_id = node.on_success if result.succeeded else node.on_failure
             next_retry_context = self._next_retry_context(
@@ -639,7 +650,7 @@ class GraphExecutor:
                 "NODE_COMPLETED" if result.succeeded else "NODE_FAILED"
             )
             outcome_at = self._next_timestamp(
-                started_at,
+                last_tool_event_at,
                 execution_id=execution_id,
                 node_id=current_id,
             )
@@ -979,6 +990,91 @@ class GraphExecutor:
             ) from exc
         self._storage.append_event(execution_id, event, lock=lock)
 
+    def _append_tool_events(
+        self,
+        execution_id: str,
+        node: NodeSpec,
+        attempt: int,
+        lock: ExecutionLock,
+        minimum_timestamp: datetime,
+        records: tuple[ToolExecutionRecord, ...],
+    ) -> datetime:
+        current = minimum_timestamp
+        for record in records:
+            called_at = self._next_timestamp(
+                current,
+                execution_id=execution_id,
+                node_id=node.id,
+            )
+            self._append_tool_event(
+                execution_id,
+                node,
+                attempt,
+                lock,
+                called_at,
+                "TOOL_CALLED",
+                record,
+            )
+            outcome_at = self._next_timestamp(
+                called_at,
+                execution_id=execution_id,
+                node_id=node.id,
+            )
+            outcome_type: Literal["TOOL_COMPLETED", "TOOL_FAILED"] = (
+                "TOOL_COMPLETED" if record.succeeded else "TOOL_FAILED"
+            )
+            self._append_tool_event(
+                execution_id,
+                node,
+                attempt,
+                lock,
+                outcome_at,
+                outcome_type,
+                record,
+            )
+            current = outcome_at
+        return current
+
+    def _append_tool_event(
+        self,
+        execution_id: str,
+        node: NodeSpec,
+        attempt: int,
+        lock: ExecutionLock,
+        timestamp: datetime,
+        event_type: Literal["TOOL_CALLED", "TOOL_COMPLETED", "TOOL_FAILED"],
+        record: ToolExecutionRecord,
+    ) -> None:
+        payload: dict[str, object] = {
+            "attempt": attempt,
+            "fencing_token": lock.fencing_token,
+            "node_id": node.id,
+            "step": record.step,
+            "call_id": record.call_id,
+            "tool_name": record.tool_name,
+            "arguments_digest": record.arguments_digest,
+        }
+        if event_type != "TOOL_CALLED":
+            payload["result_digest"] = record.result_digest
+            payload["redacted_result"] = record.redacted_result
+            if record.error_code is not None:
+                payload["error_code"] = record.error_code
+        try:
+            event = ExecutionEvent(
+                event_id=self._event_id_factory(),
+                execution_id=execution_id,
+                event_type=event_type,
+                timestamp=timestamp,
+                payload=payload,
+            )
+        except (TypeError, ValueError, ValidationError) as exc:
+            raise GraphEventConstructionError(
+                "cannot construct a canonical tool event",
+                execution_id=execution_id,
+                node_id=node.id,
+            ) from exc
+        self._storage.append_event(execution_id, event, lock=lock)
+
     def _store_payload(
         self,
         execution_id: str,
@@ -1042,6 +1138,8 @@ class GraphExecutor:
             str | None,
             RetryContext | None,
         ] | None = None
+        open_tool: tuple[str, int, int, str, str, str, int] | None = None
+        next_tool_step = 1
         pending: tuple[ExecutionEvent, str, int, str] | None = None
         last_record_revision = -1
         last_fencing_token = 0
@@ -1084,6 +1182,9 @@ class GraphExecutor:
                 "NODE_STARTED",
                 "NODE_COMPLETED",
                 "NODE_FAILED",
+                "TOOL_CALLED",
+                "TOOL_COMPLETED",
+                "TOOL_FAILED",
             }:
                 continue
             if last_timestamp is not None and event.timestamp < last_timestamp:
@@ -1183,7 +1284,105 @@ class GraphExecutor:
                     observed_retry_context_digest,
                     consumed_retry_context,
                 )
+                open_tool = None
+                next_tool_step = 1
                 last_fencing_token = fencing_token
+                continue
+
+            if event.event_type in {"TOOL_CALLED", "TOOL_COMPLETED", "TOOL_FAILED"}:
+                tool_base_keys = {
+                    "attempt",
+                    "fencing_token",
+                    "node_id",
+                    "step",
+                    "call_id",
+                    "tool_name",
+                    "arguments_digest",
+                }
+                if event.event_type == "TOOL_CALLED":
+                    if (
+                        set(payload) != tool_base_keys
+                        or open_started is None
+                        or open_tool is not None
+                    ):
+                        raise InterruptedNodeExecutionError(
+                            "tool call ledger is malformed or overlapping",
+                            execution_id=record.execution_id,
+                        )
+                    tool_node_id = self._ledger_string(
+                        payload["node_id"], field="node_id"
+                    )
+                    tool_attempt = self._ledger_integer(
+                        payload["attempt"], field="attempt", minimum=1
+                    )
+                    step = self._ledger_integer(payload["step"], field="step", minimum=1)
+                    call_id = self._ledger_string(payload["call_id"], field="call_id")
+                    tool_name = self._ledger_string(payload["tool_name"], field="tool_name")
+                    arguments_digest = self._ledger_digest(payload["arguments_digest"])
+                    tool_fencing = self._ledger_integer(
+                        payload["fencing_token"], field="fencing_token", minimum=1
+                    )
+                    if (
+                        tool_node_id != open_started[0]
+                        or tool_attempt != open_started[1]
+                        or tool_fencing != open_started[4]
+                        or step != next_tool_step
+                    ):
+                        raise InterruptedNodeExecutionError(
+                            "tool call does not match its open node attempt",
+                            execution_id=record.execution_id,
+                            node_id=tool_node_id,
+                        )
+                    open_tool = (
+                        tool_node_id,
+                        tool_attempt,
+                        step,
+                        call_id,
+                        tool_name,
+                        arguments_digest,
+                        tool_fencing,
+                    )
+                    continue
+
+                expected_tool_outcome = tool_base_keys | {
+                    "result_digest",
+                    "redacted_result",
+                }
+                if event.event_type == "TOOL_FAILED":
+                    expected_tool_outcome.add("error_code")
+                if set(payload) != expected_tool_outcome or open_tool is None:
+                    raise InterruptedNodeExecutionError(
+                        "tool outcome ledger is malformed or has no matching call",
+                        execution_id=record.execution_id,
+                    )
+                observed_tool = (
+                    self._ledger_string(payload["node_id"], field="node_id"),
+                    self._ledger_integer(payload["attempt"], field="attempt", minimum=1),
+                    self._ledger_integer(payload["step"], field="step", minimum=1),
+                    self._ledger_string(payload["call_id"], field="call_id"),
+                    self._ledger_string(payload["tool_name"], field="tool_name"),
+                    self._ledger_digest(payload["arguments_digest"]),
+                    self._ledger_integer(
+                        payload["fencing_token"], field="fencing_token", minimum=1
+                    ),
+                )
+                if observed_tool != open_tool:
+                    raise InterruptedNodeExecutionError(
+                        "tool outcome does not match its call",
+                        execution_id=record.execution_id,
+                        node_id=observed_tool[0],
+                    )
+                self._ledger_digest(payload["result_digest"])
+                redacted_result = payload["redacted_result"]
+                if type(redacted_result) is not str or len(redacted_result) > 2_000:
+                    raise InterruptedNodeExecutionError(
+                        "redacted_result must be a bounded string",
+                        execution_id=record.execution_id,
+                    )
+                if event.event_type == "TOOL_FAILED":
+                    self._ledger_string(payload["error_code"], field="error_code")
+                open_tool = None
+                next_tool_step += 1
                 continue
 
             failed = event.event_type == "NODE_FAILED"
@@ -1217,7 +1416,7 @@ class GraphExecutor:
                 expected_keys.update(model_required_keys)
                 if "model_request_id" in payload:
                     expected_keys.add("model_request_id")
-            if set(payload) != expected_keys or open_started is None:
+            if set(payload) != expected_keys or open_started is None or open_tool is not None:
                 raise InterruptedNodeExecutionError(
                     "node outcome ledger is malformed or has no matching start",
                     execution_id=record.execution_id,

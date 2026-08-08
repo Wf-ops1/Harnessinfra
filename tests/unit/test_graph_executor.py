@@ -65,6 +65,7 @@ from ai_engineering_harness.runtime import (
     StateReplayError,
     StateTransitionIntegrityError,
     TerminalNodeExecutor,
+    ToolExecutionRecord,
     UnknownCurrentNodeError,
 )
 
@@ -230,6 +231,22 @@ class _FailOutcomeAppendStorage(AtomicFileStateStorage):
             self.fail_outcome_append = False
             raise StateWriteError(
                 "controlled node outcome append interruption",
+                execution_id=execution_id,
+            )
+        return super().append_event(execution_id, event, lock=lock)
+
+
+class _FailToolOutcomeAppendStorage(AtomicFileStateStorage):
+    def append_event(
+        self,
+        execution_id: str,
+        event: ExecutionEvent,
+        *,
+        lock: ExecutionLock | None = None,
+    ) -> ExecutionEvent:
+        if event.event_type == "TOOL_COMPLETED":
+            raise StateWriteError(
+                "controlled tool outcome append interruption",
                 execution_id=execution_id,
             )
         return super().append_event(execution_id, event, lock=lock)
@@ -736,6 +753,184 @@ def test_model_metadata_and_usage_are_journaled_only_on_node_outcome(
         "model_request_id": "req-123",
     }
     assert "sensitive prompt" not in json.dumps(events)
+
+
+def test_tool_events_are_paired_redacted_and_precede_node_outcome(tmp_path: Path) -> None:
+    artifact = _agent_artifact()
+    storage = AtomicFileStateStorage(tmp_path)
+    execution_id = "exec-tool-events"
+    storage.create_execution(_record(artifact, execution_id))
+    tool_record = ToolExecutionRecord(
+        step=1,
+        call_id="call-1",
+        tool_name="knowledge_retriever",
+        arguments_digest=f"sha256:{'1' * 64}",
+        succeeded=True,
+        result_digest=f"sha256:{'2' * 64}",
+        redacted_result='{"token":"[REDACTED_SECRET]"}',
+    )
+
+    _executor(
+        storage,
+        NodeExecutorRegistry(
+            agent=AgentNodeExecutor(
+                _StaticBackend(
+                    NodeExecutionResult.completed(
+                        {"result": "ok"},
+                        tool_executions=(tool_record,),
+                    )
+                )
+            )
+        ),
+    ).execute(artifact, execution_id, {"value": 1})
+
+    events = _journal(tmp_path, execution_id)
+    event_types = [event["event_type"] for event in events]
+    assert event_types == [
+        "STATE_TRANSITIONED",
+        "NODE_STARTED",
+        "TOOL_CALLED",
+        "TOOL_COMPLETED",
+        "NODE_COMPLETED",
+        "STATE_TRANSITIONED",
+    ]
+    called = events[2]["payload"]
+    completed = events[3]["payload"]
+    assert called["arguments_digest"] == f"sha256:{'1' * 64}"
+    assert "arguments" not in called
+    assert completed["redacted_result"] == '{"token":"[REDACTED_SECRET]"}'
+    assert "raw-secret" not in json.dumps(events)
+
+
+def test_tool_record_replay_accepts_complete_pair_without_reexecution(
+    tmp_path: Path,
+) -> None:
+    artifact = _agent_artifact()
+    storage = _FailOutcomeCasStorage(tmp_path)
+    execution_id = "exec-tool-record-resume"
+    initial_input = {"value": 1}
+    _create_resume_execution(storage, artifact, execution_id, initial_input)
+    tool_record = ToolExecutionRecord(
+        step=1,
+        call_id="call-resume",
+        tool_name="knowledge_retriever",
+        arguments_digest=f"sha256:{'3' * 64}",
+        succeeded=True,
+        result_digest=f"sha256:{'4' * 64}",
+        redacted_result="ok",
+    )
+    backend = _StaticBackend(
+        NodeExecutionResult.completed(
+            {"result": "ok"},
+            tool_executions=(tool_record,),
+        )
+    )
+    executor = _resume_executor(
+        storage,
+        NodeExecutorRegistry(agent=AgentNodeExecutor(backend)),
+    )
+
+    with pytest.raises(StateWriteError, match="outcome CAS"):
+        executor.execute(artifact, execution_id, initial_input)
+    result = executor.resume(artifact, execution_id)
+
+    assert result.outcome == "success"
+    assert [
+        event.event_type
+        for event in storage.load_events(execution_id)
+        if event.event_type.startswith("TOOL_")
+    ] == ["TOOL_CALLED", "TOOL_COMPLETED"]
+
+
+def test_tool_event_replay_rejects_partial_pair_without_backend(tmp_path: Path) -> None:
+    artifact = _agent_artifact()
+    storage = _FailToolOutcomeAppendStorage(tmp_path)
+    execution_id = "exec-tool-event-partial"
+    initial_input = {"value": 1}
+    _create_resume_execution(storage, artifact, execution_id, initial_input)
+    tool_record = ToolExecutionRecord(
+        step=1,
+        call_id="call-partial",
+        tool_name="knowledge_retriever",
+        arguments_digest=f"sha256:{'5' * 64}",
+        succeeded=True,
+        result_digest=f"sha256:{'6' * 64}",
+        redacted_result="ok",
+    )
+    executor = _resume_executor(
+        storage,
+        NodeExecutorRegistry(
+            agent=AgentNodeExecutor(
+                _StaticBackend(
+                    NodeExecutionResult.completed(
+                        {"result": "ok"},
+                        tool_executions=(tool_record,),
+                    )
+                )
+            )
+        ),
+    )
+
+    with pytest.raises(StateWriteError, match="tool outcome"):
+        executor.execute(artifact, execution_id, initial_input)
+    journal_before = storage.load_events(execution_id)
+    with pytest.raises(InterruptedNodeExecutionError):
+        executor.resume(artifact, execution_id)
+
+    assert storage.load_events(execution_id) == journal_before
+
+
+def test_tool_event_replay_rejects_adulterated_extra_outcome(tmp_path: Path) -> None:
+    artifact = _agent_artifact()
+    storage = AtomicFileStateStorage(tmp_path)
+    execution_id = "exec-tool-event-adulterated"
+    initial_input = {"value": 1}
+    _create_resume_execution(storage, artifact, execution_id, initial_input)
+    tool_record = ToolExecutionRecord(
+        step=1,
+        call_id="call-original",
+        tool_name="knowledge_retriever",
+        arguments_digest=f"sha256:{'7' * 64}",
+        succeeded=True,
+        result_digest=f"sha256:{'8' * 64}",
+        redacted_result="ok",
+    )
+    executor = _resume_executor(
+        storage,
+        NodeExecutorRegistry(
+            agent=AgentNodeExecutor(
+                _StaticBackend(
+                    NodeExecutionResult.completed(
+                        {"result": "ok"},
+                        tool_executions=(tool_record,),
+                    )
+                )
+            )
+        ),
+    )
+    executor.execute(artifact, execution_id, initial_input)
+    outcome = next(
+        event
+        for event in storage.load_events(execution_id)
+        if event.event_type == "TOOL_COMPLETED"
+    )
+    adulterated = ExecutionEvent.model_validate(
+        {
+            **outcome.model_dump(),
+            "event_id": "adulterated-tool-outcome",
+            "timestamp": outcome.timestamp + timedelta(seconds=10),
+            "payload": {**outcome.payload, "call_id": "call-adulterated"},
+            "previous_hash": None,
+            "current_hash": None,
+        }
+    )
+    storage.append_event(execution_id, adulterated)
+    journal_before = storage.load_events(execution_id)
+
+    with pytest.raises(InterruptedNodeExecutionError, match="tool outcome ledger"):
+        executor.resume(artifact, execution_id)
+
+    assert storage.load_events(execution_id) == journal_before
 
 
 def test_invalid_input_contract_rejection_is_side_effect_free(tmp_path: Path) -> None:
