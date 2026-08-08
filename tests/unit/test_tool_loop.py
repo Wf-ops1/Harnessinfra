@@ -24,6 +24,10 @@ from ai_engineering_harness.models import (
 )
 from ai_engineering_harness.runtime import (
     EffectiveToolPolicy,
+    ToolApprovalRequiredError,
+    ToolCallIntent,
+    ToolEffectDurabilityError,
+    ToolExecutionRecord,
     ToolLoopCancelledError,
     ToolLoopError,
     ToolLoopExecutionError,
@@ -36,6 +40,7 @@ from ai_engineering_harness.tools import (
     ToolDefinition,
     ToolRegistration,
     ToolRouter,
+    ToolUnauthorizedError,
     ToolUnavailableError,
 )
 
@@ -88,6 +93,23 @@ class _Registry:
     def create_provider(self, provider_id: str) -> _ToolProvider:
         self.created.append(provider_id)
         return self.providers[provider_id]
+
+
+class _MemoryRecorder:
+    def __init__(self, trace: list[str] | None = None) -> None:
+        self.intents: list[ToolCallIntent] = []
+        self.outcomes: list[ToolExecutionRecord] = []
+        self.trace = trace
+
+    def record_call(self, intent: ToolCallIntent) -> None:
+        self.intents.append(intent)
+        if self.trace is not None:
+            self.trace.append("called")
+
+    def record_outcome(self, record: ToolExecutionRecord) -> None:
+        self.outcomes.append(record)
+        if self.trace is not None:
+            self.trace.append("outcome")
 
 
 def _response(
@@ -211,10 +233,14 @@ def _loop(
 
 def _execute(loop: ToolLoopExecutor, tool_router: ToolRouter, **kwargs):
     policy = EffectiveToolPolicy.from_artifact(_artifact(), "agent")
+    kwargs.setdefault("tool_effect_recorder", _MemoryRecorder())
     return loop.execute(
         "system and user prompt",
         policy=policy,
-        tool_schemas=tool_router.prepare(policy.allowed_tools),
+        tool_schemas=tool_router.prepare(
+            policy.allowed_tools,
+            effective_denied_tools=policy.denied_tools,
+        ),
         model_candidates=("local",),
         **kwargs,
     )
@@ -261,6 +287,84 @@ def test_compiled_policy_tool_result_returns_to_model_and_final_response_stops()
     }
     assert result.tool_executions[0].arguments_digest.startswith("sha256:")
     assert result.tool_executions[0].redacted_result == '{"matches":["F3.3"]}'
+
+
+def test_durable_recorder_wraps_handler_in_write_ahead_order() -> None:
+    trace: list[str] = []
+    recorder = _MemoryRecorder(trace)
+
+    def handler(payload):
+        trace.append("handler")
+        return payload
+
+    tool_router = _tool_router(handler)
+    provider = _ToolProvider(
+        "local",
+        [
+            _response(calls=(_call(),), index=1),
+            _response(content="done", index=2),
+        ],
+    )
+    loop, _ = _loop(provider, tool_router)
+
+    _execute(loop, tool_router, tool_effect_recorder=recorder)
+
+    assert trace == ["called", "handler", "outcome"]
+    assert (
+        recorder.intents[0].arguments_digest
+        == recorder.outcomes[0].arguments_digest
+    )
+
+
+def test_missing_durable_recorder_blocks_handler() -> None:
+    effects: list[object] = []
+    tool_router = _tool_router(lambda payload: effects.append(payload))
+    provider = _ToolProvider("local", [_response(calls=(_call(),))])
+    loop, _ = _loop(provider, tool_router)
+    policy = EffectiveToolPolicy.from_artifact(_artifact(), "agent")
+
+    with pytest.raises(ToolEffectDurabilityError):
+        loop.execute(
+            "prompt",
+            policy=policy,
+            tool_schemas=tool_router.prepare(policy.allowed_tools),
+            model_candidates=("local",),
+        )
+
+    assert effects == []
+
+
+def test_policy_deny_overlap_and_human_approval_fail_closed() -> None:
+    tool_router = _tool_router(lambda payload: payload)
+    with pytest.raises(ToolUnauthorizedError):
+        tool_router.prepare(
+            ("knowledge_retriever",),
+            effective_denied_tools=("knowledge_retriever",),
+        )
+
+    provider = _ToolProvider("local", [_response(content="must not run")])
+    loop, _ = _loop(provider, tool_router)
+    policy = EffectiveToolPolicy(
+        node_id="agent",
+        role="requirement_analyst",
+        allowed_tools=("knowledge_retriever",),
+        denied_tools=(),
+        human_approval_required=True,
+    )
+    with pytest.raises(ToolApprovalRequiredError):
+        loop.execute(
+            "prompt",
+            policy=policy,
+            tool_schemas=tool_router.prepare(policy.allowed_tools),
+            model_candidates=("local",),
+            tool_effect_recorder=_MemoryRecorder(),
+        )
+    assert provider.prompts == []
+
+
+def test_router_without_registrations_has_no_synthetic_operational_tools() -> None:
+    router = ToolRouter(allowed_tools=("serena_edit",))
+    assert router.registered_tools == ()
 
 
 def test_transient_model_failure_falls_back_within_one_tool_turn() -> None:
@@ -440,6 +544,36 @@ def test_budget_exhaustion_after_model_response_blocks_tool_effect() -> None:
     assert effects == []
 
 
+def test_budget_is_rechecked_before_each_dispatch_in_batch() -> None:
+    effects: list[object] = []
+    budget = BudgetTracker(max_tokens=10)
+
+    def handler(payload):
+        effects.append(payload)
+        budget.add_tokens(7)
+        return payload
+
+    tool_router = _tool_router(handler)
+    provider = _ToolProvider(
+        "local",
+        [
+            _response(
+                calls=(
+                    _call(call_id="one"),
+                    _call(call_id="two"),
+                ),
+                total_tokens=3,
+            )
+        ],
+    )
+    loop, _ = _loop(provider, tool_router, budget=budget)
+
+    with pytest.raises(ToolLoopError, match="BUDGET EXCEEDED"):
+        _execute(loop, tool_router)
+
+    assert effects == [{"query": "routing"}]
+
+
 def test_cancel_before_first_model_call_has_no_effect() -> None:
     effects: list[object] = []
     tool_router = _tool_router(lambda payload: effects.append(payload))
@@ -453,6 +587,35 @@ def test_cancel_before_first_model_call_has_no_effect() -> None:
 
     assert provider.prompts == []
     assert effects == []
+
+
+def test_cancellation_is_rechecked_before_each_dispatch_in_batch() -> None:
+    effects: list[object] = []
+    token = CancellationToken()
+
+    def handler(payload):
+        effects.append(payload)
+        token.cancel()
+        return payload
+
+    tool_router = _tool_router(handler)
+    provider = _ToolProvider(
+        "local",
+        [
+            _response(
+                calls=(
+                    _call(call_id="one"),
+                    _call(call_id="two"),
+                )
+            )
+        ],
+    )
+    loop, _ = _loop(provider, tool_router)
+
+    with pytest.raises(ToolLoopCancelledError):
+        _execute(loop, tool_router, cancellation_token=token)
+
+    assert effects == [{"query": "routing"}]
 
 
 def test_tool_error_stops_without_another_model_call_and_carries_failed_record() -> None:

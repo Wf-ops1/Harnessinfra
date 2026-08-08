@@ -65,6 +65,10 @@ from ai_engineering_harness.runtime import (
     StateReplayError,
     StateTransitionIntegrityError,
     TerminalNodeExecutor,
+    ToolCallIntent,
+    ToolEffectAmbiguousError,
+    ToolEffectDurabilityError,
+    ToolEffectIntegrityError,
     ToolExecutionRecord,
     UnknownCurrentNodeError,
 )
@@ -188,6 +192,31 @@ class _StaticBackend:
         return self.result
 
 
+@dataclass
+class _DurableStaticBackend:
+    result: NodeExecutionResult
+    trace: list[str] | None = None
+    executions: int = 0
+
+    def execute(self, context: NodeExecutionContext) -> NodeExecutionResult:
+        self.executions += 1
+        recorder = context.tool_effect_recorder
+        assert recorder is not None
+        for record in self.result.tool_executions:
+            recorder.record_call(
+                ToolCallIntent(
+                    step=record.step,
+                    call_id=record.call_id,
+                    tool_name=record.tool_name,
+                    arguments_digest=record.arguments_digest,
+                )
+            )
+            if self.trace is not None:
+                self.trace.append("effect")
+            recorder.record_outcome(record)
+        return self.result
+
+
 class _FailOutcomeCasStorage(AtomicFileStateStorage):
     def __init__(self, project_root: Path) -> None:
         super().__init__(project_root)
@@ -293,6 +322,39 @@ class _FailToolOutcomeAppendStorage(AtomicFileStateStorage):
                 "controlled tool outcome append interruption",
                 execution_id=execution_id,
             )
+        return super().append_event(execution_id, event, lock=lock)
+
+
+class _FailToolCallAppendStorage(AtomicFileStateStorage):
+    def append_event(
+        self,
+        execution_id: str,
+        event: ExecutionEvent,
+        *,
+        lock: ExecutionLock | None = None,
+    ) -> ExecutionEvent:
+        if event.event_type == "TOOL_CALLED":
+            raise StateWriteError(
+                "controlled tool call append interruption",
+                execution_id=execution_id,
+            )
+        return super().append_event(execution_id, event, lock=lock)
+
+
+class _TracingToolStorage(AtomicFileStateStorage):
+    def __init__(self, project_root: Path, trace: list[str]) -> None:
+        super().__init__(project_root)
+        self.trace = trace
+
+    def append_event(
+        self,
+        execution_id: str,
+        event: ExecutionEvent,
+        *,
+        lock: ExecutionLock | None = None,
+    ) -> ExecutionEvent:
+        if event.event_type.startswith("TOOL_"):
+            self.trace.append(event.event_type)
         return super().append_event(execution_id, event, lock=lock)
 
 
@@ -958,7 +1020,7 @@ def test_tool_events_are_paired_redacted_and_precede_node_outcome(tmp_path: Path
         storage,
         NodeExecutorRegistry(
             agent=AgentNodeExecutor(
-                _StaticBackend(
+                _DurableStaticBackend(
                     NodeExecutionResult.completed(
                         {"result": "ok"},
                         tool_executions=(tool_record,),
@@ -986,6 +1048,106 @@ def test_tool_events_are_paired_redacted_and_precede_node_outcome(tmp_path: Path
     assert "raw-secret" not in json.dumps(events)
 
 
+def test_graph_write_ahead_is_persisted_before_effect_and_outcome_after(
+    tmp_path: Path,
+) -> None:
+    artifact = _agent_artifact()
+    trace: list[str] = []
+    storage = _TracingToolStorage(tmp_path, trace)
+    execution_id = "exec-tool-write-ahead-order"
+    storage.create_execution(_record(artifact, execution_id))
+    tool_record = ToolExecutionRecord(
+        step=1,
+        call_id="call-order",
+        tool_name="knowledge_retriever",
+        arguments_digest=f"sha256:{'a' * 64}",
+        succeeded=True,
+        result_digest=f"sha256:{'b' * 64}",
+        redacted_result="ok",
+    )
+    backend = _DurableStaticBackend(
+        NodeExecutionResult.completed(
+            {"result": "ok"},
+            tool_executions=(tool_record,),
+        ),
+        trace=trace,
+    )
+
+    _executor(
+        storage,
+        NodeExecutorRegistry(agent=AgentNodeExecutor(backend)),
+    ).execute(artifact, execution_id, {"value": 1})
+
+    assert trace == ["TOOL_CALLED", "effect", "TOOL_COMPLETED"]
+
+
+def test_tool_call_journal_failure_blocks_effect_before_handler(tmp_path: Path) -> None:
+    artifact = _agent_artifact()
+    trace: list[str] = []
+    storage = _FailToolCallAppendStorage(tmp_path)
+    execution_id = "exec-tool-call-write-failure"
+    storage.create_execution(_record(artifact, execution_id))
+    tool_record = ToolExecutionRecord(
+        step=1,
+        call_id="call-blocked",
+        tool_name="knowledge_retriever",
+        arguments_digest=f"sha256:{'c' * 64}",
+        succeeded=True,
+        result_digest=f"sha256:{'d' * 64}",
+        redacted_result="must-not-run",
+    )
+    backend = _DurableStaticBackend(
+        NodeExecutionResult.completed(
+            {"result": "must-not-run"},
+            tool_executions=(tool_record,),
+        ),
+        trace=trace,
+    )
+
+    with pytest.raises(ToolEffectDurabilityError, match="write-ahead"):
+        _executor(
+            storage,
+            NodeExecutorRegistry(agent=AgentNodeExecutor(backend)),
+        ).execute(artifact, execution_id, {"value": 1})
+
+    assert trace == []
+    assert not any(
+        event.event_type.startswith("TOOL_")
+        for event in storage.load_events(execution_id)
+    )
+
+
+def test_backend_cannot_claim_tool_effect_without_durable_records(tmp_path: Path) -> None:
+    artifact = _agent_artifact()
+    storage = AtomicFileStateStorage(tmp_path)
+    execution_id = "exec-tool-evidence-mismatch"
+    storage.create_execution(_record(artifact, execution_id))
+    tool_record = ToolExecutionRecord(
+        step=1,
+        call_id="call-unrecorded",
+        tool_name="knowledge_retriever",
+        arguments_digest=f"sha256:{'e' * 64}",
+        succeeded=True,
+        result_digest=f"sha256:{'f' * 64}",
+        redacted_result="untrusted",
+    )
+
+    with pytest.raises(ToolEffectIntegrityError, match="diverges"):
+        _executor(
+            storage,
+            NodeExecutorRegistry(
+                agent=AgentNodeExecutor(
+                    _StaticBackend(
+                        NodeExecutionResult.completed(
+                            {"result": "untrusted"},
+                            tool_executions=(tool_record,),
+                        )
+                    )
+                )
+            ),
+        ).execute(artifact, execution_id, {"value": 1})
+
+
 def test_tool_record_replay_accepts_complete_pair_without_reexecution(
     tmp_path: Path,
 ) -> None:
@@ -1003,7 +1165,7 @@ def test_tool_record_replay_accepts_complete_pair_without_reexecution(
         result_digest=f"sha256:{'4' * 64}",
         redacted_result="ok",
     )
-    backend = _StaticBackend(
+    backend = _DurableStaticBackend(
         NodeExecutionResult.completed(
             {"result": "ok"},
             tool_executions=(tool_record,),
@@ -1024,6 +1186,7 @@ def test_tool_record_replay_accepts_complete_pair_without_reexecution(
         for event in storage.load_events(execution_id)
         if event.event_type.startswith("TOOL_")
     ] == ["TOOL_CALLED", "TOOL_COMPLETED"]
+    assert backend.executions == 1
 
 
 def test_tool_event_replay_rejects_partial_pair_without_backend(tmp_path: Path) -> None:
@@ -1045,7 +1208,7 @@ def test_tool_event_replay_rejects_partial_pair_without_backend(tmp_path: Path) 
         storage,
         NodeExecutorRegistry(
             agent=AgentNodeExecutor(
-                _StaticBackend(
+                _DurableStaticBackend(
                     NodeExecutionResult.completed(
                         {"result": "ok"},
                         tool_executions=(tool_record,),
@@ -1055,7 +1218,7 @@ def test_tool_event_replay_rejects_partial_pair_without_backend(tmp_path: Path) 
         ),
     )
 
-    with pytest.raises(StateWriteError, match="tool outcome"):
+    with pytest.raises(ToolEffectAmbiguousError, match="durable outcome"):
         executor.execute(artifact, execution_id, initial_input)
     journal_before = storage.load_events(execution_id)
     with pytest.raises(InterruptedNodeExecutionError):
@@ -1083,7 +1246,7 @@ def test_tool_event_replay_rejects_adulterated_extra_outcome(tmp_path: Path) -> 
         storage,
         NodeExecutorRegistry(
             agent=AgentNodeExecutor(
-                _StaticBackend(
+                _DurableStaticBackend(
                     NodeExecutionResult.completed(
                         {"result": "ok"},
                         tool_executions=(tool_record,),

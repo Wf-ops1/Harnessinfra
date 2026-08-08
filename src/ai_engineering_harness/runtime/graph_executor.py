@@ -6,6 +6,7 @@ import hashlib
 import math
 import uuid
 from collections.abc import Callable, Mapping
+from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Literal, Protocol, runtime_checkable
 
@@ -48,6 +49,10 @@ from .node_executors import (
     NodeExecutorResultError,
     RetryContext,
     RetryEvidence,
+    ToolCallIntent,
+    ToolEffectAmbiguousError,
+    ToolEffectDurabilityError,
+    ToolEffectIntegrityError,
     ToolExecutionRecord,
     _copy_json_object,
 )
@@ -119,6 +124,108 @@ class InterruptedNodeExecutionError(GraphExecutionError):
     """A started node has no durable outcome and cannot be replayed in F2.5."""
 
     classification = "requires_intervention"
+
+
+@dataclass(slots=True)
+class _DurableToolEffectRecorder:
+    """Bind one backend's tool effects to the active graph journal and lock."""
+
+    owner: GraphExecutor
+    execution_id: str
+    node: NodeSpec
+    attempt: int
+    lock: ExecutionLock
+    current_timestamp: datetime
+    open_intent: ToolCallIntent | None = None
+    records: list[ToolExecutionRecord] = field(default_factory=list)
+
+    def record_call(self, intent: ToolCallIntent) -> None:
+        if self.open_intent is not None:
+            raise ToolEffectIntegrityError(
+                "a prior tool call has no durable outcome"
+            )
+        if intent.step != len(self.records) + 1:
+            raise ToolEffectIntegrityError(
+                "tool write-ahead steps must be contiguous and start at one"
+            )
+        called_at = self.owner._next_timestamp(
+            self.current_timestamp,
+            execution_id=self.execution_id,
+            node_id=self.node.id,
+        )
+        try:
+            self.owner._append_tool_event(
+                self.execution_id,
+                self.node,
+                self.attempt,
+                self.lock,
+                called_at,
+                "TOOL_CALLED",
+                intent,
+            )
+        except Exception as exc:
+            raise ToolEffectDurabilityError(
+                "tool call write-ahead could not be persisted"
+            ) from exc
+        self.current_timestamp = called_at
+        self.open_intent = intent
+
+    def record_outcome(self, record: ToolExecutionRecord) -> None:
+        if self.open_intent is None or not _record_matches_intent(
+            record,
+            self.open_intent,
+        ):
+            raise ToolEffectIntegrityError(
+                "tool outcome does not match the open durable call"
+            )
+        outcome_at = self.owner._next_timestamp(
+            self.current_timestamp,
+            execution_id=self.execution_id,
+            node_id=self.node.id,
+        )
+        outcome_type: Literal["TOOL_COMPLETED", "TOOL_FAILED"] = (
+            "TOOL_COMPLETED" if record.succeeded else "TOOL_FAILED"
+        )
+        try:
+            self.owner._append_tool_event(
+                self.execution_id,
+                self.node,
+                self.attempt,
+                self.lock,
+                outcome_at,
+                outcome_type,
+                record,
+            )
+        except Exception as exc:
+            raise ToolEffectAmbiguousError(
+                "tool effect completed but its durable outcome is ambiguous"
+            ) from exc
+        self.current_timestamp = outcome_at
+        self.open_intent = None
+        self.records.append(record)
+
+    def finish(self, expected: tuple[ToolExecutionRecord, ...]) -> datetime:
+        if self.open_intent is not None:
+            raise ToolEffectAmbiguousError(
+                "tool call remains open after backend execution"
+            )
+        if tuple(self.records) != expected:
+            raise ToolEffectIntegrityError(
+                "backend tool evidence diverges from the durable journal"
+            )
+        return self.current_timestamp
+
+
+def _record_matches_intent(
+    record: ToolExecutionRecord,
+    intent: ToolCallIntent,
+) -> bool:
+    return (
+        record.step == intent.step
+        and record.call_id == intent.call_id
+        and record.tool_name == intent.tool_name
+        and record.arguments_digest == intent.arguments_digest
+    )
 
 
 class _StrictFrozenModel(BaseModel):
@@ -578,15 +685,6 @@ class GraphExecutor:
                 execution_id=execution_id,
                 node_id=current_id,
             )
-            context = NodeExecutionContext(
-                execution_id=execution_id,
-                artifact=artifact,
-                node=node,
-                attempt=attempt,
-                input_payload=current_payload,
-                fencing_token=lock.fencing_token,
-                retry_context=retry_context,
-            )
             self._append_node_event(
                 execution_id,
                 node,
@@ -596,6 +694,24 @@ class GraphExecutor:
                 started_at,
                 input_digest=input_digest,
                 retry_context_digest=retry_context_digest,
+            )
+            tool_effect_recorder = _DurableToolEffectRecorder(
+                owner=self,
+                execution_id=execution_id,
+                node=node,
+                attempt=attempt,
+                lock=lock,
+                current_timestamp=started_at,
+            )
+            context = NodeExecutionContext(
+                execution_id=execution_id,
+                artifact=artifact,
+                node=node,
+                attempt=attempt,
+                input_payload=current_payload,
+                fencing_token=lock.fencing_token,
+                retry_context=retry_context,
+                tool_effect_recorder=tool_effect_recorder,
             )
 
             result = (
@@ -621,13 +737,8 @@ class GraphExecutor:
                         tool_executions=result.tool_executions,
                     )
 
-            last_tool_event_at = self._append_tool_events(
-                execution_id,
-                node,
-                attempt,
-                lock,
-                started_at,
-                result.tool_executions,
+            last_tool_event_at = tool_effect_recorder.finish(
+                result.tool_executions
             )
 
             next_id = node.on_success if result.succeeded else node.on_failure
@@ -981,51 +1092,6 @@ class GraphExecutor:
             ) from exc
         self._storage.append_event(execution_id, event, lock=lock)
 
-    def _append_tool_events(
-        self,
-        execution_id: str,
-        node: NodeSpec,
-        attempt: int,
-        lock: ExecutionLock,
-        minimum_timestamp: datetime,
-        records: tuple[ToolExecutionRecord, ...],
-    ) -> datetime:
-        current = minimum_timestamp
-        for record in records:
-            called_at = self._next_timestamp(
-                current,
-                execution_id=execution_id,
-                node_id=node.id,
-            )
-            self._append_tool_event(
-                execution_id,
-                node,
-                attempt,
-                lock,
-                called_at,
-                "TOOL_CALLED",
-                record,
-            )
-            outcome_at = self._next_timestamp(
-                called_at,
-                execution_id=execution_id,
-                node_id=node.id,
-            )
-            outcome_type: Literal["TOOL_COMPLETED", "TOOL_FAILED"] = (
-                "TOOL_COMPLETED" if record.succeeded else "TOOL_FAILED"
-            )
-            self._append_tool_event(
-                execution_id,
-                node,
-                attempt,
-                lock,
-                outcome_at,
-                outcome_type,
-                record,
-            )
-            current = outcome_at
-        return current
-
     def _append_tool_event(
         self,
         execution_id: str,
@@ -1034,7 +1100,7 @@ class GraphExecutor:
         lock: ExecutionLock,
         timestamp: datetime,
         event_type: Literal["TOOL_CALLED", "TOOL_COMPLETED", "TOOL_FAILED"],
-        record: ToolExecutionRecord,
+        record: ToolCallIntent | ToolExecutionRecord,
     ) -> None:
         payload: dict[str, object] = {
             "attempt": attempt,
@@ -1046,6 +1112,12 @@ class GraphExecutor:
             "arguments_digest": record.arguments_digest,
         }
         if event_type != "TOOL_CALLED":
+            if not isinstance(record, ToolExecutionRecord):
+                raise GraphEventConstructionError(
+                    "tool outcome requires a completed execution record",
+                    execution_id=execution_id,
+                    node_id=node.id,
+                )
             payload["result_digest"] = record.result_digest
             payload["redacted_result"] = record.redacted_result
             if record.error_code is not None:
