@@ -38,7 +38,13 @@ from ai_engineering_harness.models.router import (
 from ai_engineering_harness.security.redaction import Redactor
 from ai_engineering_harness.tools import ToolRouter, ToolRouterError
 
-from .node_executors import ModelCallMetadata, ToolExecutionRecord
+from .node_executors import (
+    ModelCallMetadata,
+    ToolCallIntent,
+    ToolEffectDurabilityError,
+    ToolEffectRecorder,
+    ToolExecutionRecord,
+)
 
 _TOOL_POLICY_REFERENCE = "policies/tool_policy.yaml"
 _NonEmptyStr = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
@@ -75,6 +81,10 @@ class ToolLoopCancelledError(ToolLoopError):
     """Cancellation was observed before the next model or tool effect."""
 
 
+class ToolApprovalRequiredError(ToolLoopError):
+    """The effective policy requires approval that this boundary cannot infer."""
+
+
 class EffectiveToolPolicy(BaseModel):
     """Exact immutable policy decision consumed by one agent node."""
 
@@ -84,6 +94,24 @@ class EffectiveToolPolicy(BaseModel):
     role: _NonEmptyStr
     allowed_tools: tuple[_NonEmptyStr, ...]
     denied_tools: tuple[_NonEmptyStr, ...]
+    human_approval_required: bool = False
+
+    @model_validator(mode="after")
+    def require_unambiguous_decision(self) -> EffectiveToolPolicy:
+        if len(set(self.allowed_tools)) != len(self.allowed_tools):
+            raise ValueError("allowed_tools must be unique")
+        if len(set(self.denied_tools)) != len(self.denied_tools):
+            raise ValueError("denied_tools must be unique")
+        if set(self.allowed_tools) & set(self.denied_tools):
+            raise ValueError("allowed_tools and denied_tools must not overlap")
+        return self
+
+    def require_dispatchable(self) -> None:
+        """Fail closed before model egress when human approval is unresolved."""
+        if self.human_approval_required:
+            raise ToolApprovalRequiredError(
+                "effective tool policy requires explicit human approval"
+            )
 
     @classmethod
     def from_artifact(
@@ -136,6 +164,7 @@ class EffectiveToolPolicy(BaseModel):
             role=decision.role,
             allowed_tools=decision.allowed_tools,
             denied_tools=decision.denied_tools,
+            human_approval_required=decision.human_approval_required,
         )
 
 
@@ -195,12 +224,15 @@ class ToolLoopExecutor:
         tool_schemas: tuple[dict[str, object], ...],
         model_candidates: tuple[str, ...],
         cancellation_token: CancellationToken | None = None,
+        tool_effect_recorder: ToolEffectRecorder | None = None,
     ) -> ToolLoopResult:
         records: list[ToolExecutionRecord] = []
         model_call_records: list[ModelCallMetadata] = []
         conversation_turns: list[ModelToolConversationTurn] = []
         seen_call_ids: set[str] = set()
         model_calls = 0
+
+        policy.require_dispatchable()
 
         while True:
             self._raise_if_cancelled(
@@ -297,13 +329,33 @@ class ToolLoopExecutor:
                     records,
                     model_call_records,
                 )
+                try:
+                    self._model_router.budget_tracker.ensure_available()
+                except BudgetError as exc:
+                    raise ToolLoopError(
+                        str(exc),
+                        tool_executions=tuple(records),
+                        model_call_records=tuple(model_call_records),
+                    ) from exc
+                if tool_effect_recorder is None:
+                    raise ToolEffectDurabilityError(
+                        "tool dispatch requires a durable write-ahead recorder"
+                    )
                 step = len(records) + 1
                 arguments_json = _canonical_json(call.arguments)
+                intent = ToolCallIntent(
+                    step=step,
+                    call_id=call.call_id,
+                    tool_name=call.name,
+                    arguments_digest=_digest(arguments_json),
+                )
+                tool_effect_recorder.record_call(intent)
                 try:
                     result = self._tool_router.dispatch(
                         call.name,
                         call.arguments,
                         effective_allowed_tools=policy.allowed_tools,
+                        effective_denied_tools=policy.denied_tools,
                     )
                 except ToolRouterError as exc:
                     error_text = Redactor.redact_text(str(exc))[:2_000]
@@ -317,6 +369,7 @@ class ToolLoopExecutor:
                         redacted_result=error_text,
                         error_code=type(exc).__name__,
                     )
+                    tool_effect_recorder.record_outcome(record)
                     records.append(record)
                     raise ToolLoopExecutionError(
                         "tool execution failed",
@@ -325,17 +378,17 @@ class ToolLoopExecutor:
                     ) from exc
 
                 result_json = _canonical_json(result)
-                records.append(
-                    ToolExecutionRecord(
-                        step=step,
-                        call_id=call.call_id,
-                        tool_name=call.name,
-                        arguments_digest=_digest(arguments_json),
-                        succeeded=True,
-                        result_digest=_digest(result_json),
-                        redacted_result=Redactor.redact_text(result_json)[:2_000],
-                    )
+                record = ToolExecutionRecord(
+                    step=step,
+                    call_id=call.call_id,
+                    tool_name=call.name,
+                    arguments_digest=_digest(arguments_json),
+                    succeeded=True,
+                    result_digest=_digest(result_json),
+                    redacted_result=Redactor.redact_text(result_json)[:2_000],
                 )
+                tool_effect_recorder.record_outcome(record)
+                records.append(record)
                 tool_results.append(
                     ModelToolResult(
                         call_id=call.call_id,
@@ -375,7 +428,11 @@ class ToolLoopExecutor:
                 model_call_records=tuple(model_call_records),
             )
         try:
-            self._tool_router.validate_calls(calls, policy.allowed_tools)
+            self._tool_router.validate_calls(
+                calls,
+                policy.allowed_tools,
+                effective_denied_tools=policy.denied_tools,
+            )
         except ToolRouterError as exc:
             raise ToolLoopError(
                 "tool call batch failed preflight",
@@ -413,6 +470,7 @@ def _digest(canonical: str) -> str:
 
 __all__ = [
     "EffectiveToolPolicy",
+    "ToolApprovalRequiredError",
     "ToolLoopCancelledError",
     "ToolLoopError",
     "ToolLoopExecutionError",

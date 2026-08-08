@@ -1,15 +1,14 @@
 """Executor de personas de agentes conectados ao Models Router e Tool Router."""
 
 from pathlib import Path
-from typing import Any, cast
-
-from pydantic import JsonValue
+from typing import Any
 
 from ai_engineering_harness.contracts import CompiledGraphArtifact
 from ai_engineering_harness.models.provider import CancellationToken, LLMResponse
 from ai_engineering_harness.models.router import ModelRouter
 from ai_engineering_harness.tools.router import ToolRouter
 
+from .node_executors import ToolEffectDurabilityError, ToolEffectRecorder
 from .tool_loop import EffectiveToolPolicy, ToolLoopExecutor, ToolLoopResult
 
 
@@ -75,6 +74,7 @@ class AgentExecutor:
         primary_provider: str | None = None,
         fallback_providers: list[str] | tuple[str, ...] | None = None,
         cancellation_token: CancellationToken | None = None,
+        tool_effect_recorder: ToolEffectRecorder | None = None,
     ) -> ToolLoopResult:
         if self.tool_router is None:
             raise PermissionError(
@@ -86,7 +86,11 @@ class AgentExecutor:
             max_tool_steps=max_tool_steps,
         )
         policy = EffectiveToolPolicy.from_artifact(artifact, node_id)
-        tool_schemas = self.tool_router.prepare(policy.allowed_tools)
+        policy.require_dispatchable()
+        tool_schemas = self.tool_router.prepare(
+            policy.allowed_tools,
+            effective_denied_tools=policy.denied_tools,
+        )
         candidates = self.router.validate_route(primary_provider, fallback_providers)
         full_prompt = self._compose_prompt(prompt)
         return loop.execute(
@@ -95,12 +99,11 @@ class AgentExecutor:
             tool_schemas=tool_schemas,
             model_candidates=candidates,
             cancellation_token=cancellation_token,
+            tool_effect_recorder=tool_effect_recorder,
         )
 
     def execute_tool(self, tool_name: str, payload: dict[str, Any]) -> Any:
-        if not self.tool_router:
-            raise PermissionError(f"[POLICY ERROR] Nenhum ToolRouter associado ao executor do agente '{self.agent_name}'.")
-        return self.tool_router.dispatch(
-            tool_name,
-            cast(dict[str, JsonValue], payload),
+        del tool_name, payload
+        raise ToolEffectDurabilityError(
+            "direct tool dispatch is disabled; use execute_tool_loop with a durable recorder"
         )

@@ -55,6 +55,11 @@ from .node_executors import (
     RetryContext,
     RetryEvidence,
     TerminalNodeExecutor,
+    ToolCallIntent,
+    ToolEffectAmbiguousError,
+    ToolEffectDurabilityError,
+    ToolEffectIntegrityError,
+    ToolEffectRecorder,
     ToolExecutionRecord,
     UnsupportedNodeTypeError,
 )
@@ -72,6 +77,7 @@ from .state_machine import (
 )
 from .tool_loop import (
     EffectiveToolPolicy,
+    ToolApprovalRequiredError,
     ToolLoopCancelledError,
     ToolLoopError,
     ToolLoopExecutionError,
@@ -141,6 +147,12 @@ __all__ = [
     "StateReplayResult",
     "StateTransitionIntegrityError",
     "TerminalNodeExecutor",
+    "ToolApprovalRequiredError",
+    "ToolCallIntent",
+    "ToolEffectAmbiguousError",
+    "ToolEffectDurabilityError",
+    "ToolEffectIntegrityError",
+    "ToolEffectRecorder",
     "ToolExecutionRecord",
     "ToolLoopCancelledError",
     "ToolLoopError",

@@ -6,7 +6,7 @@
 ## 1. Fontes de verdade
 
 1. Este painel: fase, coordenação, tarefa ativa, bloqueios e próxima ação.
-2. [Dossiê ativo](docs/tasks/active/F3.C1.md): problema, evidência, escopo, aceite e rollback.
+2. [Dossiê ativo](docs/tasks/active/F3.C2.md): problema, evidência, escopo, aceite e rollback.
 3. [Plano principal](docs/plano_implementacao_harness_operacional.md): requisitos e dependências das fases.
 4. [Regras dos agentes](.agents/AGENTS.md): protocolo obrigatório de execução e Git.
 5. [Índice histórico](docs/tasks/README.md): dossiês concluídos, PRs, merges e runs.
@@ -32,12 +32,12 @@ devem ser corrigidos para refletir a decisão. Nunca depender somente do histór
 |---|---|
 | **Fase concluída** | Fase 2 — F2.1–F2.6 implementadas e promovidas |
 | **Fase ativa** | Fase 3 — realinhamento obrigatório antes de F3.4 (DEC-012) |
-| **Tarefa ativa** | `F3.C1` — integridade de modelo e model-turn |
+| **Tarefa ativa** | `F3.C2` — execução durável de tools e policy |
 | **Gate** | `READY`; `COMPLETED_LOCAL / PROMOTION_PENDING` |
 | **Executor ativo** | `Codex`, único escritor |
 | **Workspace** | `C:\Users\walla\OneDrive\Desktop\ai-engineering-harness` |
-| **Branch** | `task/f3.c1-model-turn-integrity`, criada de `0e64a88fbe1ca28b8da6a4598a4f4391ba916dd1` |
-| **Última main comprovada** | `0e64a88fbe1ca28b8da6a4598a4f4391ba916dd1`; run `31232731611`, 11/11 verde |
+| **Branch** | `task/f3.c2-tool-effect-durability`, criada de `5616fc548716acb3561dd67d3905eb008130b58c` |
+| **Última main comprovada** | `5616fc548716acb3561dd67d3905eb008130b58c`; run `31240455344`, 11/11 verde |
 | **Python** | `C:\Users\walla\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe` — 3.12.13 |
 | **uv** | `.\build\f0.6-tools\uv\bin\uv.exe` — 0.11.32; nenhuma dependência nova autorizada |
 
@@ -45,41 +45,41 @@ devem ser corrigidos para refletir a decisão. Nunca depender somente do histór
 
 | Evidência | Resultado |
 |---|---|
-| Tarefa anterior | `F3.3`, agora `PROMOTED` e arquivada no primeiro commit deste gate |
-| PR | #22; head `e29f42eaf09373451b2e9858e78a15188fc3006f`; merge `0e64a88fbe1ca28b8da6a4598a4f4391ba916dd1` |
-| CI do PR | run `31232616249`, evento `pull_request`, 11/11 jobs verdes incluindo `CI required` |
-| CI pós-merge | run `31232731611`, evento `push` em `main`, SHA exato do merge, 11/11 jobs verdes |
-| Linha comprovada | `main == origin/main == 0e64a88fbe1ca28b8da6a4598a4f4391ba916dd1` antes desta branch |
+| Tarefa anterior | `F3.C1`, agora `PROMOTED` e arquivada neste primeiro commit do gate F3.C2 |
+| PR | #23; head `78a0099a3909c40e1df6b692a841e6441bccf5a3`; merge `5616fc548716acb3561dd67d3905eb008130b58c` |
+| CI do PR | run `31240274131`, evento `pull_request`, 11/11 jobs verdes incluindo `CI required` |
+| CI pós-merge | run `31240455344`, evento `push` em `main`, SHA exato do merge, 11/11 jobs verdes |
+| Linha comprovada | `main == origin/main == 5616fc548716acb3561dd67d3905eb008130b58c` antes desta branch |
 
 ## 5. Tarefa ativa
 
-Leia integralmente: [F3.C1](docs/tasks/active/F3.C1.md) e o
+Leia integralmente: [F3.C2](docs/tasks/active/F3.C2.md) e o
 [realinhamento da Fase 3](docs/fase3_realignamento_operacional.md).
+
+F3.C2 exige nova autorização explícita; essa pausa foi cumprida e a autorização foi observada em
+`2026-08-08T02:02:32-03:00`. Ela não autoriza F3.4 nem efeitos fora do dossiê congelado.
 
 | Campo | Valor |
 |---|---|
-| **Objetivo** | corrigir continuação nativa, JSON/usage/cancelamento e preservar todos os model calls em sucesso, falha e journal |
-| **Escopo** | provider/router, tool loop, metadata do node, replay compatível, documentação e testes focados |
-| **Proibido** | dispatch/durabilidade/policy F3.C2, path/terminal/worktree/edição F3.4–F3.8, dependências e CI |
-| **Estado local** | implementação `8bd0caa`; `527 passed, 1 skipped, 6 subtests`; quality, package e escopo verdes |
-| **Estado remoto** | PR #23 aberto na branch publicada; head de produto/fechamento `697cb61db9f628b85df57c6b75e9ed2fb7d1cd05`, run `31237686951` com 11/11 `success`; merge ainda não realizado |
+| **Objetivo** | gravar tool call antes do dispatch, persistir outcome depois do efeito e bloquear retomada ambígua sem reexecução |
+| **Escopo** | tool loop/router, recorder sob lock/fencing, policy no dispatch, replay, documentação e testes focados |
+| **Proibido** | path guard, terminal, worktree, promoção e edição F3.4–F3.8; dependências, schemas, adapters e CI |
+| **Estado local** | implementação e todos os gates congelados verdes; commits locais `8187158` e `93e6a03`; fechamento documental/tag complete neste checkpoint |
+| **Estado remoto** | PR [#24](https://github.com/Wf-ops1/Harnessinfra/pull/24) aberto contra `main`; run inicial `31242452446` enfileirado; merge não autorizado |
 
 ## 6. Bloqueios atuais
 
-Nenhum bloqueio técnico ativo. O head de produto/fechamento `697cb61` foi observado com 11/11 jobs em
-`success`, `CI required=success` e PR `clean/mergeable`. Esta reconciliação documental cria um head
-posterior sem alterar produto; o merge continua proibido até o head corrente repetir 11/11 `success`,
-permanecer sem conflitos e receber autorização explícita do usuário.
+Não há implementação ativa. Branch e PR #24 foram publicados com autorização; os checks do head final
+devem ficar integralmente verdes antes de pedir autorização de merge. F3.4 continua bloqueada.
 
 ## 7. Próxima ação exata
 
 ```text
-EXECUTAR SOMENTE F3.C1:
-1. Manter o PR #23 restrito à F3.C1 e revalidar ao vivo seu head, conflito e todos os 11 jobs.
-2. Aguardar autorização explícita do usuário para o merge; CI verde não substitui essa autorização.
-3. Depois da autorização, confirmar novamente 11/11 `success`, `CI required=success` e PR sem conflito.
-4. Fazer merge commit; aguardar CI push em main no SHA exato e sincronizar main.
-5. PAUSAR. F3.C2 exige nova autorização explícita do usuário; não avançar automaticamente.
+PAUSAR EM `COMPLETED_LOCAL / PROMOTION_PENDING`:
+1. Publicar esta reconciliação no mesmo PR #24 e observar todos os checks do novo head.
+2. Não executar merge sem autorização explícita própria depois da CI verde.
+3. Após merge autorizado, validar CI de `push` no SHA exato de `main` e sincronizar o repositório.
+4. F3.4 exige promoção completa da F3.C2 e nova autorização explícita; não avançar automaticamente.
 ```
 
 ## 8. Retomada após perda de contexto

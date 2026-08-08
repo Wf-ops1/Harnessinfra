@@ -42,6 +42,18 @@ class NodeExecutorResultError(NodeExecutorError):
     """A node backend returned a value outside the public result contract."""
 
 
+class ToolEffectDurabilityError(NodeExecutorError):
+    """A tool effect could not be bound to durable write-ahead evidence."""
+
+
+class ToolEffectAmbiguousError(ToolEffectDurabilityError):
+    """A durable tool call has no trustworthy outcome and requires intervention."""
+
+
+class ToolEffectIntegrityError(ToolEffectDurabilityError):
+    """Backend tool evidence diverges from the records written during dispatch."""
+
+
 class UnsupportedNodeTypeError(NodeExecutorError):
     """No exact executor mapping exists for a node or terminal variant."""
 
@@ -232,6 +244,15 @@ class ModelCallMetadata(_StrictFrozenModel):
         )
 
 
+class ToolCallIntent(_StrictFrozenModel):
+    """Redaction-safe write-ahead identity for one not-yet-dispatched tool call."""
+
+    step: int = Field(ge=1)
+    call_id: _NonEmptyStr
+    tool_name: _NonEmptyStr
+    arguments_digest: _DigestStr
+
+
 class ToolExecutionRecord(_StrictFrozenModel):
     """Redaction-safe durable evidence for one dispatched tool call."""
 
@@ -253,8 +274,26 @@ class ToolExecutionRecord(_StrictFrozenModel):
         return self
 
 
+@runtime_checkable
+class ToolEffectRecorder(Protocol):
+    """Durable boundary invoked immediately before and after one tool effect."""
+
+    def record_call(self, intent: ToolCallIntent) -> None:
+        """Persist a write-ahead call before the operational handler is entered."""
+
+    def record_outcome(self, record: ToolExecutionRecord) -> None:
+        """Persist the redacted outcome only after the operational handler returns."""
+
+
 class NodeExecutionContext(_StrictFrozenModel):
     """Immutable context supplied to exactly one node backend invocation."""
+
+    model_config = ConfigDict(
+        strict=True,
+        frozen=True,
+        extra="forbid",
+        arbitrary_types_allowed=True,
+    )
 
     execution_id: ExecutionId
     artifact: CompiledGraphArtifact
@@ -263,6 +302,11 @@ class NodeExecutionContext(_StrictFrozenModel):
     input_payload: dict[str, object]
     fencing_token: int = Field(gt=0)
     retry_context: RetryContext | None = None
+    tool_effect_recorder: ToolEffectRecorder | None = Field(
+        default=None,
+        exclude=True,
+        repr=False,
+    )
 
     @field_validator("artifact", mode="before")
     @classmethod
@@ -275,6 +319,16 @@ class NodeExecutionContext(_StrictFrozenModel):
     @classmethod
     def detach_input_payload(cls, value: object) -> dict[str, object]:
         return _copy_json_object(value, path="input_payload")
+
+    @field_validator("tool_effect_recorder")
+    @classmethod
+    def require_durable_recorder(
+        cls,
+        value: ToolEffectRecorder | None,
+    ) -> ToolEffectRecorder | None:
+        if value is not None and not isinstance(value, ToolEffectRecorder):
+            raise TypeError("tool_effect_recorder must implement ToolEffectRecorder")
+        return value
 
 
 class NodeExecutionResult(_StrictFrozenModel):
@@ -401,6 +455,8 @@ class _BackendNodeExecutor:
         try:
             result = self.backend.execute(context)
         except NodeBackendError:
+            raise
+        except NodeExecutorError:
             raise
         except Exception as exc:
             raise NodeBackendError(
@@ -552,6 +608,11 @@ __all__ = [
     "RetryContext",
     "RetryEvidence",
     "TerminalNodeExecutor",
+    "ToolCallIntent",
+    "ToolEffectAmbiguousError",
+    "ToolEffectDurabilityError",
+    "ToolEffectIntegrityError",
+    "ToolEffectRecorder",
     "ToolExecutionRecord",
     "UnsupportedNodeTypeError",
 ]

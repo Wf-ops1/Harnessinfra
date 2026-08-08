@@ -17,6 +17,7 @@ from ai_engineering_harness.runtime.engine import (
     RuntimeEngine,
     RuntimeGraphConfigurationError,
 )
+from ai_engineering_harness.runtime.node_executors import ToolEffectDurabilityError
 from ai_engineering_harness.runtime.planner import PlanDocument, Planner
 from ai_engineering_harness.runtime.state_machine import (
     WorkflowState,
@@ -90,23 +91,28 @@ def test_plan_validated_before_execution(tmp_path: Path):
     assert planner.validate_plan(invalid_plan) is False
 
 
-def test_agent_dispatches_via_tool_router(tmp_path: Path):
+def test_agent_direct_tool_dispatch_is_disabled(tmp_path: Path):
     dummy_file = tmp_path / "dummy.py"
     dummy_file.touch()
     tool_router = ToolRouter(allowed_tools=["serena_edit"])
     model_router = ModelRouter(allowed_providers=["local"])
     executor = AgentExecutor("Amelia", model_router, tool_router=tool_router, project_root=tmp_path)
     
-    res = executor.execute_tool("serena_edit", {"file_path": str(dummy_file), "changes": {}})
-    assert res is not None
+    with pytest.raises(ToolEffectDurabilityError):
+        executor.execute_tool(
+            "serena_edit",
+            {"file_path": str(dummy_file), "changes": {}},
+        )
+
+    assert dummy_file.read_text(encoding="utf-8") == ""
 
 
-def test_tool_router_blocks_unauthorized_tool(tmp_path: Path):
+def test_agent_direct_tool_dispatch_cannot_bypass_policy(tmp_path: Path):
     tool_router = ToolRouter(allowed_tools=["serena_edit"])
     model_router = ModelRouter(allowed_providers=["local"])
     executor = AgentExecutor("Amelia", model_router, tool_router=tool_router, project_root=tmp_path)
     
-    with pytest.raises(PermissionError):
+    with pytest.raises(ToolEffectDurabilityError):
         executor.execute_tool("terminal_run", {"command": "dir", "cwd": "."})
 
 
