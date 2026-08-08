@@ -62,21 +62,23 @@ Leia integralmente: [F3.C1](docs/tasks/active/F3.C1.md) e o
 | **Escopo** | provider/router, tool loop, metadata do node, replay compatível, documentação e testes focados |
 | **Proibido** | dispatch/durabilidade/policy F3.C2, path/terminal/worktree/edição F3.4–F3.8, dependências e CI |
 | **Estado local** | implementação `8bd0caa`; `527 passed, 1 skipped, 6 subtests`; quality, package e escopo verdes |
-| **Estado remoto** | branch F3.C1 ainda não publicada; nenhum PR/CI/merge antecipado |
+| **Estado remoto** | PR #23 aberto na branch publicada; head de produto/fechamento `697cb61db9f628b85df57c6b75e9ed2fb7d1cd05`, run `31237686951` com 11/11 `success`; merge ainda não realizado |
 
 ## 6. Bloqueios atuais
 
-Nenhum bloqueio ativo. Merge continua proibido até todos os jobs do PR estarem concluídos com
-`success` e o PR permanecer sem conflitos.
+Nenhum bloqueio técnico ativo. O head de produto/fechamento `697cb61` foi observado com 11/11 jobs em
+`success`, `CI required=success` e PR `clean/mergeable`. Esta reconciliação documental cria um head
+posterior sem alterar produto; o merge continua proibido até o head corrente repetir 11/11 `success`,
+permanecer sem conflitos e receber autorização explícita do usuário.
 
 ## 7. Próxima ação exata
 
 ```text
 EXECUTAR SOMENTE F3.C1:
-1. Registrar o fechamento local e `checkpoint/f3.c1-complete`; repetir documentação/diff/scope.
-2. Revisar o diff final e publicar o único PR F3.C1.
-3. Inspecionar todos os jobs; merge proibido com check pendente/ausente/ignorado/falho ou conflito.
-4. Com 100% verde, fazer merge commit; aguardar CI push em main no SHA exato e sincronizar main.
+1. Manter o PR #23 restrito à F3.C1 e revalidar ao vivo seu head, conflito e todos os 11 jobs.
+2. Aguardar autorização explícita do usuário para o merge; CI verde não substitui essa autorização.
+3. Depois da autorização, confirmar novamente 11/11 `success`, `CI required=success` e PR sem conflito.
+4. Fazer merge commit; aguardar CI push em main no SHA exato e sincronizar main.
 5. PAUSAR. F3.C2 exige nova autorização explícita do usuário; não avançar automaticamente.
 ```
 
