@@ -224,6 +224,27 @@ class ModelCallMetadata(_StrictFrozenModel):
         )
 
 
+class ToolExecutionRecord(_StrictFrozenModel):
+    """Redaction-safe durable evidence for one dispatched tool call."""
+
+    step: int = Field(ge=1)
+    call_id: _NonEmptyStr
+    tool_name: _NonEmptyStr
+    arguments_digest: _DigestStr
+    succeeded: bool
+    result_digest: _DigestStr
+    redacted_result: str = Field(max_length=2_000)
+    error_code: _NonEmptyStr | None = None
+
+    @model_validator(mode="after")
+    def require_matching_error(self) -> ToolExecutionRecord:
+        if self.succeeded and self.error_code is not None:
+            raise ValueError("a successful tool record cannot contain an error code")
+        if not self.succeeded and self.error_code is None:
+            raise ValueError("a failed tool record requires an error code")
+        return self
+
+
 class NodeExecutionContext(_StrictFrozenModel):
     """Immutable context supplied to exactly one node backend invocation."""
 
@@ -255,6 +276,12 @@ class NodeExecutionResult(_StrictFrozenModel):
     output: dict[str, object]
     failure: NodeExecutionFailure | None = None
     model_call: ModelCallMetadata | None = None
+    tool_executions: tuple[ToolExecutionRecord, ...] = ()
+
+    @field_validator("tool_executions", mode="before")
+    @classmethod
+    def freeze_tool_executions(cls, value: object) -> object:
+        return tuple(value) if isinstance(value, list) else value
 
     @field_validator("output", mode="before")
     @classmethod
@@ -267,6 +294,14 @@ class NodeExecutionResult(_StrictFrozenModel):
             raise ValueError("a successful node result cannot contain failure details")
         if not self.succeeded and self.failure is None:
             raise ValueError("a failed node result requires failure details")
+        expected_steps = tuple(range(1, len(self.tool_executions) + 1))
+        if tuple(record.step for record in self.tool_executions) != expected_steps:
+            raise ValueError("tool execution steps must be contiguous and start at one")
+        call_ids = tuple(record.call_id for record in self.tool_executions)
+        if len(set(call_ids)) != len(call_ids):
+            raise ValueError("tool execution call IDs must be unique")
+        if self.succeeded and any(not record.succeeded for record in self.tool_executions):
+            raise ValueError("a successful node result cannot contain a failed tool record")
         return self
 
     @classmethod
@@ -275,8 +310,14 @@ class NodeExecutionResult(_StrictFrozenModel):
         output: dict[str, object],
         *,
         model_call: ModelCallMetadata | None = None,
+        tool_executions: tuple[ToolExecutionRecord, ...] = (),
     ) -> NodeExecutionResult:
-        return cls(succeeded=True, output=output, model_call=model_call)
+        return cls(
+            succeeded=True,
+            output=output,
+            model_call=model_call,
+            tool_executions=tool_executions,
+        )
 
     @classmethod
     def failed(
@@ -288,6 +329,7 @@ class NodeExecutionResult(_StrictFrozenModel):
         retryable: bool,
         retry_evidence: RetryEvidence | None = None,
         model_call: ModelCallMetadata | None = None,
+        tool_executions: tuple[ToolExecutionRecord, ...] = (),
     ) -> NodeExecutionResult:
         return cls(
             succeeded=False,
@@ -299,6 +341,7 @@ class NodeExecutionResult(_StrictFrozenModel):
                 retry_evidence=retry_evidence,
             ),
             model_call=model_call,
+            tool_executions=tool_executions,
         )
 
 
@@ -480,5 +523,6 @@ __all__ = [
     "RetryContext",
     "RetryEvidence",
     "TerminalNodeExecutor",
+    "ToolExecutionRecord",
     "UnsupportedNodeTypeError",
 ]

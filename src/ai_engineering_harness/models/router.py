@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Annotated
+from typing import Annotated, Any
 
 from pydantic import BaseModel, ConfigDict, StringConstraints, field_validator
 
@@ -155,6 +155,43 @@ class ModelRouter:
             try:
                 response = provider.complete(
                     prompt,
+                    cancellation_token=cancellation_token,
+                )
+            except ProviderError as exc:
+                if not exc.retryable:
+                    raise
+                last_transient_error = exc
+                continue
+
+            if response.provider != provider_id:
+                raise ModelRoutingIntegrityError(
+                    "provider retornado não corresponde ao candidato selecionado"
+                )
+            self.budget_tracker.add_tokens(response.total_tokens)
+            return response
+
+        assert last_transient_error is not None
+        raise last_transient_error
+
+    def call_tools_with_fallback(
+        self,
+        prompt: str,
+        tools: list[dict[str, Any]],
+        primary_provider_id: str | None = None,
+        fallback_provider_ids: list[str] | tuple[str, ...] | None = None,
+        *,
+        cancellation_token: CancellationToken | None = None,
+    ) -> LLMResponse:
+        """Call provider tools with the same F3.2 route, budget and fallback rules."""
+        candidates = self.validate_route(primary_provider_id, fallback_provider_ids)
+        last_transient_error: ProviderError | None = None
+        for provider_id in candidates:
+            self.budget_tracker.ensure_available()
+            provider = self._create_provider(provider_id)
+            try:
+                response = provider.call_tools(
+                    prompt,
+                    tools,
                     cancellation_token=cancellation_token,
                 )
             except ProviderError as exc:
