@@ -33,7 +33,7 @@ devem ser corrigidos para refletir a decisão. Nunca depender somente do histór
 | **Fase concluída** | Fase 2 — F2.1–F2.6 implementadas e promovidas |
 | **Fase ativa** | Fase 3 — realinhamento obrigatório antes de F3.4 (DEC-012) |
 | **Tarefa ativa** | `F3.C1` — integridade de modelo e model-turn |
-| **Gate** | `READY`; `ACTIVE` |
+| **Gate** | `READY`; `ACTIVE`; implementação e aceite local verdes, commit pendente |
 | **Executor ativo** | `Codex`, único escritor |
 | **Workspace** | `C:\Users\walla\OneDrive\Desktop\ai-engineering-harness` |
 | **Branch** | `task/f3.c1-model-turn-integrity`, criada de `0e64a88fbe1ca28b8da6a4598a4f4391ba916dd1` |
@@ -61,20 +61,22 @@ Leia integralmente: [F3.C1](docs/tasks/active/F3.C1.md) e o
 | **Objetivo** | corrigir continuação nativa, JSON/usage/cancelamento e preservar todos os model calls em sucesso, falha e journal |
 | **Escopo** | provider/router, tool loop, metadata do node, replay compatível, documentação e testes focados |
 | **Proibido** | dispatch/durabilidade/policy F3.C2, path/terminal/worktree/edição F3.4–F3.8, dependências e CI |
-| **Estado local** | gate documental pronto; implementação ainda não iniciada neste checkpoint |
+| **Estado local** | implementação concluída no worktree; `527 passed, 1 skipped, 6 subtests`; quality, package e escopo verdes; ainda sem commit de implementação |
 | **Estado remoto** | branch F3.C1 ainda não publicada; nenhum PR/CI/merge antecipado |
 
 ## 6. Bloqueios atuais
 
-Nenhum bloqueio ativo.
+A escrita em `.git` foi recusada antes de `git add/commit` pelo revisor de permissão do ambiente por
+limite de uso da conta. Nenhum arquivo foi staged e HEAD permanece em `2ecadf9`. É necessária nova
+aprovação explícita do usuário, após este aviso, para tentar a operação Git autorizada.
 
 ## 7. Próxima ação exata
 
 ```text
 EXECUTAR SOMENTE F3.C1:
-1. Implementar exatamente o escopo congelado no dossiê ativo.
-2. Executar focais, compatibilidade, documentação, suíte completa, quality, package e escopo.
-3. Revisar o diff, registrar evidências e publicar o único PR F3.C1.
+1. Após aprovação explícita, registrar o commit de implementação já validado.
+2. Atualizar o fechamento local/checkpoint e repetir documentação/diff/scope.
+3. Revisar o diff final e publicar o único PR F3.C1.
 4. Inspecionar todos os jobs; merge proibido com check pendente/ausente/ignorado/falho ou conflito.
 5. Com 100% verde, fazer merge commit; aguardar CI push em main no SHA exato e sincronizar main.
 6. PAUSAR. F3.C2 exige nova autorização explícita do usuário; não avançar automaticamente.
@@ -101,4 +103,4 @@ EXECUTAR SOMENTE F3.C1:
 
 ---
 
-*Atualizado em: 2026-08-07 | Fonte normativa: plano principal + DEC-012*
+*Atualizado em: 2026-08-08 | Fonte normativa: plano principal + DEC-012*

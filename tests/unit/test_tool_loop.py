@@ -18,6 +18,7 @@ from ai_engineering_harness.models import (
     CancellationToken,
     LLMResponse,
     ModelRouter,
+    ModelToolConversation,
     ProviderTimeoutError,
     ToolCall,
 )
@@ -46,6 +47,7 @@ class _ToolProvider:
         self.provider_id = provider_id
         self.outcomes = outcomes
         self.prompts: list[str] = []
+        self.conversations: list[ModelToolConversation] = []
         self.schemas: list[list[dict[str, Any]]] = []
 
     def call_tools(
@@ -55,6 +57,19 @@ class _ToolProvider:
         **_: object,
     ) -> LLMResponse:
         self.prompts.append(prompt)
+        self.schemas.append(tools)
+        outcome = self.outcomes.pop(0)
+        if isinstance(outcome, Exception):
+            raise outcome
+        return outcome
+
+    def continue_tools(
+        self,
+        conversation: ModelToolConversation,
+        tools: list[dict[str, Any]],
+        **_: object,
+    ) -> LLMResponse:
+        self.conversations.append(conversation)
         self.schemas.append(tools)
         outcome = self.outcomes.pop(0)
         if isinstance(outcome, Exception):
@@ -228,10 +243,22 @@ def test_compiled_policy_tool_result_returns_to_model_and_final_response_stops()
     assert result.final_response.content == "final answer"
     assert result.model_calls == 2
     assert result.model_call.response_id == "resp-2"
+    assert [call.response_id for call in result.model_call_records] == [
+        "resp-1",
+        "resp-2",
+    ]
     assert router.budget_tracker.consumed_tokens == 6
     assert provider.schemas[0][0]["name"] == "knowledge_retriever"
-    assert "<tool_loop_transcript>" in provider.prompts[1]
-    assert '"matches":["F3.3"]' in provider.prompts[1]
+    assert provider.prompts == ["system and user prompt"]
+    assert len(provider.conversations) == 1
+    continuation = provider.conversations[0]
+    assert continuation.initial_prompt == "system and user prompt"
+    assert continuation.turns[0].response.response_id == "resp-1"
+    assert continuation.turns[0].tool_results[0].model_dump(mode="json") == {
+        "call_id": "call-1",
+        "name": "knowledge_retriever",
+        "result": {"matches": ["F3.3"]},
+    }
     assert result.tool_executions[0].arguments_digest.startswith("sha256:")
     assert result.tool_executions[0].redacted_result == '{"matches":["F3.3"]}'
 
@@ -262,6 +289,63 @@ def test_transient_model_failure_falls_back_within_one_tool_turn() -> None:
 
     assert result.final_response.provider == "local"
     assert registry.created == ["openai", "local"]
+
+
+def test_continuation_failure_preserves_completed_model_call_evidence() -> None:
+    tool_router = _tool_router(lambda payload: payload)
+    provider = _ToolProvider(
+        "local",
+        [
+            _response(calls=(_call(),), index=1),
+            ProviderTimeoutError("timeout", provider_id="local"),
+        ],
+    )
+    loop, _ = _loop(provider, tool_router)
+
+    with pytest.raises(ToolLoopError) as captured:
+        _execute(loop, tool_router)
+
+    assert [call.response_id for call in captured.value.model_call_records] == [
+        "resp-1"
+    ]
+    assert len(captured.value.tool_executions) == 1
+    assert provider.prompts == ["system and user prompt"]
+    assert len(provider.conversations) == 1
+
+
+def test_cancel_after_continuation_response_preserves_both_model_calls() -> None:
+    token = CancellationToken()
+
+    class _CancelAfterContinuationProvider(_ToolProvider):
+        def continue_tools(
+            self,
+            conversation: ModelToolConversation,
+            tools: list[dict[str, Any]],
+            **kwargs: object,
+        ) -> LLMResponse:
+            response = super().continue_tools(conversation, tools, **kwargs)
+            token.cancel()
+            return response
+
+    tool_router = _tool_router(lambda payload: payload)
+    provider = _CancelAfterContinuationProvider(
+        "local",
+        [
+            _response(calls=(_call(),), index=1),
+            _response(content="cancelled final", index=2),
+        ],
+    )
+    loop, router = _loop(provider, tool_router)
+
+    with pytest.raises(ToolLoopError) as captured:
+        _execute(loop, tool_router, cancellation_token=token)
+
+    assert [call.response_id for call in captured.value.model_call_records] == [
+        "resp-1",
+        "resp-2",
+    ]
+    assert len(captured.value.tool_executions) == 1
+    assert router.budget_tracker.consumed_tokens == 3
 
 
 @pytest.mark.parametrize(
@@ -384,6 +468,9 @@ def test_tool_error_stops_without_another_model_call_and_carries_failed_record()
 
     assert len(provider.prompts) == 1
     assert len(captured.value.tool_executions) == 1
+    assert [call.response_id for call in captured.value.model_call_records] == [
+        "resp-1"
+    ]
     record = captured.value.tool_executions[0]
     assert record.succeeded is False
     assert record.error_code == "ToolExecutionError"

@@ -211,6 +211,14 @@ class ModelCallMetadata(_StrictFrozenModel):
     request_id: _NonEmptyStr | None = None
     response_id: _NonEmptyStr
 
+    @model_validator(mode="after")
+    def require_consistent_usage(self) -> ModelCallMetadata:
+        if self.total_tokens != self.prompt_tokens + self.completion_tokens:
+            raise ValueError(
+                "total_tokens must equal prompt_tokens + completion_tokens"
+            )
+        return self
+
     @classmethod
     def from_response(cls, response: LLMResponse) -> ModelCallMetadata:
         return cls(
@@ -275,12 +283,12 @@ class NodeExecutionResult(_StrictFrozenModel):
     succeeded: bool
     output: dict[str, object]
     failure: NodeExecutionFailure | None = None
-    model_call: ModelCallMetadata | None = None
+    model_calls: tuple[ModelCallMetadata, ...] = ()
     tool_executions: tuple[ToolExecutionRecord, ...] = ()
 
-    @field_validator("tool_executions", mode="before")
+    @field_validator("model_calls", "tool_executions", mode="before")
     @classmethod
-    def freeze_tool_executions(cls, value: object) -> object:
+    def freeze_records(cls, value: object) -> object:
         return tuple(value) if isinstance(value, list) else value
 
     @field_validator("output", mode="before")
@@ -302,7 +310,15 @@ class NodeExecutionResult(_StrictFrozenModel):
             raise ValueError("tool execution call IDs must be unique")
         if self.succeeded and any(not record.succeeded for record in self.tool_executions):
             raise ValueError("a successful node result cannot contain a failed tool record")
+        response_ids = tuple(record.response_id for record in self.model_calls)
+        if len(set(response_ids)) != len(response_ids):
+            raise ValueError("model call response IDs must be unique")
         return self
+
+    @property
+    def model_call(self) -> ModelCallMetadata | None:
+        """Compatibility accessor for the last completed model call."""
+        return self.model_calls[-1] if self.model_calls else None
 
     @classmethod
     def completed(
@@ -310,12 +326,14 @@ class NodeExecutionResult(_StrictFrozenModel):
         output: dict[str, object],
         *,
         model_call: ModelCallMetadata | None = None,
+        model_calls: tuple[ModelCallMetadata, ...] = (),
         tool_executions: tuple[ToolExecutionRecord, ...] = (),
     ) -> NodeExecutionResult:
+        normalised_model_calls = _normalise_model_calls(model_call, model_calls)
         return cls(
             succeeded=True,
             output=output,
-            model_call=model_call,
+            model_calls=normalised_model_calls,
             tool_executions=tool_executions,
         )
 
@@ -329,8 +347,10 @@ class NodeExecutionResult(_StrictFrozenModel):
         retryable: bool,
         retry_evidence: RetryEvidence | None = None,
         model_call: ModelCallMetadata | None = None,
+        model_calls: tuple[ModelCallMetadata, ...] = (),
         tool_executions: tuple[ToolExecutionRecord, ...] = (),
     ) -> NodeExecutionResult:
+        normalised_model_calls = _normalise_model_calls(model_call, model_calls)
         return cls(
             succeeded=False,
             output=output,
@@ -340,7 +360,7 @@ class NodeExecutionResult(_StrictFrozenModel):
                 retryable=retryable,
                 retry_evidence=retry_evidence,
             ),
-            model_call=model_call,
+            model_calls=normalised_model_calls,
             tool_executions=tool_executions,
         )
 
@@ -478,6 +498,15 @@ def _copy_json_object(value: object, *, path: str) -> dict[str, object]:
     if not isinstance(copied, dict):
         raise TypeError(f"{path} must be a JSON object")
     return copied
+
+
+def _normalise_model_calls(
+    model_call: ModelCallMetadata | None,
+    model_calls: tuple[ModelCallMetadata, ...],
+) -> tuple[ModelCallMetadata, ...]:
+    if model_call is not None and model_calls:
+        raise ValueError("model_call and model_calls cannot be supplied together")
+    return (model_call,) if model_call is not None else model_calls
 
 
 def _copy_json_value(value: object, *, path: str) -> object:

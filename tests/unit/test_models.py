@@ -15,6 +15,11 @@ from ai_engineering_harness.models.adapters.local import LocalAdapter
 from ai_engineering_harness.models.adapters.openai import OpenAIAdapter
 from ai_engineering_harness.models.provider import (
     CancellationToken,
+    LLMResponse,
+    ModelToolConversation,
+    ModelToolConversationTurn,
+    ModelToolResult,
+    OpenAICompatibleHTTPProvider,
     ProviderAuthError,
     ProviderCancelledError,
     ProviderInvalidRequestError,
@@ -78,6 +83,21 @@ def _json_response(request: httpx.Request, payload: dict[str, Any]) -> httpx.Res
         json=payload,
         request=request,
     )
+
+
+def _tool_schema(name: str = "read_file") -> list[dict[str, Any]]:
+    return [
+        {
+            "name": name,
+            "description": "Read one file",
+            "parameters": {
+                "type": "object",
+                "properties": {"path": {"type": "string"}},
+                "required": ["path"],
+                "additionalProperties": False,
+            },
+        }
+    ]
 
 
 def test_openai_provider_executes_responses_http_and_preserves_real_metadata() -> None:
@@ -239,6 +259,238 @@ def test_chat_tool_schema_has_no_responses_only_nested_type() -> None:
     assert response.tool_calls[0].arguments == {"query": "x"}
 
 
+def test_responses_native_continuation_sends_function_call_output() -> None:
+    bodies: list[dict[str, Any]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        bodies.append(json.loads(request.content))
+        if len(bodies) == 1:
+            return _json_response(
+                request,
+                _responses_payload(
+                    output=[
+                        {
+                            "type": "reasoning",
+                            "id": "reasoning-native",
+                            "summary": [],
+                            "encrypted_content": "opaque-state",
+                        },
+                        {
+                            "type": "function_call",
+                            "id": "function-native",
+                            "call_id": "call-native",
+                            "name": "read_file",
+                            "arguments": '{"path":"README.md"}',
+                            "status": "completed",
+                        }
+                    ]
+                ),
+            )
+        return _json_response(request, _responses_payload(content="done"))
+
+    provider = OpenAIAdapter(
+        api_key=_API_KEY,
+        transport=httpx.MockTransport(handler),
+    )
+    tools = _tool_schema()
+    first = provider.call_tools("inspect", tools)
+    conversation = ModelToolConversation(
+        initial_prompt="inspect",
+        turns=(
+            ModelToolConversationTurn(
+                response=first,
+                tool_results=(
+                    ModelToolResult(
+                        call_id="call-native",
+                        name="read_file",
+                        result={"text": "README"},
+                    ),
+                ),
+            ),
+        ),
+    )
+
+    final = provider.continue_tools(conversation, tools)
+
+    assert final.content == "done"
+    assert bodies[0]["input"] == "inspect"
+    assert bodies[1]["input"] == [
+        {"role": "user", "content": "inspect"},
+        {
+            "type": "reasoning",
+            "id": "reasoning-native",
+            "summary": [],
+            "encrypted_content": "opaque-state",
+        },
+        {
+            "type": "function_call",
+            "id": "function-native",
+            "call_id": "call-native",
+            "name": "read_file",
+            "arguments": '{"path":"README.md"}',
+            "status": "completed",
+        },
+        {
+            "type": "function_call_output",
+            "call_id": "call-native",
+            "output": '{"text":"README"}',
+        },
+    ]
+    assert "tool_loop_transcript" not in json.dumps(bodies)
+    assert bodies[1]["tools"] == bodies[0]["tools"]
+    assert "continuation_state" not in first.model_dump()
+
+
+def test_responses_cross_provider_continuation_uses_normalised_calls() -> None:
+    first_provider = OpenAIAdapter(
+        api_key=_API_KEY,
+        transport=httpx.MockTransport(
+            lambda request: _json_response(
+                request,
+                _responses_payload(
+                    output=[
+                        {
+                            "type": "reasoning",
+                            "id": "reasoning-provider-bound",
+                            "summary": [],
+                            "encrypted_content": "must-not-cross-provider",
+                        },
+                        {
+                            "type": "function_call",
+                            "id": "function-provider-bound",
+                            "call_id": "call-cross-provider",
+                            "name": "read_file",
+                            "arguments": '{"path":"README.md"}',
+                            "status": "completed",
+                        },
+                    ]
+                ),
+            )
+        ),
+    )
+    first = first_provider.call_tools("inspect", _tool_schema())
+    observed: dict[str, Any] = {}
+
+    def fallback_handler(request: httpx.Request) -> httpx.Response:
+        observed.update(json.loads(request.content))
+        return _json_response(request, _responses_payload(content="done"))
+
+    fallback_provider = OpenAICompatibleHTTPProvider(
+        provider_id="fallback",
+        model_name="fallback-model",
+        base_url="https://fallback.invalid/v1",
+        api_style="responses",
+        api_key=None,
+        requires_api_key=False,
+        transport=httpx.MockTransport(fallback_handler),
+    )
+    conversation = ModelToolConversation(
+        initial_prompt="inspect",
+        turns=(
+            ModelToolConversationTurn(
+                response=first,
+                tool_results=(
+                    ModelToolResult(
+                        call_id="call-cross-provider",
+                        name="read_file",
+                        result={"text": "README"},
+                    ),
+                ),
+            ),
+        ),
+    )
+
+    fallback_provider.continue_tools(conversation, _tool_schema())
+
+    assert observed["input"] == [
+        {"role": "user", "content": "inspect"},
+        {
+            "type": "function_call",
+            "call_id": "call-cross-provider",
+            "name": "read_file",
+            "arguments": '{"path":"README.md"}',
+        },
+        {
+            "type": "function_call_output",
+            "call_id": "call-cross-provider",
+            "output": '{"text":"README"}',
+        },
+    ]
+    assert "must-not-cross-provider" not in json.dumps(observed)
+
+
+def test_chat_native_continuation_sends_assistant_and_tool_messages() -> None:
+    bodies: list[dict[str, Any]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        bodies.append(json.loads(request.content))
+        if len(bodies) == 1:
+            return _json_response(
+                request,
+                _chat_payload(
+                    content=None,
+                    tool_calls=[
+                        {
+                            "id": "call-chat",
+                            "type": "function",
+                            "function": {
+                                "name": "read_file",
+                                "arguments": '{"path":"README.md"}',
+                            },
+                        }
+                    ],
+                ),
+            )
+        return _json_response(request, _chat_payload(content="done"))
+
+    provider = LocalAdapter(transport=httpx.MockTransport(handler))
+    tools = _tool_schema()
+    first = provider.call_tools("inspect", tools)
+    conversation = ModelToolConversation(
+        initial_prompt="inspect",
+        turns=(
+            ModelToolConversationTurn(
+                response=first,
+                tool_results=(
+                    ModelToolResult(
+                        call_id="call-chat",
+                        name="read_file",
+                        result={"text": "README"},
+                    ),
+                ),
+            ),
+        ),
+    )
+
+    final = provider.continue_tools(conversation, tools)
+
+    assert final.content == "done"
+    assert bodies[1]["messages"] == [
+        {"role": "user", "content": "inspect"},
+        {
+            "role": "assistant",
+            "content": None,
+            "tool_calls": [
+                {
+                    "id": "call-chat",
+                    "type": "function",
+                    "function": {
+                        "name": "read_file",
+                        "arguments": '{"path":"README.md"}',
+                    },
+                }
+            ],
+        },
+        {
+            "role": "tool",
+            "tool_call_id": "call-chat",
+            "content": '{"text":"README"}',
+        },
+    ]
+    assert "tool_loop_transcript" not in json.dumps(bodies)
+    assert bodies[1]["tools"] == bodies[0]["tools"]
+
+
 def test_structured_output_is_requested_and_validated_locally() -> None:
     observed_body: dict[str, Any] = {}
     schema = {
@@ -291,6 +543,25 @@ def test_invalid_structured_output_fails_without_retry() -> None:
 
     assert exc_info.value.retryable is False
     assert calls == 1
+
+
+@pytest.mark.parametrize("content", ['{"value":NaN}', '{"value":1,"value":2}'])
+def test_strict_json_structured_output_rejects_non_finite_and_duplicates(
+    content: str,
+) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return _json_response(request, _responses_payload(content=content))
+
+    provider = OpenAIAdapter(api_key=_API_KEY, transport=httpx.MockTransport(handler))
+    with pytest.raises(ProviderResponseError, match="structured output inválido"):
+        provider.structured_output(
+            "strict JSON",
+            {
+                "type": "object",
+                "properties": {"value": {"type": "number"}},
+                "required": ["value"],
+            },
+        )
 
 
 def test_rate_limit_error_retries_then_returns_real_response() -> None:
@@ -454,6 +725,78 @@ def test_invalid_tool_arguments_from_provider_fail_closed() -> None:
         provider.call_tools(
             "tool",
             [{"name": "read_file", "parameters": {"type": "object"}}],
+        )
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    [
+        '{"value":NaN}',
+        '{"value":Infinity}',
+        '{"value":-Infinity}',
+        '{"value":1,"value":2}',
+    ],
+)
+def test_strict_json_tool_arguments_reject_non_finite_and_duplicates(
+    arguments: str,
+) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return _json_response(
+            request,
+            _responses_payload(
+                output=[
+                    {
+                        "type": "function_call",
+                        "call_id": "call-strict",
+                        "name": "read_file",
+                        "arguments": arguments,
+                    }
+                ]
+            ),
+        )
+
+    provider = OpenAIAdapter(api_key=_API_KEY, transport=httpx.MockTransport(handler))
+    with pytest.raises(ProviderResponseError, match="resposta incompatível"):
+        provider.call_tools("tool", _tool_schema())
+
+
+def test_strict_json_http_payload_rejects_duplicate_keys() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            text=(
+                '{"id":"one","id":"two","model":"m","status":"completed",'
+                '"output":[],"usage":{"input_tokens":1,"output_tokens":1,'
+                '"total_tokens":2}}'
+            ),
+            request=request,
+        )
+
+    provider = OpenAIAdapter(api_key=_API_KEY, transport=httpx.MockTransport(handler))
+    with pytest.raises(ProviderResponseError, match="JSON inválido"):
+        provider.complete("strict")
+
+
+def test_usage_consistency_rejects_provider_and_direct_response_mismatch() -> None:
+    payload = _responses_payload()
+    payload["usage"]["total_tokens"] = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return _json_response(request, payload)
+
+    provider = OpenAIAdapter(api_key=_API_KEY, transport=httpx.MockTransport(handler))
+    with pytest.raises(ProviderResponseError, match="total_tokens"):
+        provider.complete("usage consistency")
+
+    with pytest.raises(ValueError, match="total_tokens"):
+        LLMResponse(
+            content="invalid",
+            provider="local",
+            model_name="model",
+            prompt_tokens=100,
+            completion_tokens=100,
+            total_tokens=0,
+            response_id="invalid-usage",
         )
 
 

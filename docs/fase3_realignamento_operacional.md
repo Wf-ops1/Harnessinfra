@@ -63,7 +63,9 @@ Uma autorização ampla para “executar a Fase 3” não substitui a autorizaç
 ### Resultado obrigatório
 
 - continuação de tools representada por contrato tipado e provider-neutral;
-- Responses API recebe itens nativos `function_call`/`function_call_output` no segundo request;
+- Responses API com estado manual preserva todos os itens de `response.output`, inclusive reasoning,
+  e recebe `function_call_output` no segundo request; estado provider-native permanece só em memória
+  e só retorna ao mesmo provider, enquanto fallback usa a representação normalizada;
 - Chat Completions recebe mensagem `assistant.tool_calls` e mensagens `role=tool` com
   `tool_call_id` no segundo request;
 - nenhum provider real recebe transcript textual como substituto do protocolo nativo;

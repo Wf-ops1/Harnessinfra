@@ -7,11 +7,13 @@ from typing import Annotated, Any
 
 from pydantic import BaseModel, ConfigDict, StringConstraints, field_validator
 
-from ai_engineering_harness.governance.budget import BudgetTracker
+from ai_engineering_harness.governance.budget import BudgetExceededError, BudgetTracker
 from ai_engineering_harness.models.provider import (
     BaseLLMProvider,
     CancellationToken,
     LLMResponse,
+    ModelToolConversation,
+    ProviderCancelledError,
     ProviderError,
 )
 from ai_engineering_harness.models.registry import ProviderConfiguration, ProviderRegistry
@@ -29,6 +31,32 @@ class ModelEgressDeniedError(PermissionError):
 
 class ModelRoutingIntegrityError(RuntimeError):
     """O provider respondeu com identidade incompatível com a rota selecionada."""
+
+    def __init__(self, message: str, *, response: LLMResponse) -> None:
+        super().__init__(message)
+        self.response = response
+
+
+class ModelResponseCancelledError(ProviderCancelledError):
+    """Cancellation observed after a response completed but before charging."""
+
+    def __init__(self, response: LLMResponse, *, provider_id: str) -> None:
+        super().__init__(
+            "chamada do provider cancelada após a resposta",
+            provider_id=provider_id,
+        )
+        self.response = response
+
+
+class ModelResponseBudgetExceededError(BudgetExceededError):
+    """Budget exceeded by a completed response whose metadata must survive."""
+
+    def __init__(self, response: LLMResponse, cause: BudgetExceededError) -> None:
+        super().__init__(
+            max_tokens=cause.max_tokens,
+            consumed_tokens=cause.consumed_tokens,
+        )
+        self.response = response
 
 
 class ModelRouteConfiguration(BaseModel):
@@ -150,6 +178,7 @@ class ModelRouter:
         candidates = self.validate_route(primary_provider_id, fallback_provider_ids)
         last_transient_error: ProviderError | None = None
         for provider_id in candidates:
+            self._raise_if_cancelled(cancellation_token, provider_id=provider_id)
             self.budget_tracker.ensure_available()
             provider = self._create_provider(provider_id)
             try:
@@ -158,16 +187,23 @@ class ModelRouter:
                     cancellation_token=cancellation_token,
                 )
             except ProviderError as exc:
+                self._raise_if_cancelled(cancellation_token, provider_id=provider_id)
                 if not exc.retryable:
                     raise
                 last_transient_error = exc
                 continue
 
+            self._raise_if_cancelled(
+                cancellation_token,
+                provider_id=provider_id,
+                response=response,
+            )
             if response.provider != provider_id:
                 raise ModelRoutingIntegrityError(
-                    "provider retornado não corresponde ao candidato selecionado"
+                    "provider retornado não corresponde ao candidato selecionado",
+                    response=response,
                 )
-            self.budget_tracker.add_tokens(response.total_tokens)
+            self._charge_response(response)
             return response
 
         assert last_transient_error is not None
@@ -186,6 +222,7 @@ class ModelRouter:
         candidates = self.validate_route(primary_provider_id, fallback_provider_ids)
         last_transient_error: ProviderError | None = None
         for provider_id in candidates:
+            self._raise_if_cancelled(cancellation_token, provider_id=provider_id)
             self.budget_tracker.ensure_available()
             provider = self._create_provider(provider_id)
             try:
@@ -195,20 +232,96 @@ class ModelRouter:
                     cancellation_token=cancellation_token,
                 )
             except ProviderError as exc:
+                self._raise_if_cancelled(cancellation_token, provider_id=provider_id)
                 if not exc.retryable:
                     raise
                 last_transient_error = exc
                 continue
 
+            self._raise_if_cancelled(
+                cancellation_token,
+                provider_id=provider_id,
+                response=response,
+            )
             if response.provider != provider_id:
                 raise ModelRoutingIntegrityError(
-                    "provider retornado não corresponde ao candidato selecionado"
+                    "provider retornado não corresponde ao candidato selecionado",
+                    response=response,
                 )
-            self.budget_tracker.add_tokens(response.total_tokens)
+            self._charge_response(response)
             return response
 
         assert last_transient_error is not None
         raise last_transient_error
+
+    def continue_tools_with_fallback(
+        self,
+        conversation: ModelToolConversation,
+        tools: list[dict[str, Any]],
+        primary_provider_id: str | None = None,
+        fallback_provider_ids: list[str] | tuple[str, ...] | None = None,
+        *,
+        cancellation_token: CancellationToken | None = None,
+    ) -> LLMResponse:
+        """Continue a native typed tool conversation under the same route rules."""
+        candidates = self.validate_route(primary_provider_id, fallback_provider_ids)
+        last_transient_error: ProviderError | None = None
+        for provider_id in candidates:
+            self._raise_if_cancelled(cancellation_token, provider_id=provider_id)
+            self.budget_tracker.ensure_available()
+            provider = self._create_provider(provider_id)
+            try:
+                response = provider.continue_tools(
+                    conversation,
+                    tools,
+                    cancellation_token=cancellation_token,
+                )
+            except ProviderError as exc:
+                self._raise_if_cancelled(cancellation_token, provider_id=provider_id)
+                if not exc.retryable:
+                    raise
+                last_transient_error = exc
+                continue
+
+            self._raise_if_cancelled(
+                cancellation_token,
+                provider_id=provider_id,
+                response=response,
+            )
+            if response.provider != provider_id:
+                raise ModelRoutingIntegrityError(
+                    "provider retornado não corresponde ao candidato selecionado",
+                    response=response,
+                )
+            self._charge_response(response)
+            return response
+
+        assert last_transient_error is not None
+        raise last_transient_error
+
+    def _charge_response(self, response: LLMResponse) -> None:
+        try:
+            self.budget_tracker.add_tokens(response.total_tokens)
+        except BudgetExceededError as exc:
+            raise ModelResponseBudgetExceededError(response, exc) from exc
+
+    @staticmethod
+    def _raise_if_cancelled(
+        token: CancellationToken | None,
+        *,
+        provider_id: str,
+        response: LLMResponse | None = None,
+    ) -> None:
+        if token is not None and token.is_cancelled:
+            if response is not None:
+                raise ModelResponseCancelledError(
+                    response,
+                    provider_id=provider_id,
+                )
+            raise ProviderCancelledError(
+                "chamada do provider cancelada antes do próximo candidato",
+                provider_id=provider_id,
+            )
 
     def _validate_egress(self, provider_id: str) -> None:
         if provider_id not in self.allowed_providers:

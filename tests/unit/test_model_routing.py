@@ -9,8 +9,10 @@ import pytest
 from ai_engineering_harness.core.config import ConfigResolver
 from ai_engineering_harness.governance import BudgetExceededError, BudgetTracker
 from ai_engineering_harness.models import (
+    CancellationToken,
     LLMResponse,
     ModelEgressDeniedError,
+    ModelResponseCancelledError,
     ModelRouter,
     ModelRoutingConfigurationError,
     ModelRoutingIntegrityError,
@@ -203,11 +205,60 @@ def test_provider_identity_mismatch_fails_closed() -> None:
     provider = _StaticProvider("openai", [_response("local")])
     registry = _StaticRegistry({"openai": provider})
 
-    with pytest.raises(ModelRoutingIntegrityError):
+    with pytest.raises(ModelRoutingIntegrityError) as captured:
         _router(registry, allowed=("openai",)).complete_with_fallback(
             "sentinel",
             fallback_provider_ids=(),
         )
+
+    assert captured.value.response.response_id == "resp-local"
+
+
+def test_cancel_after_transient_error_blocks_fallback_candidate() -> None:
+    token = CancellationToken()
+
+    class _CancellingProvider:
+        def complete(self, prompt: str, **_: object) -> LLMResponse:
+            token.cancel()
+            raise ProviderTimeoutError("timeout", provider_id="openai")
+
+    fallback = _StaticProvider("local", [_response("local")])
+    registry = _StaticRegistry(  # type: ignore[arg-type]
+        {"openai": _CancellingProvider(), "local": fallback}
+    )
+    router = _router(registry)
+
+    with pytest.raises(ProviderCancelledError):
+        router.complete_with_fallback("cancel", cancellation_token=token)
+
+    assert registry.created == ["openai"]
+    assert fallback.prompts == []
+    assert router.budget_tracker.consumed_tokens == 0
+
+
+def test_cancel_after_response_blocks_budget_and_return() -> None:
+    token = CancellationToken()
+
+    class _CancellingResponseProvider:
+        def complete(self, prompt: str, **_: object) -> LLMResponse:
+            token.cancel()
+            return _response("openai")
+
+    registry = _StaticRegistry(  # type: ignore[arg-type]
+        {"openai": _CancellingResponseProvider()}
+    )
+    router = _router(registry, allowed=("openai",))
+
+    with pytest.raises(ModelResponseCancelledError) as captured:
+        router.complete_with_fallback(
+            "cancel",
+            fallback_provider_ids=(),
+            cancellation_token=token,
+        )
+
+    assert registry.created == ["openai"]
+    assert router.budget_tracker.consumed_tokens == 0
+    assert captured.value.response.response_id == "resp-openai"
 
 
 @pytest.mark.parametrize(
