@@ -24,6 +24,7 @@ from ai_engineering_harness.contracts import (
     TerminalStateSpec,
 )
 from ai_engineering_harness.contracts.execution import ExecutionId
+from ai_engineering_harness.models.provider import LLMResponse
 
 _NonEmptyStr = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 _DigestStr = Annotated[str, StringConstraints(pattern=r"^sha256:[0-9a-f]{64}$")]
@@ -199,6 +200,30 @@ class NodeExecutionFailure(_StrictFrozenModel):
         return self
 
 
+class ModelCallMetadata(_StrictFrozenModel):
+    """Redaction-safe identity and usage of one completed model call."""
+
+    provider_id: _NonEmptyStr
+    model_name: _NonEmptyStr
+    prompt_tokens: int = Field(ge=0)
+    completion_tokens: int = Field(ge=0)
+    total_tokens: int = Field(ge=0)
+    request_id: _NonEmptyStr | None = None
+    response_id: _NonEmptyStr
+
+    @classmethod
+    def from_response(cls, response: LLMResponse) -> ModelCallMetadata:
+        return cls(
+            provider_id=response.provider,
+            model_name=response.model_name,
+            prompt_tokens=response.prompt_tokens,
+            completion_tokens=response.completion_tokens,
+            total_tokens=response.total_tokens,
+            request_id=response.request_id,
+            response_id=response.response_id,
+        )
+
+
 class NodeExecutionContext(_StrictFrozenModel):
     """Immutable context supplied to exactly one node backend invocation."""
 
@@ -229,6 +254,7 @@ class NodeExecutionResult(_StrictFrozenModel):
     succeeded: bool
     output: dict[str, object]
     failure: NodeExecutionFailure | None = None
+    model_call: ModelCallMetadata | None = None
 
     @field_validator("output", mode="before")
     @classmethod
@@ -244,8 +270,13 @@ class NodeExecutionResult(_StrictFrozenModel):
         return self
 
     @classmethod
-    def completed(cls, output: dict[str, object]) -> NodeExecutionResult:
-        return cls(succeeded=True, output=output)
+    def completed(
+        cls,
+        output: dict[str, object],
+        *,
+        model_call: ModelCallMetadata | None = None,
+    ) -> NodeExecutionResult:
+        return cls(succeeded=True, output=output, model_call=model_call)
 
     @classmethod
     def failed(
@@ -256,6 +287,7 @@ class NodeExecutionResult(_StrictFrozenModel):
         message: str,
         retryable: bool,
         retry_evidence: RetryEvidence | None = None,
+        model_call: ModelCallMetadata | None = None,
     ) -> NodeExecutionResult:
         return cls(
             succeeded=False,
@@ -266,6 +298,7 @@ class NodeExecutionResult(_StrictFrozenModel):
                 retryable=retryable,
                 retry_evidence=retry_evidence,
             ),
+            model_call=model_call,
         )
 
 
@@ -432,6 +465,7 @@ __all__ = [
     "FailedToolCall",
     "HumanApprovalNodeExecutor",
     "KnowledgeSyncNodeExecutor",
+    "ModelCallMetadata",
     "NodeBackendError",
     "NodeExecutionBackend",
     "NodeExecutionContext",

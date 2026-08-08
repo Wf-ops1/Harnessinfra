@@ -37,6 +37,7 @@ from ai_engineering_harness.security.redaction import Redactor
 
 from .node_executors import (
     FailedToolCall,
+    ModelCallMetadata,
     NodeBackendError,
     NodeExecutionContext,
     NodeExecutionFailure,
@@ -615,6 +616,7 @@ class GraphExecutor:
                         code="invalid_node_output",
                         message="node output did not satisfy its declared contract",
                         retryable=False,
+                        model_call=result.model_call,
                     )
 
             next_id = node.on_success if result.succeeded else node.on_failure
@@ -659,6 +661,7 @@ class GraphExecutor:
                 output_digest=output_digest,
                 record_revision=record.revision + 1,
                 next_retry_context_digest=next_retry_context_digest,
+                model_call=result.model_call,
             )
 
             replacement = self._next_record(
@@ -924,6 +927,7 @@ class GraphExecutor:
         record_revision: int | None = None,
         retry_context_digest: str | None = None,
         next_retry_context_digest: str | None = None,
+        model_call: ModelCallMetadata | None = None,
     ) -> None:
         payload: dict[str, object] = {
             "attempt": attempt,
@@ -946,6 +950,19 @@ class GraphExecutor:
         if failure is not None:
             payload["error_code"] = failure.code
             payload["retryable"] = failure.retryable
+        if model_call is not None:
+            payload.update(
+                {
+                    "model_provider": model_call.provider_id,
+                    "model_name": model_call.model_name,
+                    "model_prompt_tokens": model_call.prompt_tokens,
+                    "model_completion_tokens": model_call.completion_tokens,
+                    "model_total_tokens": model_call.total_tokens,
+                    "model_response_id": model_call.response_id,
+                }
+            )
+            if model_call.request_id is not None:
+                payload["model_request_id"] = model_call.request_id
         try:
             event = ExecutionEvent(
                 event_id=self._event_id_factory(),
@@ -1184,11 +1201,54 @@ class GraphExecutor:
                 expected_keys.update({"error_code", "retryable"})
             if "next_retry_context_digest" in payload:
                 expected_keys.add("next_retry_context_digest")
+            model_required_keys = {
+                "model_provider",
+                "model_name",
+                "model_prompt_tokens",
+                "model_completion_tokens",
+                "model_total_tokens",
+                "model_response_id",
+            }
+            model_optional_keys = {"model_request_id"}
+            model_keys_present = set(payload) & (
+                model_required_keys | model_optional_keys
+            )
+            if model_keys_present:
+                expected_keys.update(model_required_keys)
+                if "model_request_id" in payload:
+                    expected_keys.add("model_request_id")
             if set(payload) != expected_keys or open_started is None:
                 raise InterruptedNodeExecutionError(
                     "node outcome ledger is malformed or has no matching start",
                     execution_id=record.execution_id,
                 )
+            if model_keys_present:
+                self._ledger_string(payload["model_provider"], field="model_provider")
+                self._ledger_string(payload["model_name"], field="model_name")
+                self._ledger_integer(
+                    payload["model_prompt_tokens"],
+                    field="model_prompt_tokens",
+                    minimum=0,
+                )
+                self._ledger_integer(
+                    payload["model_completion_tokens"],
+                    field="model_completion_tokens",
+                    minimum=0,
+                )
+                self._ledger_integer(
+                    payload["model_total_tokens"],
+                    field="model_total_tokens",
+                    minimum=0,
+                )
+                self._ledger_string(
+                    payload["model_response_id"],
+                    field="model_response_id",
+                )
+                if "model_request_id" in payload:
+                    self._ledger_string(
+                        payload["model_request_id"],
+                        field="model_request_id",
+                    )
             node_id = self._ledger_string(payload["node_id"], field="node_id")
             attempt = self._ledger_integer(payload["attempt"], field="attempt", minimum=1)
             input_digest = self._ledger_digest(payload["input_digest"])

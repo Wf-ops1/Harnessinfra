@@ -8,7 +8,8 @@ import pytest
 from ai_engineering_harness.cli.commands.rollback import RollbackManager
 from ai_engineering_harness.compiler.compiler import GraphCompiler
 from ai_engineering_harness.contracts.execution import ExecutionState
-from ai_engineering_harness.models.router import ModelRouter
+from ai_engineering_harness.models.registry import ProviderConfiguration, ProviderRegistry
+from ai_engineering_harness.models.router import ModelRouter, ModelRoutingConfigurationError
 from ai_engineering_harness.observability.audit import AuditTrailManager
 from ai_engineering_harness.runtime.agent_executor import AgentExecutor
 from ai_engineering_harness.runtime.context_assembler import ContextAssembler, InsufficientContextError
@@ -107,6 +108,39 @@ def test_tool_router_blocks_unauthorized_tool(tmp_path: Path):
     
     with pytest.raises(PermissionError):
         executor.execute_tool("terminal_run", {"command": "dir", "cwd": "."})
+
+
+def test_agent_validates_full_model_route_before_composing_prompt(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    registry = ProviderRegistry(
+        {
+            "openai": ProviderConfiguration(
+                adapter="openai",
+                model="configured-model",
+            )
+        }
+    )
+    router = ModelRouter(
+        allowed_providers=("openai", "local"),
+        provider_registry=registry,
+        default_primary_provider="openai",
+    )
+    executor = AgentExecutor("Amelia", router, project_root=tmp_path)
+    composed = False
+
+    def compose(_: str) -> str:
+        nonlocal composed
+        composed = True
+        return "must-not-be-composed"
+
+    monkeypatch.setattr(executor, "_compose_prompt", compose)
+
+    with pytest.raises(ModelRoutingConfigurationError, match="não registrado"):
+        executor.execute_node("sensitive", fallback_providers=("local",))
+
+    assert composed is False
 
 
 def test_runtime_requires_explicit_graph_executor(tmp_path: Path):

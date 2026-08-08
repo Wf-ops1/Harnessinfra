@@ -48,7 +48,31 @@ class ConfigResolver:
             "context_sufficiency_threshold": 0.72,
             "approval_policy": "strict",
             "data_egress": {"allowed_providers": ["openai", "anthropic", "local"]},
-            "verification": {"enforce_applicable_only": True}
+            "models": {
+                "providers": {
+                    "openai": {
+                        "adapter": "openai",
+                        "model": "gpt-4o",
+                        "api_key_env": "OPENAI_API_KEY",
+                    },
+                    "anthropic": {
+                        "adapter": "anthropic",
+                        "model": "claude-3-5-sonnet",
+                        "api_key_env": "ANTHROPIC_API_KEY",
+                    },
+                    "local": {
+                        "adapter": "local",
+                        "model": "llama3",
+                        "base_url": "http://127.0.0.1:11434/v1",
+                    },
+                },
+                "routing": {
+                    "primary_provider": "local",
+                    "fallback_providers": [],
+                },
+            },
+            "budget": {"max_tokens": 100000},
+            "verification": {"enforce_applicable_only": True},
         }
         config = deep_merge(config, package_defaults)
 
@@ -84,4 +108,7 @@ class ConfigResolver:
         if cli_overrides:
             config = deep_merge(config, cli_overrides)
 
+        from ai_engineering_harness.models.router import ModelRouter
+
+        ModelRouter.validate_effective_config(config)
         return config
