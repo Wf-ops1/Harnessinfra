@@ -63,9 +63,9 @@ auditável. Isso é a direção do produto, não uma descrição do estado entre
 As seguintes implementações são deliberadamente tratadas como dívida técnica, não como capacidades
 operacionais:
 
-- [roteamento de modelos](src/ai_engineering_harness/models/router.py) ainda usa registry estático,
-  não conecta usage ao budget nem persiste provider/modelo nos node events; Anthropic permanece
-  explicitamente não implementado;
+- [adapters de modelos](src/ai_engineering_harness/models/adapters/) OpenAI/local já usam transporte
+  real e Anthropic falha explicitamente; o [roteamento de modelos](src/ai_engineering_harness/models/router.py)
+  ainda usa registry estático, não conecta usage ao budget nem persiste provider/modelo nos node events;
 - [SerenaAdapter](src/ai_engineering_harness/tools/adapters/serena.py) não abre conexão MCP nem aplica
   edição semântica;
 - [CodebaseMemoryAdapter](src/ai_engineering_harness/indexer/codebase_memory_adapter.py) persiste uma

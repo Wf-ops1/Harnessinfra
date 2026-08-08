@@ -33,7 +33,7 @@ devem ser corrigidos para refletir a decisão. Nunca depender somente do histór
 | **Fase concluída** | Fase 2 — F2.1–F2.6 implementadas e promovidas |
 | **Fase ativa** | Fase 3 — modelos, ferramentas e workspace reais |
 | **Tarefa ativa** | `F3.1` — implementar provider real de modelo |
-| **Gate** | `READY`; contrato congelado antes do primeiro arquivo de implementação |
+| **Gate** | `READY`; `COMPLETED_LOCAL / PROMOTION_PENDING` |
 | **Executor ativo** | `Codex`, único escritor |
 | **Workspace** | `C:\Users\walla\OneDrive\Desktop\ai-engineering-harness` |
 | **Branch** | `task/f3.1-model-provider`, criada de `1d08602dab90edc7eb9f8a72509fa5548abd80e3` |
@@ -60,7 +60,7 @@ Leia integralmente: [F3.1](docs/tasks/active/F3.1.md).
 | **Objetivo** | substituir respostas fabricadas por provider remoto e local reais, tipados e fail-closed |
 | **Escopo** | contratos/model adapters, testes determinísticos, teste live condicionado e documentação da tarefa |
 | **Proibido** | roteamento F3.2, loop F3.3, outras tarefas/fases, dependências, lockfile e CI |
-| **Estado local** | gate documental `READY`; implementação ainda não iniciada |
+| **Estado local** | `472 passed, 1 skip live condicionado, 6 subtests`; mypy/Ruff/compileall/lock/diff/escopo verdes |
 | **Estado remoto** | branch F3.1 ainda não publicada; nenhum PR/CI/merge antecipado |
 
 ## 6. Bloqueios atuais
@@ -70,12 +70,13 @@ Nenhum bloqueio ativo.
 ## 7. Próxima ação exata
 
 ```text
-IMPLEMENTAR SOMENTE F3.1 A PARTIR DE checkpoint/f3.1-ready:
-1. Implementar providers HTTP remoto/local, contratos tipados, falhas seguras e redaction do allowlist.
-2. Executar aceite focado/negativo/live condicionado, compatibilidade, suíte integral e quality gates.
-3. Revisar diff e escopo; registrar resultados reais no dossiê sem antecipar fatos remotos.
-4. Publicar somente task/f3.1-model-provider e abrir seu único PR para main.
-5. Nunca mesclar antes de todos os jobs, inclusive CI required, concluírem verdes e o PR estar sem conflitos.
+PROMOVER SOMENTE F3.1 EM SEU ÚNICO PR:
+1. Publicar somente task/f3.1-model-provider; não publicar tags.
+2. Abrir um único PR para main e aguardar explicitamente todos os jobs, incluindo CI required.
+3. Nunca mesclar com check pendente, ausente, ignorado ou falho, nem com conflito.
+4. Com todos os jobs verdes e branch atualizada, executar merge commit autorizado.
+5. Aguardar a CI de push da main, confirmar o SHA e os 11 jobs; sincronizar main local.
+6. Não abrir PR de fechamento; certificar/arquivar F3.1 no primeiro commit do gate F3.2.
 ```
 
 ## 8. Retomada após perda de contexto
