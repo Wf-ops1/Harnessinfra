@@ -65,22 +65,21 @@ F3.C2 exige nova autorização explícita; essa pausa foi cumprida e a autoriza�
 | **Escopo** | tool loop/router, recorder sob lock/fencing, policy no dispatch, replay, documentação e testes focados |
 | **Proibido** | path guard, terminal, worktree, promoção e edição F3.4–F3.8; dependências, schemas, adapters e CI |
 | **Estado local** | implementação e todos os gates congelados verdes; commits locais `8187158` e `93e6a03`; fechamento documental/tag complete neste checkpoint |
-| **Estado remoto** | branch F3.C2 somente local; nenhum push, PR, CI ou merge antecipado |
+| **Estado remoto** | PR [#24](https://github.com/Wf-ops1/Harnessinfra/pull/24) aberto contra `main`; run inicial `31242452446` enfileirado; merge não autorizado |
 
 ## 6. Bloqueios atuais
 
-Não há implementação ativa. Push e abertura do PR único da F3.C2 aguardam autorização explícita do
-usuário. F3.4 e qualquer efeito real de path, processo, worktree, promoção ou edição continuam bloqueados.
+Não há implementação ativa. Branch e PR #24 foram publicados com autorização; os checks do head final
+devem ficar integralmente verdes antes de pedir autorização de merge. F3.4 continua bloqueada.
 
 ## 7. Próxima ação exata
 
 ```text
 PAUSAR EM `COMPLETED_LOCAL / PROMOTION_PENDING`:
-1. Concluir o commit documental e a tag local `checkpoint/f3.c2-complete`.
-2. Não executar push nem abrir PR sem autorização explícita separada do usuário.
-3. Após autorização, publicar a branch, abrir um único PR para `main` e validar todos os checks do head.
-4. Merge exige autorização explícita própria depois da CI verde.
-5. F3.4 exige promoção completa da F3.C2, CI pós-merge verde, sincronização e nova autorização; não avançar automaticamente.
+1. Publicar esta reconciliação no mesmo PR #24 e observar todos os checks do novo head.
+2. Não executar merge sem autorização explícita própria depois da CI verde.
+3. Após merge autorizado, validar CI de `push` no SHA exato de `main` e sincronizar o repositório.
+4. F3.4 exige promoção completa da F3.C2 e nova autorização explícita; não avançar automaticamente.
 ```
 
 ## 8. Retomada após perda de contexto
