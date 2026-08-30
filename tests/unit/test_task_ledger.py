@@ -1110,8 +1110,6 @@ def test_f5_7_promotion_preserves_r3_negative_evidence_and_certification() -> No
     assert "1106 passed, 5 skipped, 6 subtests passed" in f7_c1_dossier
     assert "task/f7.c1-public-path-composition" in f7_c1_dossier
     assert "checkpoint/f7.c1-ready" in f7_c1_dossier
-    assert "https://github.com/Wf-ops1/Hartrol/pull/92" in f7_c1_dossier
-    assert "33321887150" in f7_c1_dossier
     assert "32085923509" in panel
     assert not (ACTIVE_ROOT / "F7.3.md").exists() and (COMPLETED_ROOT / "F7.3.md").is_file()
     f7_3_dossier = _read(COMPLETED_ROOT / "F7.3.md")

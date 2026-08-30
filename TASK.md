@@ -48,7 +48,7 @@
 | **Fase ativa** | Fase 7 — maturidade operacional |
 | **Tarefa ativa** | [F7.C1 — composição operacional do caminho público](docs/tasks/active/F7.C1.md) |
 | **Gate** | `REPAIR_ACTIVE / PROMOTION_BLOCKED` |
-| **Estado corrente** | PR [#92](https://github.com/Wf-ops1/Hartrol/pull/92) aberto no head inicial `f1d8cd0`; CI `33321887150` reprovou scan integral e E2E Windows; reparo mínimo local passou E2E `1/1` e ledger `21/21`, ainda sem push corretivo |
+| **Estado corrente** | PR [#92](https://github.com/Wf-ops1/Hartrol/pull/92) no head R1 `1e53e63`; CI `33323254683` aprovou ambos os Windows e outros nove jobs, scan code 3 por linhas deslocadas; R2 local preserva a baseline e passou docs `36/36`, Ruff e compileall |
 | **Estado F5.6** | F5.6 `PROMOTED`; aprovação de promoção permanece vinculada ao conteúdo exato |
 | **Executor ativo** | `Codex`, único escritor da F7.C1 |
 | **Workspace** | `C:\Users\walla\OneDrive\Desktop\ai-engineering-harness` |
@@ -255,7 +255,7 @@ fechamento integral da F6.6, com parada obrigatória antes da F6.7. A branch foi
 o PR #80 aberto e o head inicial `06abef0` certificado 11/11 pelo run `31967211097`.
 Autorizações posteriores encerraram F6.6/F6.7, produziram/promoveram F7.1 e abriram o PR #84. Sua cadeia encerrou no head `ceca850`, CI `31999182890`, merge `b46ebd9` e pós-merge `32000365336`, sem remover refs. Em `2026-08-17T03:21:29-03:00`, o usuário autorizou continuar a Fase 7; a cadeia F7.2 encerrou no head `09e0ee3`, PR #85/run `32038804579`, merge `53cafa5` e pós-merge `32039759737`, sem remover refs. Autorizações seguintes encerraram o PR administrativo #86 no head `b40f251`, CI `32043891060`, merge `4e9f7a25` e pós-merge `32045181204`. Em `2026-08-17T14:01:09-03:00`, iniciou F7.3; após a correção UTF-8, o head `97d2606` passou no run `32088471059`, foi incorporado pelo merge `be17bcb` e recebeu CI de push `32088913196` verde. A reconciliação [#88](https://github.com/Wf-ops1/Hartrol/pull/88) encerrou no head `3be0d12`, CI `32095513602`, merge `43bd135` e CI pós-merge `32096041236` verde. Em `2026-08-29`, o usuário autorizou concluir e publicar a revisão transversal; o PR #89 encerrou no merge `7b4dd3d` e CI `33287246294` verde. A autorização nominal seguinte abriu a preparação F7.4; em `2026-08-29T23:36:44-03:00`, `autorizo continue` aceitou a recomendação Apache-2.0 e autorizou a implementação local depois do checkpoint READY. O PR #90 encerrou no head `42b6f8f`/CI `33291856113`, merge `a62c164` e CI pós-merge `33292240896`; a branch de produto foi preservada e a reconciliação local foi autorizada.
 
-O fechamento posterior da F7.4 está em PR #91/head `f4b4f45`/CI `33293246380`/merge `0ea7f801`/pós-merge `33293579533`; em `2026-08-30`, a autorização específica publicou os três commits F7.C1 sem force/tags e abriu o PR #92. O run `33321887150` falhou no scan integral e no E2E Windows; o reparo R1 permanece somente local.
+O fechamento posterior da F7.4 está em PR #91/head `f4b4f45`/CI `33293246380`/merge `0ea7f801`/pós-merge `33293579533`; em `2026-08-30`, a autorização específica abriu o PR #92 e publicou o R1 `1e53e63`. O run `33323254683` confirmou Windows, mas o scan retornou 3 por deslocamento de linhas; o R2 permanece somente local.
 ## 5. Tarefa ativa
 
 A [F7.C1](docs/tasks/active/F7.C1.md) está `REPAIR_ACTIVE / PROMOTION_BLOCKED` no PR #92.
@@ -264,14 +264,14 @@ Novo push, merge, tags remotas e remoção de refs continuam sem autorização; 
 
 ## 6. Bloqueios e fronteiras externas
 
-`POST_PROMOTION_BLOCKED` permanece evidência histórica; o run `33321887150` é o negativo vigente: falso positivo documental no scan Linux e cache
-ocultado antes da build offline no Windows. O reparo local passou focalmente; novo push, merge, tag,
+`POST_PROMOTION_BLOCKED` permanece evidência histórica; o run `33323254683` é o negativo vigente: zero segredo novo, porém baseline desatualizada
+por quatro asserts redundantes. O R2 restaura os números originais; novo push, merge, tag,
 release e remoção de refs permanecem fora da autorização; a ordem é F7.C1 → F7.5 pela DEC-016.
 
 ## 7. Próxima ação exata
 
 ```text
-CONCLUIR A CERTIFICAÇÃO LOCAL E PEDIR AUTORIZAÇÃO PARA PUBLICAR O COMMIT CORRETIVO NO PR #92.
+PEDIR AUTORIZAÇÃO EXPLÍCITA PARA PUBLICAR O R2 CERTIFICADO NO PR #92.
 NÃO FAZER MERGE, NÃO INICIAR F7.5, NÃO PUBLICAR TAGS E NÃO REMOVER REFS.
 ```
 
@@ -297,4 +297,4 @@ NÃO FAZER MERGE, NÃO INICIAR F7.5, NÃO PUBLICAR TAGS E NÃO REMOVER REFS.
 18. Preserve PR #82: inicial `5ee3fcc`/`31978357679`; final `cfd97c6`/`31978820506`; merge `38849ed`; pós-merge `31979153948` 11/11. F7.1 parte somente dessa base.
 19. Preserve F7.1: `c55edaa`/`2ce104b`, `1/1`, `42/1`, `1050/5/6`; PR #83 final `a26807c`/`31985232560`, merge `76f43dd`/pós-merge `31985776520`.
 20. Preserve PR #84: final `ceca850`/`31999182890`, merge `b46ebd9`/pós-merge `32000365336`; F7.2 `1badf40`/`bdae858`/`09e0ee3`, PR #85/run `32038804579`, merge `53cafa5`/pós-merge `32039759737`; PR #86 final `b40f251`/`32043891060`, merge `4e9f7a25`/pós-merge `32045181204`; F7.3 negativo `32085923509`, final `97d2606`/`32088471059`, merge `be17bcb`/pós-merge `32088913196`, reconciliação #88 final `3be0d12`/`32095513602`, merge `43bd135`/pós-merge `32096041236`; F7.4 PR #90 final `42b6f8f`/`33291856113`, merge `a62c164`/pós-merge `33292240896`.
-*Atualizado em: 2026-08-30T13:28:54-03:00 | Fonte: PR #92/run 33321887150 negativo; reparo R1 local com E2E 1/1 e ledger 21/21; novo push não autorizado*
+*Atualizado em: 2026-08-30T13:56:56-03:00 | Fonte: PR #92/head 1e53e63/run 33323254683; Windows verde, scan code 3; R2 docs 36/36 sem baseline, push não autorizado*

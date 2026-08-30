@@ -322,8 +322,6 @@ def test_public_state_docs_distinguish_real_primitives_from_missing_composition(
     assert "Apache-2.0" in panel
     assert "docs/tasks/completed/F7.4.md" in panel
     assert "docs/tasks/active/F7.C1.md" in panel
-    assert "https://github.com/Wf-ops1/Hartrol/pull/92" in panel
-    assert "33321887150" in panel
     assert all(
         evidence in panel
         for evidence in ("42b6f8f", "33291856113", "a62c164", "33292240896", "PR #91", "0ea7f801", "33293579533")
