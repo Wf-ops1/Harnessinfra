@@ -47,8 +47,8 @@
 | **Fases concluídas** | Fases 0–4 no escopo planejado; F5.1–F5.7 e F5.C1, F6.1–F6.7 e F7.1–F7.4 terminalmente reconciliadas |
 | **Fase ativa** | Fase 7 — maturidade operacional |
 | **Tarefa ativa** | [F7.C1 — composição operacional do caminho público](docs/tasks/active/F7.C1.md) |
-| **Gate** | `READY` |
-| **Estado corrente** | lacuna reproduzida: `harness run new-feature` termina em `agent node executor backend is unavailable`; escopo congelado antes de produto |
+| **Gate** | `COMPLETED_LOCAL / PROMOTION_PENDING` |
+| **Estado corrente** | composição pública F7.C1 implementada no produto `2415f41`; full `1106/5/6`, cobertura F7.3, matriz, build/smoke e auditorias locais verdes; nenhuma ref remota publicada |
 | **Estado F5.6** | F5.6 `PROMOTED`; aprovação de promoção permanece vinculada ao conteúdo exato |
 | **Executor ativo** | `Codex`, único escritor da F7.C1 |
 | **Workspace** | `C:\Users\walla\OneDrive\Desktop\ai-engineering-harness` |
@@ -73,7 +73,7 @@
 | **Checkpoint F7.4** | `checkpoint/f7.4-ready` → `be777aeb79fbc3dd3eb604d49ec4de8cbc9ffbe4`; `checkpoint/f7.4-complete` → `9dc3b969933d7178e7c6313a59ccbc5c890eb9b4`, ambos somente locais | <!-- pragma: allowlist secret -->
 | **Promoção F7.4** | [PR #90](https://github.com/Wf-ops1/Hartrol/pull/90), head final `42b6f8fa39f348eb4866179a79b69456996dd309`, CI `33291856113`, merge `a62c16457bbd04cc9c30e31df65d429e30b2158f`, pós-merge `33292240896`; 11/11 + `CI required` verdes, branch remota preservada e sem tags remotas | <!-- pragma: allowlist secret -->
 | **Reconciliação F7.4** | PR #91, head final `f4b4f45`, CI `33293246380`, merge `0ea7f801`, pós-merge `33293579533`; 11 jobs mais `CI required` verdes |
-| **Checkpoint F7.C1** | `checkpoint/f7.c1-ready` será criado no commit documental antes de qualquer edição de produto; somente local |
+| **Checkpoint F7.C1** | `checkpoint/f7.c1-ready` → `caf1dad`; produto `2415f41`; `checkpoint/f7.c1-complete` apontará para o commit documental de certificação; todos somente locais |
 | **Implementação F7.2** | branch `task/f7.2-test-matrix`; baseline de 1055 testes coletáveis; produto `bdae858861a9c5294f90a231115b3ed930030117`; matriz canônica com 12 camadas/42 requisitos/46 node IDs e runner multiplataforma estrito |
 | **Validação F7.2** | matriz `62 passed in 83.45s`; full `1062 passed, 5 skipped, 6 subtests passed in 461.12s`; Ruff/mypy/compileall/build/smoke verdes |
 | **Promoção F7.2** | [PR #85](https://github.com/Wf-ops1/Hartrol/pull/85), head `09e0ee30e52e498b8fb8c3a128c2ffa5fc1ff6e8`, CI [32038804579](https://github.com/Wf-ops1/Hartrol/actions/runs/32038804579) tentativa #2 10/10 + `CI required`; merge `53cafa5134c3af5f4d0a7497b3f44e996a6581dd`; pós-merge [32039759737](https://github.com/Wf-ops1/Hartrol/actions/runs/32039759737) verde |
@@ -258,9 +258,9 @@ Autorizações posteriores encerraram F6.6/F6.7, produziram/promoveram F7.1 e ab
 O fechamento posterior da F7.4 está em PR #91/head `f4b4f45`/CI `33293246380`/merge `0ea7f801`/pós-merge `33293579533`; em `2026-08-30T02:11:04-03:00`, a autorização vigente foi aplicada à implementação local da F7.C1, sem efeitos remotos.
 ## 5. Tarefa ativa
 
-A [F7.C1](docs/tasks/active/F7.C1.md) está `READY` na branch local exclusiva. O problema público foi
-reproduzido, o predecessor está terminal e o allowlist foi congelado. A autorização vigente cobre
-implementação e certificação locais; publicação, PR, merge, tags remotas e remoção de refs não.
+A [F7.C1](docs/tasks/active/F7.C1.md) está `COMPLETED_LOCAL / PROMOTION_PENDING` na branch exclusiva.
+O produto `2415f41` e o aceite local integral estão certificados. Publicação, PR, merge, tags remotas
+e remoção de refs continuam sem autorização; F7.5 permanece bloqueada.
 
 ## 6. Bloqueios e fronteiras externas
 
@@ -271,8 +271,8 @@ refs permanecem fora da autorização; a ordem vigente é F7.C1 → F7.5 pela DE
 ## 7. Próxima ação exata
 
 ```text
-CRIAR O COMMIT DOCUMENTAL E O CHECKPOINT LOCAL `checkpoint/f7.c1-ready`.
-SOMENTE DEPOIS IMPLEMENTAR E CERTIFICAR A COMPOSIÇÃO PÚBLICA; NÃO PUBLICAR REFS.
+AGUARDAR AUTORIZAÇÃO EXPLÍCITA PARA PUBLICAR A BRANCH E ABRIR O PR DE PRODUTO F7.C1.
+NÃO INICIAR F7.5, NÃO PUBLICAR TAGS E NÃO REMOVER REFS.
 ```
 
 ## 8. Retomada após perda de contexto
@@ -297,4 +297,4 @@ SOMENTE DEPOIS IMPLEMENTAR E CERTIFICAR A COMPOSIÇÃO PÚBLICA; NÃO PUBLICAR R
 18. Preserve PR #82: inicial `5ee3fcc`/`31978357679`; final `cfd97c6`/`31978820506`; merge `38849ed`; pós-merge `31979153948` 11/11. F7.1 parte somente dessa base.
 19. Preserve F7.1: `c55edaa`/`2ce104b`, `1/1`, `42/1`, `1050/5/6`; PR #83 final `a26807c`/`31985232560`, merge `76f43dd`/pós-merge `31985776520`.
 20. Preserve PR #84: final `ceca850`/`31999182890`, merge `b46ebd9`/pós-merge `32000365336`; F7.2 `1badf40`/`bdae858`/`09e0ee3`, PR #85/run `32038804579`, merge `53cafa5`/pós-merge `32039759737`; PR #86 final `b40f251`/`32043891060`, merge `4e9f7a25`/pós-merge `32045181204`; F7.3 negativo `32085923509`, final `97d2606`/`32088471059`, merge `be17bcb`/pós-merge `32088913196`, reconciliação #88 final `3be0d12`/`32095513602`, merge `43bd135`/pós-merge `32096041236`; F7.4 PR #90 final `42b6f8f`/`33291856113`, merge `a62c164`/pós-merge `33292240896`.
-*Atualizado em: 2026-08-30T02:11:04-03:00 | Fonte: baseline F7.C1 e CI pós-reconciliação 33293579533 verdes; implementação somente local*
+*Atualizado em: 2026-08-30T04:05:03-03:00 | Fonte: produto local 2415f41, full 1106/5/6, coverage F7.3, matriz, segurança e wheel verdes; promoção não autorizada*
