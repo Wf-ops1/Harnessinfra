@@ -1075,7 +1075,7 @@ def test_f5_7_promotion_preserves_r3_negative_evidence_and_certification() -> No
         "914 passed, 5 skipped, 6 subtests passed em 328.79s",
     ):
         assert result in f5_c1_dossier
-    assert "| **Gate** | `COMPLETED_LOCAL / PROMOTION_PENDING` |" in panel
+    assert "| **Gate** | `PR_OPEN / CHECKS_PENDING` |" in panel
     assert "Apache-2.0" in panel
     assert "docs/tasks/active/F7.4.md" in panel
     assert "32085923509" in panel
