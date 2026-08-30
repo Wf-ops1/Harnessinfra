@@ -15,8 +15,9 @@ registry e backend determinísticos somente no teste; CLI/defaults ainda não co
 automaticamente essa fronteira.
 
 Não use `harness run`, `harness doctor`, `harness verify` ou `harness rollback` como garantia de segurança em um
-repositório valioso. Embora as Fases 0–4 estejam implementadas no escopo planejado, as Fases 5–7
-ainda não estão concluídas; execute esses comandos somente em cópias descartáveis.
+repositório valioso. As Fases 0–6 e as tarefas F7.1–F7.3 foram concluídas no escopo planejado, mas a
+composição automática do runtime padrão continua pendente; F7.4, a corretiva F7.C1 e F7.5 ainda não
+começaram. Execute esses comandos somente em cópias descartáveis.
 
 ## Objetivo do produto
 
@@ -42,7 +43,7 @@ auditável. Isso é a direção do produto, não uma descrição do estado entre
 |---|---|---|---|
 | Ambiente e pacote | `uv.lock`, build de wheel, metadata e toolchain reproduzível | Bootstrap ainda depende de instalar `uv` | Distribuição e instalação externa suportadas como produto |
 | Versionamento | Package version única e schemas graph/artifact/policy separados | Compatibilidade ainda é comparação exata | Migrações compatíveis e política de evolução |
-| Configuração e governança | F5.1–F5.7, F5.C1, F6.1–F6.7, F7.1 e F7.2 estão terminalmente reconciliadas; F7.3 está `PROMOTED` pelo PR #87/merge `be17bcb`/pós-merge `32088913196` | A reconciliação documental F7.3 está na PR #88, com CI `32095106958` em andamento; F7.4 não iniciou | Governança operacional integral após composição futura |
+| Configuração e governança | F5.1–F5.7, F5.C1, F6.1–F6.7 e F7.1–F7.3 estão terminalmente reconciliadas; F7.3 encerrou no PR #87/merge `be17bcb` e a reconciliação #88 no merge `43bd135` | F7.4 não iniciou; a composição automática do lifecycle foi congelada como F7.C1 pela [DEC-016](docs/decisions/DEC-016-composicao-operacional-antes-da-release.md) | Governança operacional integral após F7.4 → F7.C1 → F7.5 |
 | CLI e scaffold | `--help`, `--version`, `init`, `compile`, `run`, `resume`, `approve`, `cancel`, `cleanup-worktree`, `rollback`, `list`, `status`, `inspect`, `events`, `evidence` e doctor possuem contratos/testes | Sem backends reais, `run` falha no preflight; os comandos F6.5 são inspeção local fail-closed e estado/worktree válidos continuam necessários | UX estável para CLI e IDE em repositórios externos |
 | Compilação de grafos | Um único `GraphCompiler` valida contratos/policies e publica artefato 2.0 determinístico, versionado, íntegro e atômico | Capabilities compiladas ainda são declarativas, sem provar adapter disponível ou autorização runtime | Migrações de schema e expansão segura de workflows após o MVP |
 | Runtime/FSM | `GraphExecutor` segue somente arestas compiladas; record/journal usam lock, CAS e fencing. A F5.7 promovida persiste decisão/pedido, interrompe e reapera a árvore vinculada, impede sucesso pós-cancelamento e reconcilia `CANCELLED` sob lock após quiescência | Efeito iniciado sem outcome exige intervenção; executores, tools e worktree ainda dependem de backends/providers injetados | Integração automática dos efeitos reais no lifecycle padrão e recovery F6 |
@@ -52,7 +53,7 @@ auditável. Isso é a direção do produto, não uma descrição do estado entre
 | Verificação e auditoria | F4.5 mantém a taxonomia única `typecheck/lint/unit_test/build/security_scan`, e runner `0/0` falham antes de subprocessos; F6.1–F6.3 fornecem journal/audit/evidence fail-closed; F6.5 adiciona inspeção; F6.6 documenta nove checkpoints; F6.7 promoveu a transação knowledge fail-closed | Proteção sem chave é somente “tamper-evident local”; F6.7 não foi ligada automaticamente ao lifecycle | Matriz operacional integral com recovery ampliado |
 | Doctor | A F6.4 promovida faz sete componentes percorrerem seis estágios reais; texto/JSON compartilham resultado tipado, `--workflow` resolve gates sem executá-los e ambiente unhealthy retorna não zero | Provider/MCP live continuam dependentes de configuração e serviços externos; adapters não suportados falham fechados | UX adicional e novos adapters somente após contrato/testes equivalentes |
 | Worktree, promoção e rollback | `ExternalWorktreeManager` cria candidate commit real e singular e faz cleanup explícito; F3.7 promove por `git cherry-pick`; F5.6 revalida aprovação ligada ao conteúdo; F5.7 R3 promovida confina Git, liga aprovação destrutiva à tentativa e falha corretamente em rollback bloqueado. A F7.1 atravessa esses efeitos em repositório externo descartável | Rollback não reexecuta gates pós-reversão e a composição continua opt-in/injetada no teste | Composição operacional padrão e recovery/evidence ampliado |
-| CI e release | GitHub Actions executa quality/tests/package em Windows e Linux; F7.3 tornou mypy strict, coverage/branches, secrets e auditoria de dependências gates obrigatórios; `main` exige `CI required` | A CI da reconciliação administrativa #88 está em andamento; ela ainda precisa ser incorporada e certificada em `main` | Distribuição pública e processo de release operacional na F7 |
+| CI e release | GitHub Actions executa quality/tests/package em Windows e Linux; F7.3 tornou mypy strict, coverage/branches, secrets e auditoria de dependências gates obrigatórios; `main` exige `CI required` e a reconciliação #88 passou no merge `43bd135`/CI `32096041236` | Empacotamento F7.4 e composição pública F7.C1, seguidos da release candidate F7.5, ainda não começaram | Distribuição pública e processo de release operacional na F7 |
 
 ## Estado do roadmap
 
@@ -252,29 +253,31 @@ auditável. Isso é a direção do produto, não uma descrição do estado entre
   pós-merge `31979153948`. A F7.1 concluiu no produto `2ce104b` com dedicado `1/1`, E2E
   `42 passed, 1 skipped` e full `1050 passed, 5 skipped, 6 subtests passed`, além de quality, build e
   smoke oficial offline. A prova usa composição determinística exclusiva do teste e não altera
-  `src/`. O [PR #83](https://github.com/Wf-ops1/xXHarnessinfraXx/pull/83) abriu no head `ed439a0`,
+  `src/`. O [PR #83](https://github.com/Wf-ops1/Hartrol/pull/83) abriu no head `ed439a0`,
   certificado por `31984775704`, encerrou no head `a26807c`, certificado 10/10 + `CI required` por
   `31985232560`, foi incorporado pelo merge `76f43dd` e recebeu CI pós-merge `31985776520` no SHA
   exato. A branch de produto foi preservada e nenhuma tag remota foi publicada. A reconciliação
-  [PR #84](https://github.com/Wf-ops1/xXHarnessinfraXx/pull/84) abriu no head inicial `197eb33`/CI
+  [PR #84](https://github.com/Wf-ops1/Hartrol/pull/84) abriu no head inicial `197eb33`/CI
   `31998528616`, encerrou no head `ceca850`/CI `31999182890`, foi incorporado pelo merge `b46ebd9` e
   recebeu 10/10 + `CI required` na CI pós-merge `32000365336`. A F7.2 iniciou somente depois desse
   fechamento e concluiu no commit de implementação `bdae858`: 12 camadas, 42 requisitos, 46 node
   IDs, matriz 62/62 e regressão 1062/5/6, sem alterar produto, dependências ou CI. O
-  [PR #85](https://github.com/Wf-ops1/xXHarnessinfraXx/pull/85) encerrou no head `09e0ee3`, foi
+  [PR #85](https://github.com/Wf-ops1/Hartrol/pull/85) encerrou no head `09e0ee3`, foi
   certificado 10/10 + `CI required` na tentativa #2 do run `32038804579`, incorporado pelo merge
   `53cafa5` e recertificado pela CI pós-merge `32039759737`. A reconciliação
-  [PR #86](https://github.com/Wf-ops1/xXHarnessinfraXx/pull/86) encerrou no head `b40f251`,
+  [PR #86](https://github.com/Wf-ops1/Hartrol/pull/86) encerrou no head `b40f251`,
   certificado 10/10 + `CI required` na tentativa #2 do run `32043891060`, foi incorporado pelo merge
   `4e9f7a25` e recebeu os dez jobs mais `CI required` verdes na CI pós-merge `32045181204`. A F7.3
   iniciou somente depois desse fechamento terminal. Ela tornou mypy strict, coverage/branch coverage,
   scan de secrets e auditoria completa de dependências gates obrigatórios. A falha inicial de secrets
   `32085923509` foi preservada, corrigida por UTF-8 explícito e recertificada no head final `97d2606`
-  da [PR #87](https://github.com/Wf-ops1/xXHarnessinfraXx/pull/87), cujo run `32088471059` passou
+  da [PR #87](https://github.com/Wf-ops1/Hartrol/pull/87), cujo run `32088471059` passou
   12/12 + `CI required`. O merge `be17bcb` recebeu a CI de `push` `32088913196` igualmente verde no
   SHA exato; a branch remota foi preservada e não há tags remotas. A reconciliação administrativa
-  [#88](https://github.com/Wf-ops1/xXHarnessinfraXx/pull/88) está aberta e sua CI `32095106958` está
-  em andamento; portanto a F7.4 permanece somente planejada.
+  [#88](https://github.com/Wf-ops1/Hartrol/pull/88) encerrou no head `3be0d12`, passou 12/12 +
+  `CI required` no run `32095513602`, foi incorporada no merge `43bd135` e recebeu a CI pós-merge
+  `32096041236` igualmente verde. A F7.4 permanece somente planejada; a DEC-016 exige F7.C1 entre
+  F7.4 e F7.5 para que a release candidate use a composição operacional pública.
 
 ## Dívidas técnicas críticas
 

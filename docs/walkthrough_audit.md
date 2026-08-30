@@ -1,6 +1,6 @@
 # Auditoria Técnica da Estrutura, Fluxos e Pendências
 
-> **Status: diagnóstico do protótipo; não é certificação operacional**
+> **Status:** diagnóstico corrente após F7.3; não é certificação de release nem de produção.
 
 ## 1. Método
 
@@ -45,49 +45,45 @@ Para artefatos com a policy F4.3, o prefixo real agora é
 solicitação após três decisões persistidas leva a `FAILED_RETRY_EXHAUSTED`. O grafo maior acima
 descreve a FSM legada, não o fluxo padrão atual da CLI nem efeitos garantidos. O lifecycle canônico
 percorre arestas compiladas, persiste bundle/eventos e retoma por identidade; com o
-registry padrão vazio, `harness run` falha fechado antes de modelo ou tool. `PromotionManager` ainda
-pode produzir SHA de dry-run. O `PythonAstIndexer` também permanece separado do lifecycle, mas
+registry padrão vazio, `harness run` falha fechado antes de modelo ou tool. `PromotionManager` suporta
+dry-run explícito sem atribuir ao resultado semântica de promoção. O `PythonAstIndexer` permanece
+separado do lifecycle, mas
 `harness index` agora resolve o commit Git real, lê seus blobs `.py`, produz símbolos AST e publica um
 snapshot `ready` canônico. O `CodebaseMemoryAdapter` somente serve esse snapshot com digest válido;
 consulta ausente/inválida continua falhando explicitamente, sem indexação implícita.
 
-Na implementação local F4.4, `PLANNING → EXECUTING` somente ocorre depois de contexto suficiente relido,
+Na F4.4 promovida, `PLANNING → EXECUTING` somente ocorre depois de contexto suficiente relido,
 structured output tipado, payload content-addressed, projeção `plan.json` atômica e evento
 `PLAN_GENERATED`. Resume recupera o payload sem nova chamada; efeito iniciado sem outcome, tamper,
-duplicata ou divergência de policy/input bloqueiam antes do primeiro nó. Essa mudança está consolidada
-no commit local, mas ainda não foi publicada nem promovida.
+duplicata ou divergência de policy/input bloqueiam antes do primeiro nó.
 
 ## 4. Matriz de comandos
 
 | Comando | Código existe | Efeito real comprovado | Classificação |
 |---|---:|---:|---|
 | `harness init` | Sim | Cria/copia scaffold local | Implementado como base |
-| `harness doctor` | Sim | Apenas renderiza resultados pré-aprovados | Simulado |
+| `harness doctor` | Sim | Inspeciona sete componentes em seis estágios, compartilha resultado texto/JSON e retorna não zero quando unhealthy | F6.4 `PROMOTED`; read-only real |
 | `harness compile` | Sim | Compila pelo pipeline canônico e grava artefato validado | Implementado como contrato interno |
-| `harness index` | Sim | Faz rebuild AST dos blobs Python do SHA Git atual, publica e recarrega snapshot íntegro | Implementado localmente; explícito, Python-only e ainda fora do lifecycle |
+| `harness index` | Sim | Faz rebuild AST dos blobs Python do SHA Git atual, publica e recarrega snapshot íntegro | Implementado; explícito, Python-only e ainda fora do lifecycle |
 | `harness run` | Sim | Cria bundle e falha fechado sem executor injetado | Experimental/fail-closed |
-| `harness status` | Sim | Lê arquivo de estado | Implementado como leitura local |
-| `harness inspect` | Sim | Lê estado, audit e aprovação | Experimental |
-| `harness approve` | Sim | Persiste decisão | Parcial; não retoma o fluxo |
+| `harness status` | Sim | Projeta estado tipado, tentativa, duração, blocker, próxima ação e budget | F6.5 `PROMOTED`; leitura local fail-closed |
+| `harness inspect` | Sim | Lê status, digests, journal e aprovação sem payload bruto | F6.5 `PROMOTED`; leitura local fail-closed |
+| `harness approve` | Sim | Persiste decisão ligada ao conteúdo da solicitação corrente | F5.6 `PROMOTED`; não fabrica candidate nem retoma sem backend |
 | `harness resume` | Sim | Retoma do bundle canônico | Implementado como contrato injetável |
-| `harness verify` | Sim | Carrega worktree validado, resolve configuração/argv e executa gates selecionados | Experimental; persistência e decisão final ainda faltam |
-| `harness audit` | Sim | Valida o `ExecutionEvent` canônico, falha fechado e exporta JSON/SARIF com identidade exata | F6.2 implementada localmente; tamper-evident local, com HMAC opcional por API |
-| `harness rollback` | Sim | Eventos locais e Git opcional | Experimental/inseguro |
+| `harness verify` | Sim | Carrega worktree validado, resolve configuração/argv, persiste resultado commit-bound e executa targeted → full | F4.5–F4.8 `PROMOTED`; primitiva injetável |
+| `harness audit` | Sim | Valida o evento canônico, falha fechado e exporta JSON/SARIF com identidade exata | F6.2 `PROMOTED`; tamper-evident local, com HMAC opcional por API |
+| `harness rollback` | Sim | Executa `git revert --no-edit` do SHA canônico com trust, aprovação e conflito fail-closed | F5.7 `PROMOTED`; primitiva injetável, sem gates pós-reversão automáticos |
 
 ## 5. Riscos prioritários
 
 | Prioridade | Risco | Causa atual | Fase responsável |
 |---|---|---|---|
-| P0 | Alteração fora de isolamento | Worktree/guard/edição reais ainda não são compostos automaticamente pelo lifecycle | F4/F5 |
-| P0 | Git mutável fora do protocolo | Promoção F3.7 usa candidate/worktree/cherry-pick reais quando injetada; rollback legado ainda não usa o protocolo atual | F6 |
-| P0 | Sucesso sem efeito | Promoção F3.7 removeu SHA sintético e exige outcome Git real; doctor/memória e composição padrão ainda não formam prova operacional integral | F4/F6 |
-| P0 | Diagnóstico enganoso | Doctor retorna saudável incondicionalmente | F6.5 |
-| P1 | Primitivas não compostas | Lifecycle padrão não injeta provider, tools, worktree ou gates | F4/F5 |
-| P0 | Verificação incompleta | F4.5/F4.6 bloqueiam suíte inválida e pré-requisito ausente, mas a CLI reprovada ainda pode retornar zero e não existe resultado persistido/commit-bound | F4.7 |
-| P1 | Resolução ainda não promovida | O R3 local seleciona por `sys.prefix` e preserva o launcher no `TerminalAdapter`, mas o PR #44 ainda está no head R2 e aguarda publicação/CI POSIX | F4.6; promoção bloqueada |
-| P1 | Aprovação não vinculada ao diff | F3.7 exige status aprovado e candidate verificado, mas a aprovação F2.5 não assina o conteúdo/diff | F5 |
-| P1 | Evidência insuficiente | Pode registrar identificadores sintéticos | F6/F7 |
-| P1 | CI ainda não cobre comportamento operacional completo | Pipeline cobre providers/paths/worktree/terminal/edição como primitivas, não sua composição com promoção e recovery | F4–F7 |
+| P0 | Release declarada operacional sem wiring público | O E2E F7.1 monta as primitivas explicitamente, enquanto `harness run` usa registry vazio | F7.C1 antes de F7.5 |
+| P1 | Portabilidade incompleta | Package resources, metadata de release, paths por SO e wheel externa ainda precisam do gate F7.4 | F7.4 |
+| P1 | Primitivas não compostas | Lifecycle padrão não injeta provider, tools, worktree, gates, promotion, knowledge e evidence como uma fronteira única | F7.C1 |
+| P1 | Âncora somente local | Journal/evidence possuem hash e digest, mas não uma âncora externa imutável | Limitação publicada; fora do MVP distribuído |
+| P2 | Gates pós-rollback ausentes | O revert é real e validado, mas a suíte não é reexecutada automaticamente depois dele | F7.C1 ou limitação explícita da RC |
+| P2 | Serviços live condicionais | Provider remoto e Serena MCP dependem de configuração, credenciais e disponibilidade externa | Doctor/configuração fail-closed; documentação de suporte F7.4 |
 
 ## 6. Gates para considerar o produto operacional
 
