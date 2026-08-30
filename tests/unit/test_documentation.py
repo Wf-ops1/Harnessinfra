@@ -318,7 +318,6 @@ def test_public_state_docs_distinguish_real_primitives_from_missing_composition(
     assert "7d6a0e179f30008a7a67275da94878a179f0aba9" in panel
     assert "31887143905" in panel
     assert "| **Gate** | `REPAIR_ACTIVE / PROMOTION_BLOCKED` |" in panel
-    assert "2415f41" in panel
     assert "Apache-2.0" in panel
     assert "docs/tasks/completed/F7.4.md" in panel
     assert "docs/tasks/active/F7.C1.md" in panel
@@ -517,6 +516,7 @@ def test_public_state_docs_distinguish_real_primitives_from_missing_composition(
     assert "BUDGET_RESERVED" in user_guide
     assert "status`/`inspect" in walkthrough
     assert "certificar/arquivar a F3.8 no primeiro commit do gate seguinte" not in panel
+    assert "2415f41" in panel
 
     assert "OpenAI Responses e endpoint local fazem HTTP real" in lifecycle
     assert "Serena não é MCP" not in lifecycle

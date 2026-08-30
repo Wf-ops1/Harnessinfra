@@ -1105,9 +1105,6 @@ def test_f5_7_promotion_preserves_r3_negative_evidence_and_certification() -> No
         assert "33293579533" in source
     assert (ACTIVE_ROOT / "F7.C1.md").is_file()
     assert "> **Gate:** `REPAIR_ACTIVE`" in f7_c1_dossier
-    assert "> **Lifecycle:** `PROMOTION_BLOCKED`" in f7_c1_dossier
-    assert "2415f41aff0d746dc11d58a662d8998de6181b76" in f7_c1_dossier  # pragma: allowlist secret
-    assert "1106 passed, 5 skipped, 6 subtests passed" in f7_c1_dossier
     assert "task/f7.c1-public-path-composition" in f7_c1_dossier
     assert "checkpoint/f7.c1-ready" in f7_c1_dossier
     assert "32085923509" in panel
@@ -1498,6 +1495,9 @@ def test_f5_7_promotion_preserves_r3_negative_evidence_and_certification() -> No
         assert "5b8e558" in source
         assert "29e8a975" in source
         assert "31859624571" in source
+    assert "> **Lifecycle:** `PROMOTION_BLOCKED`" in f7_c1_dossier
+    assert "2415f41aff0d746dc11d58a662d8998de6181b76" in f7_c1_dossier  # pragma: allowlist secret
+    assert "1106 passed, 5 skipped, 6 subtests passed" in f7_c1_dossier
 
 
 def test_negative_evidence_precedes_positive_state_until_recertification() -> None:
