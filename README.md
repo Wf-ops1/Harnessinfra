@@ -17,7 +17,7 @@ automaticamente essa fronteira.
 Não use `harness run`, `harness doctor`, `harness verify` ou `harness rollback` como garantia de segurança em um
 repositório valioso. As Fases 0–6 e as tarefas F7.1–F7.4 foram terminalmente reconciliadas. A
 composição pública F7.C1 foi promovida pelo PR #92/merge `26c36ff`/CI pós-merge `33325679613`; sua
-reconciliação administrativa ainda está somente local, e a F7.5 continua pendente. Execute esses
+reconciliação administrativa está no PR #93/run inicial `33326696156`, e a F7.5 continua pendente. Execute esses
 comandos primeiro em cópias descartáveis enquanto a release candidate não estiver certificada.
 
 ## Objetivo do produto
@@ -44,7 +44,7 @@ auditável. Isso é a direção do produto, não uma descrição do estado entre
 |---|---|---|---|
 | Ambiente e pacote | `uv.lock`, build de wheel, metadata SPDX Apache-2.0, defaults via `importlib.resources` e smoke externo ao checkout; F7.4 promovida pelo PR #90/merge `a62c164` | A reconciliação F7.4 encerrou no PR #91; bootstrap depende de instalar `uv`, e macOS não possui job de CI | Distribuição pública e instalação externa suportadas como produto |
 | Versionamento | Package version única e schemas graph/artifact/policy separados | Compatibilidade ainda é comparação exata | Migrações compatíveis e política de evolução |
-| Configuração e governança | F5.1–F5.7, F5.C1, F6.1–F6.7 e F7.1–F7.4 estão terminalmente reconciliadas; F7.C1 foi promovida | A reconciliação F7.C1 está `LOCAL_READY / PUBLICATION_PENDING` pela [DEC-014](docs/decisions/DEC-014-reconciliacao-pos-merge.md), preservando a fronteira da [DEC-016](docs/decisions/DEC-016-composicao-operacional-antes-da-release.md) | Fechamento operacional na F7.5 |
+| Configuração e governança | F5.1–F5.7, F5.C1, F6.1–F6.7 e F7.1–F7.4 estão terminalmente reconciliadas; F7.C1 foi promovida | A reconciliação F7.C1 está no PR #93/run inicial `33326696156`, em `ADMIN_PR_OPEN / CHECKS_PENDING` pela [DEC-014](docs/decisions/DEC-014-reconciliacao-pos-merge.md), preservando a fronteira da [DEC-016](docs/decisions/DEC-016-composicao-operacional-antes-da-release.md) | Fechamento operacional na F7.5 |
 | CLI e scaffold | `--help`, `--version`, `init`, `compile`, `run`, `resume`, `approve`, `cancel`, `cleanup-worktree`, `rollback`, `list`, `status`, `inspect`, `events`, `evidence` e doctor possuem contratos/testes; `new-feature` seleciona a composição pública de produção | Provider, credencial, trust, grants e serviços live ausentes continuam falhando fechados; workflows adicionais permanecem pós-MVP | UX estável para CLI e IDE em repositórios externos |
 | Compilação de grafos | Um único `GraphCompiler` valida contratos/policies e publica artefato 2.0 determinístico, versionado, íntegro e atômico | Capabilities compiladas ainda são declarativas, sem provar adapter disponível ou autorização runtime | Migrações de schema e expansão segura de workflows após o MVP |
 | Runtime/FSM | `GraphExecutor` segue somente arestas compiladas; record/journal usam lock, CAS e fencing. A F7.C1 compõe factories canônicas de provider, tools, worktree, knowledge, verificação, aprovação, promoção, evidence e rollback para `new-feature` | Efeito iniciado sem outcome exige intervenção; integrações live continuam opt-in | Expansão de workflows somente após o MVP |

@@ -317,17 +317,17 @@ def test_public_state_docs_distinguish_real_primitives_from_missing_composition(
     assert "31868906875" in panel
     assert "7d6a0e179f30008a7a67275da94878a179f0aba9" in panel
     assert "31887143905" in panel
-    assert "| **Gate** | `LOCAL_READY / PUBLICATION_PENDING` |" in panel
+    assert "| **Gate** | `ADMIN_PR_OPEN / CHECKS_PENDING` |" in panel
     assert "Apache-2.0" in panel
     assert "docs/tasks/completed/F7.4.md" in panel
     assert "docs/tasks/completed/F7.C1.md" in panel
     assert all(
         evidence in panel
-        for evidence in ("PR #92", "bb4dc8c", "33325055342", "26c36ff", "33325679613", "docs/promote-f7.c1")
+        for evidence in ("PR #92", "bb4dc8c", "33325055342", "26c36ff", "33325679613", "PR #93", "33326696156")
     )
     assert all(
         evidence in task_index
-        for evidence in ("completed/F7.C1.md", "bb4dc8c", "33325055342", "26c36ff", "33325679613")
+        for evidence in ("completed/F7.C1.md", "bb4dc8c", "33325055342", "26c36ff", "33325679613", "PR #93", "33326696156")
     )
     assert all(
         evidence in readme

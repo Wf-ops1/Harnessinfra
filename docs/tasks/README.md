@@ -20,10 +20,10 @@ em [`TASK.md`](../../TASK.md); requisitos normativos permanecem no
 
 ## Tarefa ativa
 
-Nenhuma implementação ativa. A [F7.C1 — composição operacional do caminho público](completed/F7.C1.md)
+Nenhuma tarefa ativa. A [F7.C1 — composição operacional do caminho público](completed/F7.C1.md)
 está `PROMOTED`: PR #92/head `bb4dc8c`/CI `33325055342`, merge `26c36ff` e CI pós-merge
-`33325679613`, todos verdes. A reconciliação está `LOCAL_READY / PUBLICATION_PENDING` em
-`docs/promote-f7.c1`; a F7.5 foi autorizada e aguarda esse fechamento terminal pela DEC-014.
+`33325679613`, todos verdes. A reconciliação está `ADMIN_PR_OPEN / CHECKS_PENDING` no PR #93,
+head inicial `b6d9e05`/run `33326696156`; a F7.5 aguarda esse fechamento terminal pela DEC-014.
 
 A [F7.4 — empacotamento e portabilidade](completed/F7.4.md) está terminalmente `PROMOTED`: produto
 PR #90/head `42b6f8f`/CI `33291856113`/merge `a62c164`/pós-merge `33292240896`; reconciliação

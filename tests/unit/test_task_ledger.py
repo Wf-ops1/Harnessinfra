@@ -1077,7 +1077,7 @@ def test_f5_7_promotion_preserves_r3_negative_evidence_and_certification() -> No
         "914 passed, 5 skipped, 6 subtests passed em 328.79s",
     ):
         assert result in f5_c1_dossier
-    assert "| **Gate** | `LOCAL_READY / PUBLICATION_PENDING` |" in panel
+    assert "| **Gate** | `ADMIN_PR_OPEN / CHECKS_PENDING` |" in panel
     assert "Apache-2.0" in panel
     assert "docs/tasks/completed/F7.4.md" in panel
     assert not (ACTIVE_ROOT / "F7.4.md").exists()
@@ -1105,7 +1105,7 @@ def test_f5_7_promotion_preserves_r3_negative_evidence_and_certification() -> No
         assert "33293579533" in source
     assert not (ACTIVE_ROOT / "F7.C1.md").exists() and (COMPLETED_ROOT / "F7.C1.md").is_file()
     assert "> **Gate:** `COMPLETED_LOCAL`" in f7_c1_dossier
-    assert all(evidence in f7_c1_dossier for evidence in ("PR #92", "33325055342", "26c36ff", "33325679613"))
+    assert all(evidence in f7_c1_dossier for evidence in ("PR #92", "33325055342", "26c36ff", "33325679613", "#93", "b6d9e05", "33326696156"))
     assert "checkpoint/f7.c1-ready" in f7_c1_dossier
     assert "32085923509" in panel
     assert not (ACTIVE_ROOT / "F7.3.md").exists() and (COMPLETED_ROOT / "F7.3.md").is_file()

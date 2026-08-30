@@ -5,7 +5,7 @@
 ## 1. Fontes de verdade
 
 1. Este painel: fase, coordenação, gate, bloqueios e próxima ação.
-2. [F7.C1](docs/tasks/completed/F7.C1.md): produto `PROMOTED` pelo PR #92/head `bb4dc8c`/CI `33325055342`/merge `26c36ff`/pós-merge `33325679613`; reconciliação `LOCAL_READY / PUBLICATION_PENDING`; predecessoras [F7.4](docs/tasks/completed/F7.4.md) e [F7.3](docs/tasks/completed/F7.3.md) reconciliadas.
+2. [F7.C1](docs/tasks/completed/F7.C1.md): produto `PROMOTED` pelo PR #92/head `bb4dc8c`/CI `33325055342`/merge `26c36ff`/pós-merge `33325679613`; reconciliação PR #93/run inicial `33326696156` em `ADMIN_PR_OPEN / CHECKS_PENDING`; predecessoras [F7.4](docs/tasks/completed/F7.4.md) e [F7.3](docs/tasks/completed/F7.3.md) reconciliadas.
 3. [F7.2](docs/tasks/completed/F7.2.md): produto PR #85/merge `53cafa5`/pós-merge `32039759737`; reconciliação PR #86/final `b40f251`/CI `32043891060`/merge `4e9f7a25`/pós-merge `32045181204`.
 4. [F7.1](docs/tasks/completed/F7.1.md): produto PR #83/merge `76f43dd`/pós-merge `31985776520`; reconciliação PR #84/final `ceca850`/CI `31999182890`/merge `b46ebd9`/pós-merge `32000365336`.
 4. Fase 6 — [F6.7](docs/tasks/completed/F6.7.md): knowledge transaction promovida pelo PR #81; reconciliação #82 encerrada no merge `38849ed`, com CI pós-merge `31979153948` verde.
@@ -46,13 +46,13 @@
 |---|---|
 | **Fases concluídas** | Fases 0–4 no escopo planejado; F5.1–F5.7 e F5.C1, F6.1–F6.7 e F7.1–F7.4 terminalmente reconciliadas; produto F7.C1 promovido |
 | **Fase ativa** | Fase 7 — maturidade operacional |
-| **Tarefa ativa** | nenhuma tarefa ativa; reconciliação de [F7.C1](docs/tasks/completed/F7.C1.md) preparada localmente |
-| **Gate** | `LOCAL_READY / PUBLICATION_PENDING` |
-| **Estado corrente** | Produto PR [#92](https://github.com/Wf-ops1/Hartrol/pull/92)/head `bb4dc8c`/CI `33325055342` incorporado no merge `26c36ff`; CI pós-merge `33325679613` integralmente verde; F7.5 autorizada, ainda não iniciada |
+| **Tarefa ativa** | nenhuma tarefa ativa; reconciliação de [F7.C1](docs/tasks/completed/F7.C1.md) aberta no PR #93 |
+| **Gate** | `ADMIN_PR_OPEN / CHECKS_PENDING` |
+| **Estado corrente** | Produto PR [#92](https://github.com/Wf-ops1/Hartrol/pull/92)/head `bb4dc8c`/CI `33325055342` incorporado no merge `26c36ff`; CI pós-merge `33325679613` verde; PR administrativo #93 aberto no head inicial `b6d9e05`/run `33326696156`; F7.5 ainda não iniciada |
 | **Estado F5.6** | F5.6 `PROMOTED`; aprovação de promoção permanece vinculada ao conteúdo exato |
 | **Executor ativo** | `Codex`, único escritor da reconciliação administrativa F7.C1 |
 | **Workspace** | `C:\Users\walla\OneDrive\Desktop\ai-engineering-harness` |
-| **Branch** | `docs/promote-f7.c1`, local, sem upstream, criada de `main == origin/main == 26c36ffaa5b3edde616066a15c1db7fe4b321d12` |
+| **Branch** | `docs/promote-f7.c1`, publicada em `origin/docs/promote-f7.c1`, criada de `main == origin/main == 26c36ffaa5b3edde616066a15c1db7fe4b321d12` |
 | **Branch de produto F6.5** | `task/f6.5-status-inspection`, remota e preservada após o merge |
 | **Branch de produto F6.4** | `task/f6.4-real-doctor`, remota e preservada após o merge |
 | **Branch de produto F6.3** | `task/f6.3-evidence-manifest`, remota e preservada após o merge |
@@ -185,7 +185,7 @@
 | Produto | PR #90/head `42b6f8f`/CI `33291856113`/merge `a62c164`/pós-merge `33292240896` |
 | Reconciliação administrativa | PR #91/head final `f4b4f45`/CI `33293246380`/merge `0ea7f801` |
 | CI terminal | `33293579533` passou onze jobs obrigatórios mais `CI required` no SHA exato `0ea7f801` |
-| Fronteira | F7.C1 → F7.5: produto `PROMOTED`, reconciliação `LOCAL_READY / PUBLICATION_PENDING`; F7.5 autorizada e bloqueada somente até o fechamento administrativo terminal |
+| Fronteira | F7.C1 → F7.5: produto `PROMOTED`, reconciliação `ADMIN_PR_OPEN / CHECKS_PENDING`; F7.5 autorizada e bloqueada somente até o fechamento administrativo terminal |
 | Promoção anterior | F7.1 — produto `2ce104b687650587fa6881a88ea281dac22a83b3`, full `1050 passed, 5 skipped, 6 subtests passed in 968.39s`; PR #83 inicial `ed439a0`/`31984775704`, final `a26807c030c7f099c5419ed5166a17cb46f4a2e4`/`31985232560`, merge `76f43dd29923c87e00062ca65afd534b5f4f1863`/pós-merge `31985776520`; [PR #84](https://github.com/Wf-ops1/Hartrol/pull/84) inicial `197eb33b0d9c33a87a51cef38b4da39afc5588c6`/`31998528616`, final `ceca850083fbbc2a6da54394054b09b6f335c9c7`/`31999182890`, merge `b46ebd9c84cacab6bd58d2fb2712879f6dabc164`/pós-merge `32000365336` |
 | Promoção anterior | F6.6 — PR #79 / merge `8be6789` / pós-merge `31963338576`; reconciliação PR #80 / merge `1327f299` / pós-merge `31968035375` |
 | Promoção anterior | F6.5 — PR #77 / merge `c049125` / pós-merge `31953772121`; reconciliação PR #78 / merge `6386816` / pós-merge `31956649961` |
@@ -258,8 +258,8 @@ Autorizações posteriores encerraram F6.6/F6.7, produziram/promoveram F7.1 e ab
 O fechamento posterior da F7.4 está em PR #91/head `f4b4f45`/CI `33293246380`/merge `0ea7f801`/pós-merge `33293579533`; a F7.C1 encerrou no PR #92/head `bb4dc8c`/CI `33325055342`/merge `26c36ff`/pós-merge `33325679613`. Em `2026-08-30`, o usuário autorizou concluir integralmente a F7.5 e seus efeitos necessários.
 ## 5. Tarefa ativa
 
-Nenhuma implementação ativa. A [F7.C1](docs/tasks/completed/F7.C1.md) está `PROMOTED`; sua reconciliação
-administrativa está `LOCAL_READY / PUBLICATION_PENDING` em `docs/promote-f7.c1`.
+Nenhuma tarefa ativa. A [F7.C1](docs/tasks/completed/F7.C1.md) está `PROMOTED`; sua reconciliação
+administrativa está `ADMIN_PR_OPEN / CHECKS_PENDING` no PR #93/run inicial `33326696156`.
 O ciclo integral F7.5 está autorizado, mas só começa depois do merge e da CI desta reconciliação.
 
 ## 6. Bloqueios e fronteiras externas
