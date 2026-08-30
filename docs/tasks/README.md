@@ -20,10 +20,10 @@ em [`TASK.md`](../../TASK.md); requisitos normativos permanecem no
 
 ## Tarefa ativa
 
-A [F7.4 — empacotamento e portabilidade](active/F7.4.md) está `READY_FOR_IMPLEMENTATION` na branch
-local exclusiva. Apache-2.0 foi escolhida, o contrato está congelado e o checkpoint READY deve
-preceder qualquer edição de implementação. Publicação, PR, merge, tag e F7.C1 permanecem fora do
-gate atual.
+A [F7.4 — empacotamento e portabilidade](active/F7.4.md) está
+`COMPLETED_LOCAL / PROMOTION_PENDING` na branch local exclusiva. Apache-2.0, recursos instalados,
+documentos de release, wheel e smoke externo foram certificados; publicação, PR, merge, tag remota e
+F7.C1 permanecem fora do gate atual.
 
 A [F7.3 — quality gates do próprio projeto](completed/F7.3.md)
 está `PROMOTED`: a PR [#87](https://github.com/Wf-ops1/Hartrol/pull/87) encerrou no head

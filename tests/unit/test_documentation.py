@@ -59,6 +59,31 @@ def test_f73_quality_gate_guide_documents_every_fail_closed_gate() -> None:
         assert contract in guide
 
 
+def test_f74_portability_and_release_documents_match_current_support() -> None:
+    readme = _read(ROOT / "README.md")
+    user_guide = _read(ROOT / "docs" / "user_guide.md")
+    portability = _read(ROOT / "docs" / "portability.md")
+    support = _read(ROOT / "SUPPORT.md")
+
+    for reference in ("docs/portability.md", "SUPPORT.md", "CHANGELOG.md", "LICENSE"):
+        assert reference in readme
+    assert "Empacotamento e portabilidade F7.4" in user_guide
+    for contract in (
+        "importlib.resources",
+        "%LOCALAPPDATA%",
+        "Library/Application Support",
+        ".local/share",
+        "Job Object",
+        "grupo de processos",
+        "Windows e Linux",
+        "macOS",
+        "F7.C1",
+    ):
+        assert contract in portability
+    assert "Python 3.11 a 3.14" in support
+    assert "Vulnerabilidades não devem ser divulgadas em issue pública" in support
+
+
 def test_f66_recovery_matrix_has_exactly_nine_checkpoint_contracts() -> None:
     user_guide = _read(ROOT / "docs" / "user_guide.md")
     checkpoints = (
@@ -292,7 +317,7 @@ def test_public_state_docs_distinguish_real_primitives_from_missing_composition(
     assert "31868906875" in panel
     assert "7d6a0e179f30008a7a67275da94878a179f0aba9" in panel
     assert "31887143905" in panel
-    assert "| **Gate** | `READY / IMPLEMENTATION_AUTHORIZED` |" in panel
+    assert "| **Gate** | `COMPLETED_LOCAL / PROMOTION_PENDING` |" in panel
     assert "Apache-2.0" in panel
     assert "docs/tasks/active/F7.4.md" in panel
     assert "32085923509" in panel
