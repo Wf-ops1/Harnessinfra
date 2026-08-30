@@ -46,8 +46,8 @@
 | **Fases concluídas** | Fases 0–6; F7.1–F7.5 promovidas; reconciliação final F7.5 pendente |
 | **Fase ativa** | Fase 7 — reconciliação terminal e publicação da RC |
 | **Tarefa ativa** | Nenhuma tarefa ativa de produto; reconciliação administrativa F7.5 em curso |
-| **Gate** | `PROMOTED / ADMIN_LOCAL` — produto F7.5 certificado em `main` |
-| **Estado corrente** | PR #94/head `008bd69`/CI `33332733192`/merge `c82e099`/pós-merge `33333106708` verdes; PR administrativo, tag e prerelease pendentes |
+| **Gate** | `PROMOTED / ADMIN_PR_OPEN` — produto F7.5 certificado em `main` |
+| **Estado corrente** | Produto #94 terminal; admin #95/head inicial `9640089`/CI `33333639460` verde; head documental final, merge, tag e prerelease pendentes |
 | **Estado F5.6** | F5.6 `PROMOTED`; aprovação de promoção permanece vinculada ao conteúdo exato |
 | **Executor ativo** | `Codex`, único escritor da F7.5 |
 | **Workspace** | `C:\Users\walla\OneDrive\Desktop\ai-engineering-harness` |
@@ -260,7 +260,7 @@ O fechamento F7.C1 inclui produto #92/`33325055342`/merge `26c36ff`/pós `333256
 
 Nenhuma tarefa ativa de produto. A [F7.5](docs/tasks/completed/F7.5.md) está `PROMOTED`: PR #94,
 head `008bd69`, CI `33332733192`, merge `c82e099` e pós-merge `33333106708` verdes. A reconciliação
-administrativa está local; tag e GitHub prerelease aguardam seu fechamento terminal.
+administrativa está no PR #95/head inicial `9640089`/CI `33333639460`; tag e prerelease aguardam seu fechamento.
 
 ## 6. Bloqueios e fronteiras externas
 
@@ -271,7 +271,7 @@ fora do escopo. Tag publicada será imutável; correção posterior exige nova R
 ## 7. Próxima ação exata
 
 ```text
-PUBLICAR docs/promote-f7.5, ABRIR PR ADMINISTRATIVO E EXIGIR CI/POST-MERGE VERDES.
+PUBLICAR O REGISTRO NO PR #95 E EXIGIR CI FINAL, MERGE E PÓS-MERGE VERDES.
 NÃO PUBLICAR TAG ANTES DOS MERGES, CIs PÓS-MERGE E RECONCILIAÇÃO TERMINAL VERDES.
 ```
 
@@ -297,4 +297,4 @@ NÃO PUBLICAR TAG ANTES DOS MERGES, CIs PÓS-MERGE E RECONCILIAÇÃO TERMINAL VE
 18. Preserve PR #82: inicial `5ee3fcc`/`31978357679`; final `cfd97c6`/`31978820506`; merge `38849ed`; pós-merge `31979153948` 11/11. F7.1 parte somente dessa base.
 19. Preserve F7.1: `c55edaa`/`2ce104b`, `1/1`, `42/1`, `1050/5/6`; PR #83 final `a26807c`/`31985232560`, merge `76f43dd`/pós-merge `31985776520`.
 20. Preserve PR #84: final `ceca850`/`31999182890`, merge `b46ebd9`/pós-merge `32000365336`; F7.2 `1badf40`/`bdae858`/`09e0ee3`, PR #85/run `32038804579`, merge `53cafa5`/pós-merge `32039759737`; PR #86 final `b40f251`/`32043891060`, merge `4e9f7a25`/pós-merge `32045181204`; F7.3 negativo `32085923509`, final `97d2606`/`32088471059`, merge `be17bcb`/pós-merge `32088913196`, reconciliação #88 final `3be0d12`/`32095513602`, merge `43bd135`/pós-merge `32096041236`; F7.4 PR #90 final `42b6f8f`/`33291856113`, merge `a62c164`/pós-merge `33292240896`.
-*Atualizado em: 2026-08-30T17:23:17-03:00 | Fonte: F7.5 #94/008bd69/33332733192/c82e099/33333106708; admin local*
+*Atualizado em: 2026-08-30T17:35:00-03:00 | Fonte: F7.5 produto terminal; admin #95/9640089/33333639460 verde*

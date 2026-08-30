@@ -317,7 +317,7 @@ def test_public_state_docs_distinguish_real_primitives_from_missing_composition(
     assert "31868906875" in panel
     assert "7d6a0e179f30008a7a67275da94878a179f0aba9" in panel
     assert "31887143905" in panel
-    assert "| **Gate** | `PROMOTED / ADMIN_LOCAL` — produto F7.5 certificado" in panel
+    assert "| **Gate** | `PROMOTED / ADMIN_PR_OPEN` — produto F7.5 certificado" in panel
     assert "Apache-2.0" in panel
     assert "checkpoint/f7.4-complete" in panel
     assert "docs/tasks/completed/F7.C1.md" in panel
