@@ -277,8 +277,8 @@ auditável. Isso é a direção do produto, não uma descrição do estado entre
   [#88](https://github.com/Wf-ops1/Hartrol/pull/88) encerrou no head `3be0d12`, passou 12/12 +
   `CI required` no run `32095513602`, foi incorporada no merge `43bd135` e recebeu a CI pós-merge
   `32096041236` igualmente verde. A F7.4 foi concluída e certificada na branch local
-  `task/f7.4-packaging-portability`, com checkpoint `checkpoint/f7.4-ready`; sua promoção ainda não
-  ocorreu. A DEC-016 exige F7.C1 entre F7.4 e F7.5 para que a release candidate use a composição
+  `task/f7.4-packaging-portability`, com checkpoints locais `checkpoint/f7.4-ready` e
+  `checkpoint/f7.4-complete`; sua promoção ainda não ocorreu. A DEC-016 exige F7.C1 entre F7.4 e F7.5 para que a release candidate use a composição
   operacional pública.
 
 ## Dívidas técnicas críticas

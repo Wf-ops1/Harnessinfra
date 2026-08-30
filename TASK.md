@@ -70,7 +70,7 @@
 | **Checkpoint F7.1** | `checkpoint/f7.1-ready` → `c55edaaaadd3137d682eb6c6175333fe924b6967`; `checkpoint/f7.1-complete` → `ed439a08b2a6b2f37b7d140aaaba2e504d1cc0aa`; ambos somente locais |
 | **Checkpoint F7.2** | `checkpoint/f7.2-ready` → `1badf4004b1670774c3fa85c3cae93b6351e49f4`; `checkpoint/f7.2-complete` → `09e0ee30e52e498b8fb8c3a128c2ffa5fc1ff6e8`; ambos somente locais |
 | **Checkpoint F7.3** | `checkpoint/f7.3-ready` → `4bbe19327c76a1d79ecd38ca306ff8670af7c18d`; `checkpoint/f7.3-r1-ready` → `d5964eab73f34ae48f98b086d3f5ee5d6f6c7d41`; `checkpoint/f7.3-complete` → `2723869a4f16d44e5e76b26331b3eb6e9c567326`; `checkpoint/f7.3-r3-complete` → `97d2606b79c427a647d8218a3fad778c176bcd60`; todos somente locais |
-| **Checkpoint F7.4** | `checkpoint/f7.4-ready` → `be777aeb79fbc3dd3eb604d49ec4de8cbc9ffbe4`; `checkpoint/f7.4-complete` será criado no commit candidato, ambos somente locais |
+| **Checkpoint F7.4** | `checkpoint/f7.4-ready` → `be777aeb79fbc3dd3eb604d49ec4de8cbc9ffbe4`; `checkpoint/f7.4-complete` → `9dc3b969933d7178e7c6313a59ccbc5c890eb9b4`, ambos somente locais | <!-- pragma: allowlist secret -->
 | **Main sincronizada** | `main == origin/main == 7b4dd3d0a8720e6d47b6840cad8e5361fd4f0201`; PR documental #89 e CI pós-merge `33287246294` 11/11 + `CI required` verdes |
 | **Implementação F7.2** | branch `task/f7.2-test-matrix`; baseline de 1055 testes coletáveis; produto `bdae858861a9c5294f90a231115b3ed930030117`; matriz canônica com 12 camadas/42 requisitos/46 node IDs e runner multiplataforma estrito |
 | **Validação F7.2** | matriz `62 passed in 83.45s`; full `1062 passed, 5 skipped, 6 subtests passed in 461.12s`; Ruff/mypy/compileall/build/smoke verdes |
@@ -269,8 +269,8 @@ técnico ou jurídico local; a CI do head remoto ainda não existe. Publicação
 ## 7. Próxima ação exata
 
 ```text
-CONSOLIDAR O COMMIT CANDIDATO E checkpoint/f7.4-complete SOMENTE LOCAIS.
-PARAR ANTES DE PUSH/PR/MERGE; NÃO INICIAR F7.C1 SEM NOVA AUTORIZAÇÃO NOMINAL.
+SOLICITAR AUTORIZAÇÃO NOMINAL PARA PUSH SEM FORCE E ABERTURA DO PR F7.4.
+PARAR ANTES DO MERGE; NÃO INICIAR F7.C1 SEM NOVA AUTORIZAÇÃO NOMINAL.
 ```
 
 ## 8. Retomada após perda de contexto
