@@ -992,6 +992,7 @@ def test_f5_7_promotion_preserves_r3_negative_evidence_and_certification() -> No
     dossier = _read(COMPLETED_ROOT / "F5.7.md")
     f5_c1_dossier = _read(COMPLETED_ROOT / "F5.C1.md")
     f6_1_dossier = _read(COMPLETED_ROOT / "F6.1.md")
+    f7_4_dossier = _read(COMPLETED_ROOT / "F7.4.md")
     task_index = _read(TASKS_INDEX)
     readme = _read(ROOT / "README.md")
 
@@ -1075,9 +1076,30 @@ def test_f5_7_promotion_preserves_r3_negative_evidence_and_certification() -> No
         "914 passed, 5 skipped, 6 subtests passed em 328.79s",
     ):
         assert result in f5_c1_dossier
-    assert "| **Gate** | `READY_FOR_MERGE / MERGE_AUTHORIZATION_REQUIRED` |" in panel
+    assert "| **Gate** | `ADMIN_PR_OPEN / CHECKS_PENDING` |" in panel
     assert "Apache-2.0" in panel
-    assert "docs/tasks/active/F7.4.md" in panel
+    assert "docs/tasks/completed/F7.4.md" in panel
+    assert not (ACTIVE_ROOT / "F7.4.md").exists()
+    assert (COMPLETED_ROOT / "F7.4.md").is_file()
+    for evidence in (
+        "> **Gate:** `COMPLETED_LOCAL`",
+        "> **Lifecycle:** `PROMOTED`",
+        "task/f7.4-packaging-portability",
+        "checkpoint/f7.4-ready",
+        "checkpoint/f7.4-complete",
+        "42b6f8fa39f348eb4866179a79b69456996dd309",  # pragma: allowlist secret
+        "33291856113",
+        "a62c16457bbd04cc9c30e31df65d429e30b2158f",  # pragma: allowlist secret
+        "33292240896",
+        "ADMIN_PR_OPEN / CHECKS_PENDING",
+        "docs/promote-f7.4", "https://github.com/Wf-ops1/Hartrol/pull/91", "33293115877",
+    ):
+        assert evidence in f7_4_dossier
+    for source in (panel, task_index, readme):
+        assert "42b6f8f" in source
+        assert "33291856113" in source
+        assert "a62c164" in source
+        assert "33292240896" in source
     assert "32085923509" in panel
     assert not (ACTIVE_ROOT / "F7.3.md").exists() and (COMPLETED_ROOT / "F7.3.md").is_file()
     f7_3_dossier = _read(COMPLETED_ROOT / "F7.3.md")
