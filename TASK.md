@@ -5,7 +5,7 @@
 ## 1. Fontes de verdade
 
 1. Este painel: fase, coordenação, gate, bloqueios e próxima ação.
-2. [F7.3](docs/tasks/completed/F7.3.md): `PROMOTED`; PR #87/head `97d2606`/merge `be17bcb`/pós-merge `32088913196`; reconciliação [#88](https://github.com/Wf-ops1/Hartrol/pull/88) final `3be0d12`/CI `32095513602`/merge `43bd135`/pós-merge `32096041236`.
+2. [F7.4](docs/tasks/active/F7.4.md): `READY_FOR_IMPLEMENTATION`; Apache-2.0 escolhida, escopo congelado e baseline `7b4dd3d`/CI `33287246294`; predecessora [F7.3](docs/tasks/completed/F7.3.md) promovida em `task/f7.3-quality-gates`.
 3. [F7.2](docs/tasks/completed/F7.2.md): produto PR #85/merge `53cafa5`/pós-merge `32039759737`; reconciliação PR #86/final `b40f251`/CI `32043891060`/merge `4e9f7a25`/pós-merge `32045181204`.
 4. [F7.1](docs/tasks/completed/F7.1.md): produto PR #83/merge `76f43dd`/pós-merge `31985776520`; reconciliação PR #84/final `ceca850`/CI `31999182890`/merge `b46ebd9`/pós-merge `32000365336`.
 4. Fase 6 — [F6.7](docs/tasks/completed/F6.7.md): knowledge transaction promovida pelo PR #81; reconciliação #82 encerrada no merge `38849ed`, com CI pós-merge `31979153948` verde.
@@ -46,13 +46,13 @@
 |---|---|
 | **Fases concluídas** | Fases 0–4 no escopo planejado; F5.1–F5.7 e F5.C1, F6.1–F6.7 e F7.1–F7.3 terminalmente reconciliadas |
 | **Fase ativa** | Fase 7 — maturidade operacional |
-| **Tarefa ativa** | Nenhuma implementação; F7.4 é somente planejada e F7.C1 foi instituída antes da F7.5 pela DEC-016 |
-| **Gate** | `PAUSED / F7.4_AUTHORIZATION_REQUIRED` |
-| **Estado corrente** | F7.3 e sua reconciliação estão terminalmente verdes; a revisão transversal alinha o estado corrente, a identidade `Wf-ops1/Hartrol` e a ordem F7.4 → F7.C1 → F7.5, sem alterar produto |
+| **Tarefa ativa** | [F7.4 — empacotamento e portabilidade](docs/tasks/active/F7.4.md), pronta para implementação local |
+| **Gate** | `READY / IMPLEMENTATION_AUTHORIZED` |
+| **Estado corrente** | Apache-2.0 escolhida pela autorização da recomendação; três lacunas reproduzidas e contrato congelado; checkpoint documental em criação antes da implementação |
 | **Estado F5.6** | F5.6 `PROMOTED`; aprovação de promoção permanece vinculada ao conteúdo exato |
-| **Executor ativo** | Nenhum executor de implementação; revisão documental executada por `Codex` como escritor único |
+| **Executor ativo** | `Codex`, único escritor autorizado da F7.4 |
 | **Workspace** | `C:\Users\walla\OneDrive\Desktop\ai-engineering-harness` |
-| **Branch** | revisão `docs/refresh-current-documentation` criada de `main == origin/main == 43bd1352267b4ed955637d5ce77dbb481a9c22a9`; produto `task/f7.3-quality-gates` remoto e preservado |
+| **Branch** | `task/f7.4-packaging-portability`, local, criada limpa de `main == origin/main == 7b4dd3d0a8720e6d47b6840cad8e5361fd4f0201` |
 | **Branch de produto F6.5** | `task/f6.5-status-inspection`, remota e preservada após o merge |
 | **Branch de produto F6.4** | `task/f6.4-real-doctor`, remota e preservada após o merge |
 | **Branch de produto F6.3** | `task/f6.3-evidence-manifest`, remota e preservada após o merge |
@@ -70,7 +70,8 @@
 | **Checkpoint F7.1** | `checkpoint/f7.1-ready` → `c55edaaaadd3137d682eb6c6175333fe924b6967`; `checkpoint/f7.1-complete` → `ed439a08b2a6b2f37b7d140aaaba2e504d1cc0aa`; ambos somente locais |
 | **Checkpoint F7.2** | `checkpoint/f7.2-ready` → `1badf4004b1670774c3fa85c3cae93b6351e49f4`; `checkpoint/f7.2-complete` → `09e0ee30e52e498b8fb8c3a128c2ffa5fc1ff6e8`; ambos somente locais |
 | **Checkpoint F7.3** | `checkpoint/f7.3-ready` → `4bbe19327c76a1d79ecd38ca306ff8670af7c18d`; `checkpoint/f7.3-r1-ready` → `d5964eab73f34ae48f98b086d3f5ee5d6f6c7d41`; `checkpoint/f7.3-complete` → `2723869a4f16d44e5e76b26331b3eb6e9c567326`; `checkpoint/f7.3-r3-complete` → `97d2606b79c427a647d8218a3fad778c176bcd60`; todos somente locais |
-| **Main sincronizada** | `main == origin/main == 43bd1352267b4ed955637d5ce77dbb481a9c22a9` após a reconciliação F7.3 e a CI `32096041236` verde |
+| **Checkpoint F7.4** | `checkpoint/f7.4-ready` será criado sobre o commit documental deste gate e permanecerá somente local |
+| **Main sincronizada** | `main == origin/main == 7b4dd3d0a8720e6d47b6840cad8e5361fd4f0201`; PR documental #89 e CI pós-merge `33287246294` 11/11 + `CI required` verdes |
 | **Implementação F7.2** | branch `task/f7.2-test-matrix`; baseline de 1055 testes coletáveis; produto `bdae858861a9c5294f90a231115b3ed930030117`; matriz canônica com 12 camadas/42 requisitos/46 node IDs e runner multiplataforma estrito |
 | **Validação F7.2** | matriz `62 passed in 83.45s`; full `1062 passed, 5 skipped, 6 subtests passed in 461.12s`; Ruff/mypy/compileall/build/smoke verdes |
 | **Promoção F7.2** | [PR #85](https://github.com/Wf-ops1/Hartrol/pull/85), head `09e0ee30e52e498b8fb8c3a128c2ffa5fc1ff6e8`, CI [32038804579](https://github.com/Wf-ops1/Hartrol/actions/runs/32038804579) tentativa #2 10/10 + `CI required`; merge `53cafa5134c3af5f4d0a7497b3f44e996a6581dd`; pós-merge [32039759737](https://github.com/Wf-ops1/Hartrol/actions/runs/32039759737) verde |
@@ -252,31 +253,30 @@ iniciar sua implementação local na branch exclusiva. O produto foi promovido p
 `docs/promote-f6.6` e preparar a reconciliação local. A autorização posterior `AUTORIZO` cobriu o
 fechamento integral da F6.6, com parada obrigatória antes da F6.7. A branch foi publicada sem force,
 o PR #80 aberto e o head inicial `06abef0` certificado 11/11 pelo run `31967211097`.
-Autorizações posteriores encerraram F6.6/F6.7, produziram/promoveram F7.1 e abriram o PR #84. Sua cadeia encerrou no head `ceca850`, CI `31999182890`, merge `b46ebd9` e pós-merge `32000365336`, sem remover refs. Em `2026-08-17T03:21:29-03:00`, o usuário autorizou continuar a Fase 7; a cadeia F7.2 encerrou no head `09e0ee3`, PR #85/run `32038804579`, merge `53cafa5` e pós-merge `32039759737`, sem remover refs. Autorizações seguintes encerraram o PR administrativo #86 no head `b40f251`, CI `32043891060`, merge `4e9f7a25` e pós-merge `32045181204`. Em `2026-08-17T14:01:09-03:00`, iniciou F7.3; após a correção UTF-8, o head `97d2606` passou no run `32088471059`, foi incorporado pelo merge `be17bcb` e recebeu CI de push `32088913196` verde. A reconciliação [#88](https://github.com/Wf-ops1/Hartrol/pull/88) encerrou no head `3be0d12`, CI `32095513602`, merge `43bd135` e CI pós-merge `32096041236` verde. Em `2026-08-29`, o usuário autorizou concluir e publicar a revisão transversal. A invocação Windows do scan saiu `3` ao reserializar paths POSIX com `\\`; a baseline foi renormalizada sem alterar detectors ou hashes, o validador confirmou `307` achados revisados e os 21 contratos de segurança passaram. A CI Ubuntu permanece como autoridade final; nenhuma F7.4 foi iniciada.
+Autorizações posteriores encerraram F6.6/F6.7, produziram/promoveram F7.1 e abriram o PR #84. Sua cadeia encerrou no head `ceca850`, CI `31999182890`, merge `b46ebd9` e pós-merge `32000365336`, sem remover refs. Em `2026-08-17T03:21:29-03:00`, o usuário autorizou continuar a Fase 7; a cadeia F7.2 encerrou no head `09e0ee3`, PR #85/run `32038804579`, merge `53cafa5` e pós-merge `32039759737`, sem remover refs. Autorizações seguintes encerraram o PR administrativo #86 no head `b40f251`, CI `32043891060`, merge `4e9f7a25` e pós-merge `32045181204`. Em `2026-08-17T14:01:09-03:00`, iniciou F7.3; após a correção UTF-8, o head `97d2606` passou no run `32088471059`, foi incorporado pelo merge `be17bcb` e recebeu CI de push `32088913196` verde. A reconciliação [#88](https://github.com/Wf-ops1/Hartrol/pull/88) encerrou no head `3be0d12`, CI `32095513602`, merge `43bd135` e CI pós-merge `32096041236` verde. Em `2026-08-29`, o usuário autorizou concluir e publicar a revisão transversal; o PR #89 encerrou no merge `7b4dd3d` e CI `33287246294` verde. A autorização nominal seguinte abriu a preparação F7.4; em `2026-08-29T23:36:44-03:00`, `autorizo continue` aceitou a recomendação Apache-2.0 e autorizou a implementação local depois do checkpoint READY.
 
 ## 5. Tarefa ativa
 
-Não há nenhuma tarefa ativa de implementação ou dossiê ativo. A [F7.3](docs/tasks/completed/F7.3.md) está `PROMOTED` e sua
-reconciliação [#88](https://github.com/Wf-ops1/Hartrol/pull/88) foi certificada no merge `43bd135`/CI `32096041236`.
-A revisão transversal corrige o estado corrente e institui F7.C1 antes da release. A F7.4 é somente planejada;
-o estado histórico `POST_PROMOTION_BLOCKED` da F7.2 permanece auditável e não descreve bloqueio atual.
+A [F7.4](docs/tasks/active/F7.4.md) está `READY_FOR_IMPLEMENTATION` na branch exclusiva. Apache-2.0,
+escopo, aceite e rollback estão congelados; nenhum arquivo de implementação foi alterado antes deste
+checkpoint.
 
 ## 6. Bloqueios e fronteiras externas
 
-O run `32085923509` permanece como evidência negativa histórica. Não há bloqueio técnico ou CI pendente;
-o próximo gate depende de autorização nominal específica para F7.4.
+O run `32085923509` e `POST_PROMOTION_BLOCKED` permanecem evidências históricas. Não há bloqueio
+técnico, jurídico ou CI pendente. Publicação, PR, merge, tag e F7.C1 continuam fora da autorização.
 
 ## 7. Próxima ação exata
 
 ```text
-PARAR APÓS A INCORPORAÇÃO E A CI VERDE DESTA REVISÃO DOCUMENTAL.
-AGUARDAR AUTORIZAÇÃO NOMINAL PRÓPRIA PARA INICIAR A F7.4; A ORDEM DEPOIS É F7.C1 → F7.5.
+CRIAR O COMMIT DOCUMENTAL E checkpoint/f7.4-ready SOMENTE LOCAIS.
+IMPLEMENTAR E CERTIFICAR O ESCOPO F7.4; NÃO INICIAR F7.C1 NEM PUBLICAR SEM NOVO GATE.
 ```
 
 ## 8. Retomada após perda de contexto
 
-1. Leia `.agents/AGENTS.md`, este painel, `docs/tasks/completed/F7.3.md`, a Fase 7 e a DEC-014.
-2. Confirme `main == origin/main == 43bd135`; preserve os checkpoints e a branch remota de produto F7.3.
+1. Leia `.agents/AGENTS.md`, este painel, `docs/tasks/active/F7.4.md`, a Fase 7 e as DEC-014/DEC-016.
+2. Confirme a branch F7.4 sobre `main == origin/main == 7b4dd3d` e preserve o checkpoint/allowlist.
 3. Preserve PR #68/merge `29e8a975`/CI `31859624571` como encerramento terminal da F5.C1.
 4. Preserve `282`/`929` e `320`/`930` como históricos; a recertificação R2 vigente é `325`/`935`.
 5. Preserve PR #69/head `4c57a33`/CI `31868906875`/merge `7d6a0e1`/pós-merge `31887143905`.
@@ -297,4 +297,4 @@ AGUARDAR AUTORIZAÇÃO NOMINAL PRÓPRIA PARA INICIAR A F7.4; A ORDEM DEPOIS É F
 20. Preserve PR #84: final `ceca850`/`31999182890`, merge `b46ebd9`/pós-merge `32000365336`; F7.2 `1badf40`/`bdae858`/`09e0ee3`, PR #85/run `32038804579`, merge `53cafa5`/pós-merge `32039759737`; PR #86 final `b40f251`/`32043891060`, merge `4e9f7a25`/pós-merge `32045181204`; F7.3 negativo `32085923509`, final `97d2606`/`32088471059`, merge `be17bcb`/pós-merge `32088913196`, reconciliação #88 final `3be0d12`/`32095513602`, merge `43bd135`/pós-merge `32096041236`.
 ---
 
-*Atualizado em: 2026-08-29 | Fonte: reconciliação F7.3 certificada, auditoria de retomada e DEC-016*
+*Atualizado em: 2026-08-29T23:36:44-03:00 | Fonte: F7.4 READY, Apache-2.0 e implementação local autorizada*

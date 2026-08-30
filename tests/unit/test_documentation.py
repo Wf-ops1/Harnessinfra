@@ -292,7 +292,9 @@ def test_public_state_docs_distinguish_real_primitives_from_missing_composition(
     assert "31868906875" in panel
     assert "7d6a0e179f30008a7a67275da94878a179f0aba9" in panel
     assert "31887143905" in panel
-    assert "| **Gate** | `PAUSED / F7.4_AUTHORIZATION_REQUIRED` |" in panel
+    assert "| **Gate** | `READY / IMPLEMENTATION_AUTHORIZED` |" in panel
+    assert "Apache-2.0" in panel
+    assert "docs/tasks/active/F7.4.md" in panel
     assert "32085923509" in panel
     assert "docs/tasks/completed/F7.3.md" in panel
     assert all(evidence in panel for evidence in ("task/f7.3-quality-gates", "97d2606b79c427a647d8218a3fad778c176bcd60", "32088471059", "be17bcb4130ad28c882d2dd781554114e2f6badb", "32088913196", "https://github.com/Wf-ops1/Hartrol/pull/88", "3be0d129a2ef82ac368083b1654847198dd3f757", "32095513602", "43bd1352267b4ed955637d5ce77dbb481a9c22a9", "32096041236"))  # pragma: allowlist secret
