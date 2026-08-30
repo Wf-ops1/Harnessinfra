@@ -20,13 +20,15 @@ em [`TASK.md`](../../TASK.md); requisitos normativos permanecem no
 
 ## Tarefa ativa
 
-Nenhuma tarefa ativa. A [F7.4 — empacotamento e portabilidade](completed/F7.4.md) está `PROMOTED`:
-o [PR #90](https://github.com/Wf-ops1/Hartrol/pull/90) encerrou no head `42b6f8f`, certificado 11/11
-mais `CI required` pelo run `33291856113`, foi incorporado no merge `a62c164` e recebeu a CI de
-`push` `33292240896` verde no SHA exato. A branch remota de produto foi preservada e não há tags
-remotas. A reconciliação está `ADMIN_PR_OPEN / CHECKS_PENDING` no
-[PR #91](https://github.com/Wf-ops1/Hartrol/pull/91), head inicial `669b78b`, com a CI
-`33293115877` em andamento; F7.C1 permanece bloqueada pela DEC-014/DEC-016 até o fechamento terminal.
+A [F7.C1 — composição operacional do caminho público](active/F7.C1.md) está `READY` na branch local
+`task/f7.c1-public-path-composition`, sem upstream. O caminho público foi reproduzido falhando por
+registry de executores vazio; escopo, aceite e rollback estão congelados antes da implementação.
+Publicação, PR, merge, tags remotas e remoção de refs não estão autorizados.
+
+A [F7.4 — empacotamento e portabilidade](completed/F7.4.md) está terminalmente `PROMOTED`: produto
+PR #90/head `42b6f8f`/CI `33291856113`/merge `a62c164`/pós-merge `33292240896`; reconciliação
+PR #91/head final `f4b4f45`/CI `33293246380`/merge `0ea7f801`/pós-merge `33293579533`, com onze jobs
+mais `CI required` verdes no SHA exato. As branches remotas foram preservadas e não há tags remotas.
 
 A [F7.3 — quality gates do próprio projeto](completed/F7.3.md)
 está `PROMOTED`: a PR [#87](https://github.com/Wf-ops1/Hartrol/pull/87) encerrou no head
@@ -224,7 +226,8 @@ checks no run `31629604755`, foi incorporado pelo merge `c46910e` e recebeu 11/1
 | F7 | F7.1 | [E2E Git temporário](completed/F7.1.md) | PR #83 / head `a26807c` / merge `76f43dd` / pós-merge `31985776520`; administrativo #84 / merge `b46ebd9` / pós-merge `32000365336` |
 | F7 | F7.2 | [Matriz de testes](completed/F7.2.md) | PR #85 / head `09e0ee3` / merge `53cafa5` / pós-merge `32039759737`; administrativo #86 / merge `4e9f7a25` / pós-merge `32045181204` |
 | F7 | F7.3 | [Quality gates do projeto](completed/F7.3.md) | PR #87 / head `97d2606` / CI `32088471059`; merge `be17bcb` / pós-merge `32088913196`; administrativo #88 / head `3be0d12` / CI `32095513602` / merge `43bd135` / pós-merge `32096041236` |
-| F7 | F7.4 | [Empacotamento e portabilidade](completed/F7.4.md) | PR #90 / head `42b6f8f` / CI `33291856113`; merge `a62c164` / pós-merge `33292240896`; administrativo local pendente de publicação |
+| F7 | F7.4 | [Empacotamento e portabilidade](completed/F7.4.md) | PR #90 / head `42b6f8f` / CI `33291856113`; merge `a62c164` / pós-merge `33292240896`; administrativo #91 / head `f4b4f45` / CI `33293246380` / merge `0ea7f801` / pós-merge `33293579533` |
+| F7 | F7.C1 | [Composição operacional do caminho público](active/F7.C1.md) | `READY`; branch local `task/f7.c1-public-path-composition`; checkpoint local pendente neste commit documental |
 
 Fechamentos documentais adicionais preservados no Git: PR #13 / merge `3596df3` / run
 `31211290100` e PR #15 / merge `d48151b` / run `31215944126`.
