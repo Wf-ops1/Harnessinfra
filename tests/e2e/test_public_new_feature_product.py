@@ -382,7 +382,6 @@ def test_installed_public_cli_delivers_promotes_audits_and_rolls_back(
     command_environment = os.environ.copy()
     for variable in ("TEMP", "TMP", "TMPDIR"):
         command_environment[variable] = str(command_temp)
-    command_environment["LOCALAPPDATA"] = str(local_appdata)
 
     repository = tmp_path / "external-repository"
     (repository / "demo_app").mkdir(parents=True)
@@ -409,6 +408,7 @@ def test_installed_public_cli_delivers_promotes_audits_and_rolls_back(
         installed_environment=installed_environment,
         command_environment=command_environment,
     )
+    command_environment["LOCALAPPDATA"] = str(local_appdata)
 
     environment = command_environment.copy()
     environment["PYTHONPATH"] = str(installed_environment)

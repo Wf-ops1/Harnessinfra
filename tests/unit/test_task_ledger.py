@@ -1077,7 +1077,7 @@ def test_f5_7_promotion_preserves_r3_negative_evidence_and_certification() -> No
         "914 passed, 5 skipped, 6 subtests passed em 328.79s",
     ):
         assert result in f5_c1_dossier
-    assert "| **Gate** | `COMPLETED_LOCAL / PROMOTION_PENDING` |" in panel
+    assert "| **Gate** | `REPAIR_ACTIVE / PROMOTION_BLOCKED` |" in panel
     assert "Apache-2.0" in panel
     assert "docs/tasks/completed/F7.4.md" in panel
     assert not (ACTIVE_ROOT / "F7.4.md").exists()
@@ -1104,12 +1104,14 @@ def test_f5_7_promotion_preserves_r3_negative_evidence_and_certification() -> No
         assert "0ea7f801" in source
         assert "33293579533" in source
     assert (ACTIVE_ROOT / "F7.C1.md").is_file()
-    assert "> **Gate:** `COMPLETED_LOCAL`" in f7_c1_dossier
-    assert "> **Lifecycle:** `PROMOTION_PENDING`" in f7_c1_dossier
-    assert "2415f41aff0d746dc11d58a662d8998de6181b76" in f7_c1_dossier
+    assert "> **Gate:** `REPAIR_ACTIVE`" in f7_c1_dossier
+    assert "> **Lifecycle:** `PROMOTION_BLOCKED`" in f7_c1_dossier
+    assert "2415f41aff0d746dc11d58a662d8998de6181b76" in f7_c1_dossier  # pragma: allowlist secret
     assert "1106 passed, 5 skipped, 6 subtests passed" in f7_c1_dossier
     assert "task/f7.c1-public-path-composition" in f7_c1_dossier
     assert "checkpoint/f7.c1-ready" in f7_c1_dossier
+    assert "https://github.com/Wf-ops1/Hartrol/pull/92" in f7_c1_dossier
+    assert "33321887150" in f7_c1_dossier
     assert "32085923509" in panel
     assert not (ACTIVE_ROOT / "F7.3.md").exists() and (COMPLETED_ROOT / "F7.3.md").is_file()
     f7_3_dossier = _read(COMPLETED_ROOT / "F7.3.md")
