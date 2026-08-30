@@ -1077,7 +1077,7 @@ def test_f5_7_promotion_preserves_r3_negative_evidence_and_certification() -> No
         "914 passed, 5 skipped, 6 subtests passed em 328.79s",
     ):
         assert result in f5_c1_dossier
-    assert "| **Gate** | `COMPLETED_LOCAL` — produto `9f7886a`" in panel
+    assert "| **Gate** | `PROMOTED / ADMIN_LOCAL` — produto F7.5 certificado" in panel
     assert "Apache-2.0" in panel
     assert "checkpoint/f7.4-complete" in panel
     assert not (ACTIVE_ROOT / "F7.4.md").exists()

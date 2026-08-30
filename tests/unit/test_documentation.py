@@ -317,7 +317,7 @@ def test_public_state_docs_distinguish_real_primitives_from_missing_composition(
     assert "31868906875" in panel
     assert "7d6a0e179f30008a7a67275da94878a179f0aba9" in panel
     assert "31887143905" in panel
-    assert "| **Gate** | `COMPLETED_LOCAL` — produto `9f7886a`" in panel
+    assert "| **Gate** | `PROMOTED / ADMIN_LOCAL` — produto F7.5 certificado" in panel
     assert "Apache-2.0" in panel
     assert "checkpoint/f7.4-complete" in panel
     assert "docs/tasks/completed/F7.C1.md" in panel
@@ -595,7 +595,7 @@ def test_release_order_requires_current_docs_and_public_runtime_composition() ->
     assert "> **Estado:** aceita" in decision
     assert "não autoriza iniciar F7.4" in decision
     assert "F7.C1" in readme and "DEC-016" in readme
-    assert "DEC-016" in panel and "F7.5 localmente certificada" in panel
+    assert "DEC-016" in panel and "A [F7.5](docs/tasks/completed/F7.5.md) está `PROMOTED`" in panel
     assert "https://github.com/Wf-ops1/Hartrol/pull/88" in panel
 
 
@@ -617,7 +617,7 @@ def test_f75_release_candidate_surfaces_are_consistent() -> None:
     lifecycle = _read(ROOT / "docs" / "agentic_lifecycle_audit.md")
     operating_model = _read(ROOT / "docs" / "agentic_operating_model.md")
     panel = _read(ROOT / "TASK.md")
-    dossier = _read(ROOT / "docs" / "tasks" / "active" / "F7.5.md")
+    dossier = _read(ROOT / "docs" / "tasks" / "completed" / "F7.5.md")
 
     for surface in (readme, changelog, support, portability, limitations, dossier):
         assert "0.2.0rc1" in surface
