@@ -24,8 +24,9 @@ Nenhuma tarefa ativa. A [F7.4 — empacotamento e portabilidade](completed/F7.4.
 o [PR #90](https://github.com/Wf-ops1/Hartrol/pull/90) encerrou no head `42b6f8f`, certificado 11/11
 mais `CI required` pelo run `33291856113`, foi incorporado no merge `a62c164` e recebeu a CI de
 `push` `33292240896` verde no SHA exato. A branch remota de produto foi preservada e não há tags
-remotas. A reconciliação está `LOCAL_READY / PUBLICATION_PENDING` em `docs/promote-f7.4`; F7.C1
-permanece bloqueada pela DEC-014/DEC-016 até o fechamento administrativo terminal.
+remotas. A reconciliação está `ADMIN_PR_OPEN / CHECKS_PENDING` no
+[PR #91](https://github.com/Wf-ops1/Hartrol/pull/91), head inicial `669b78b`, com a CI
+`33293115877` em andamento; F7.C1 permanece bloqueada pela DEC-014/DEC-016 até o fechamento terminal.
 
 A [F7.3 — quality gates do próprio projeto](completed/F7.3.md)
 está `PROMOTED`: a PR [#87](https://github.com/Wf-ops1/Hartrol/pull/87) encerrou no head

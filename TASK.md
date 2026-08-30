@@ -5,7 +5,7 @@
 ## 1. Fontes de verdade
 
 1. Este painel: fase, coordenação, gate, bloqueios e próxima ação.
-2. [F7.4](docs/tasks/completed/F7.4.md): produto `PROMOTED` pelo PR #90/head `42b6f8f`/CI `33291856113`/merge `a62c164`/pós-merge `33292240896`; reconciliação `LOCAL_READY / PUBLICATION_PENDING`; predecessora [F7.3](docs/tasks/completed/F7.3.md) terminalmente reconciliada em `task/f7.3-quality-gates`.
+2. [F7.4](docs/tasks/completed/F7.4.md): produto `PROMOTED` pelo PR #90/head `42b6f8f`/CI `33291856113`/merge `a62c164`/pós-merge `33292240896`; reconciliação PR #91/head inicial `669b78b`/CI `33293115877` em andamento; predecessora [F7.3](docs/tasks/completed/F7.3.md) terminalmente reconciliada em `task/f7.3-quality-gates`.
 3. [F7.2](docs/tasks/completed/F7.2.md): produto PR #85/merge `53cafa5`/pós-merge `32039759737`; reconciliação PR #86/final `b40f251`/CI `32043891060`/merge `4e9f7a25`/pós-merge `32045181204`.
 4. [F7.1](docs/tasks/completed/F7.1.md): produto PR #83/merge `76f43dd`/pós-merge `31985776520`; reconciliação PR #84/final `ceca850`/CI `31999182890`/merge `b46ebd9`/pós-merge `32000365336`.
 4. Fase 6 — [F6.7](docs/tasks/completed/F6.7.md): knowledge transaction promovida pelo PR #81; reconciliação #82 encerrada no merge `38849ed`, com CI pós-merge `31979153948` verde.
@@ -46,13 +46,13 @@
 |---|---|
 | **Fases concluídas** | Fases 0–4 no escopo planejado; F5.1–F5.7 e F5.C1, F6.1–F6.7 e F7.1–F7.3 terminalmente reconciliadas; produto F7.4 promovido |
 | **Fase ativa** | Fase 7 — maturidade operacional |
-| **Tarefa ativa** | nenhuma tarefa ativa; reconciliação de [F7.4](docs/tasks/completed/F7.4.md) preparada localmente |
-| **Gate** | `LOCAL_READY / PUBLICATION_PENDING` |
-| **Estado corrente** | Produto PR #90/head `42b6f8f`/CI `33291856113` incorporado no merge `a62c164`; CI pós-merge `33292240896` integralmente verde; F7.C1 não iniciado |
+| **Tarefa ativa** | nenhuma tarefa ativa; reconciliação de [F7.4](docs/tasks/completed/F7.4.md) publicada no PR #91 |
+| **Gate** | `ADMIN_PR_OPEN / CHECKS_PENDING` |
+| **Estado corrente** | PR administrativo #91 aberto, head inicial `669b78b`, CI `33293115877` em andamento; merge e F7.C1 não autorizados |
 | **Estado F5.6** | F5.6 `PROMOTED`; aprovação de promoção permanece vinculada ao conteúdo exato |
 | **Executor ativo** | `Codex`, único escritor da reconciliação administrativa F7.4 |
 | **Workspace** | `C:\Users\walla\OneDrive\Desktop\ai-engineering-harness` |
-| **Branch** | `docs/promote-f7.4`, local, sem upstream, criada de `main == origin/main == a62c16457bbd04cc9c30e31df65d429e30b2158f` |
+| **Branch** | `docs/promote-f7.4`, publicada sem force e rastreando `origin/docs/promote-f7.4`; base `main == origin/main == a62c16457bbd04cc9c30e31df65d429e30b2158f` |
 | **Branch de produto F6.5** | `task/f6.5-status-inspection`, remota e preservada após o merge |
 | **Branch de produto F6.4** | `task/f6.4-real-doctor`, remota e preservada após o merge |
 | **Branch de produto F6.3** | `task/f6.3-evidence-manifest`, remota e preservada após o merge |
@@ -185,7 +185,7 @@
 | PR de produto | [#87](https://github.com/Wf-ops1/Hartrol/pull/87), head final `97d2606`, CI `32088471059`, 12/12 + `CI required` success |
 | Merge de produto | `be17bcb4130ad28c882d2dd781554114e2f6badb`; CI de `push` `32088913196`, 12/12 + `CI required` success |
 | Reconciliação administrativa | [PR #88](https://github.com/Wf-ops1/Hartrol/pull/88), head final `3be0d129a2ef82ac368083b1654847198dd3f757`, CI `32095513602` 12/12 + `CI required`, merge `43bd1352267b4ed955637d5ce77dbb481a9c22a9`; CI pós-merge `32096041236` 12/12 + `CI required` |
-| Fronteira | F7.4 produto `PROMOTED`, reconciliação `LOCAL_READY / PUBLICATION_PENDING`; F7.C1 bloqueada até o fechamento administrativo, depois F7.C1 → F7.5 |
+| Fronteira | F7.4 produto `PROMOTED`, reconciliação `ADMIN_PR_OPEN / CHECKS_PENDING` no PR #91; F7.C1 bloqueada até o fechamento administrativo, depois F7.C1 → F7.5 |
 | Promoção anterior | F7.1 — produto `2ce104b687650587fa6881a88ea281dac22a83b3`, full `1050 passed, 5 skipped, 6 subtests passed in 968.39s`; PR #83 inicial `ed439a0`/`31984775704`, final `a26807c030c7f099c5419ed5166a17cb46f4a2e4`/`31985232560`, merge `76f43dd29923c87e00062ca65afd534b5f4f1863`/pós-merge `31985776520`; [PR #84](https://github.com/Wf-ops1/Hartrol/pull/84) inicial `197eb33b0d9c33a87a51cef38b4da39afc5588c6`/`31998528616`, final `ceca850083fbbc2a6da54394054b09b6f335c9c7`/`31999182890`, merge `b46ebd9c84cacab6bd58d2fb2712879f6dabc164`/pós-merge `32000365336` |
 | Promoção anterior | F6.6 — PR #79 / merge `8be6789` / pós-merge `31963338576`; reconciliação PR #80 / merge `1327f299` / pós-merge `31968035375` |
 | Promoção anterior | F6.5 — PR #77 / merge `c049125` / pós-merge `31953772121`; reconciliação PR #78 / merge `6386816` / pós-merge `31956649961` |
@@ -258,26 +258,26 @@ Autorizações posteriores encerraram F6.6/F6.7, produziram/promoveram F7.1 e ab
 ## 5. Tarefa ativa
 
 Nenhuma tarefa ativa. A [F7.4](docs/tasks/completed/F7.4.md) está `PROMOTED`; sua reconciliação
-administrativa está `LOCAL_READY / PUBLICATION_PENDING` na branch local `docs/promote-f7.4`. O
-produto passou full `1097/5/6`, CI final `33291856113` e CI pós-merge `33292240896`.
+administrativa está `ADMIN_PR_OPEN / CHECKS_PENDING` no PR #91. O head inicial `669b78b` disparou
+a CI `33293115877`; merge, F7.C1, tags remotas e remoção de refs não estão autorizados.
 
 ## 6. Bloqueios e fronteiras externas
 
 O run `32085923509` e `POST_PROMOTION_BLOCKED` permanecem evidências históricas. Não há bloqueio
-técnico, jurídico ou de CI. Push/PR/merge administrativos, tag remota, remoção de refs e F7.C1
-continuam fora da autorização; F7.C1 depende do fechamento terminal da reconciliação pela DEC-014.
+técnico, jurídico ou de CI. Merge administrativo, tag remota, remoção de refs e F7.C1 continuam
+fora da autorização; F7.C1 depende do fechamento terminal da reconciliação pela DEC-014.
 
 ## 7. Próxima ação exata
 
 ```text
-SOLICITAR AUTORIZAÇÃO PARA PUBLICAR A RECONCILIAÇÃO E ABRIR O PR ADMINISTRATIVO.
-NÃO INICIAR F7.C1, CRIAR TAG REMOTA NEM REMOVER REFS.
+AGUARDAR A CI INTEGRAL DO PR ADMINISTRATIVO #91 NO NOVO HEAD.
+SOLICITAR AUTORIZAÇÃO ANTES DO MERGE; NÃO INICIAR F7.C1 NEM REMOVER REFS.
 ```
 
 ## 8. Retomada após perda de contexto
 
 1. Leia `.agents/AGENTS.md`, este painel, `docs/tasks/completed/F7.4.md`, a Fase 7 e as DEC-014/DEC-016.
-2. Confirme `docs/promote-f7.4` local sobre `main == origin/main == a62c164` e preserve refs/checkpoints.
+2. Confirme `docs/promote-f7.4` publicada no PR #91 sobre `origin/main == a62c164` e preserve refs/checkpoints.
 3. Preserve PR #68/merge `29e8a975`/CI `31859624571` como encerramento terminal da F5.C1.
 4. Preserve `282`/`929` e `320`/`930` como históricos; a recertificação R2 vigente é `325`/`935`.
 5. Preserve PR #69/head `4c57a33`/CI `31868906875`/merge `7d6a0e1`/pós-merge `31887143905`.
@@ -297,4 +297,4 @@ NÃO INICIAR F7.C1, CRIAR TAG REMOTA NEM REMOVER REFS.
 19. Preserve F7.1: `c55edaa`/`2ce104b`, `1/1`, `42/1`, `1050/5/6`; PR #83 final `a26807c`/`31985232560`, merge `76f43dd`/pós-merge `31985776520`.
 20. Preserve PR #84: final `ceca850`/`31999182890`, merge `b46ebd9`/pós-merge `32000365336`; F7.2 `1badf40`/`bdae858`/`09e0ee3`, PR #85/run `32038804579`, merge `53cafa5`/pós-merge `32039759737`; PR #86 final `b40f251`/`32043891060`, merge `4e9f7a25`/pós-merge `32045181204`; F7.3 negativo `32085923509`, final `97d2606`/`32088471059`, merge `be17bcb`/pós-merge `32088913196`, reconciliação #88 final `3be0d12`/`32095513602`, merge `43bd135`/pós-merge `32096041236`; F7.4 PR #90 final `42b6f8f`/`33291856113`, merge `a62c164`/pós-merge `33292240896`.
 ---
-*Atualizado em: 2026-08-30T01:28:51-03:00 | Fonte: PR #90/head 42b6f8f/CI 33291856113/merge a62c164/pós-merge 33292240896; reconciliação somente local*
+*Atualizado em: 2026-08-30T01:44:01-03:00 | Fonte: PR administrativo #91/head inicial 669b78b/CI 33293115877 em andamento; merge não autorizado*

@@ -1076,7 +1076,7 @@ def test_f5_7_promotion_preserves_r3_negative_evidence_and_certification() -> No
         "914 passed, 5 skipped, 6 subtests passed em 328.79s",
     ):
         assert result in f5_c1_dossier
-    assert "| **Gate** | `LOCAL_READY / PUBLICATION_PENDING` |" in panel
+    assert "| **Gate** | `ADMIN_PR_OPEN / CHECKS_PENDING` |" in panel
     assert "Apache-2.0" in panel
     assert "docs/tasks/completed/F7.4.md" in panel
     assert not (ACTIVE_ROOT / "F7.4.md").exists()
@@ -1091,8 +1091,8 @@ def test_f5_7_promotion_preserves_r3_negative_evidence_and_certification() -> No
         "33291856113",
         "a62c16457bbd04cc9c30e31df65d429e30b2158f",  # pragma: allowlist secret
         "33292240896",
-        "LOCAL_READY / PUBLICATION_PENDING",
-        "docs/promote-f7.4",
+        "ADMIN_PR_OPEN / CHECKS_PENDING",
+        "docs/promote-f7.4", "https://github.com/Wf-ops1/Hartrol/pull/91", "33293115877",
     ):
         assert evidence in f7_4_dossier
     for source in (panel, task_index, readme):

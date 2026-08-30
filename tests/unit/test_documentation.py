@@ -317,21 +317,21 @@ def test_public_state_docs_distinguish_real_primitives_from_missing_composition(
     assert "31868906875" in panel
     assert "7d6a0e179f30008a7a67275da94878a179f0aba9" in panel
     assert "31887143905" in panel
-    assert "| **Gate** | `LOCAL_READY / PUBLICATION_PENDING` |" in panel
+    assert "| **Gate** | `ADMIN_PR_OPEN / CHECKS_PENDING` |" in panel
     assert "Apache-2.0" in panel
     assert "docs/tasks/completed/F7.4.md" in panel
     assert "nenhuma tarefa ativa" in panel.casefold()
     assert all(
         evidence in panel
-        for evidence in ("42b6f8f", "33291856113", "a62c164", "33292240896", "docs/promote-f7.4")
+        for evidence in ("42b6f8f", "33291856113", "a62c164", "33292240896", "docs/promote-f7.4", "PR #91", "33293115877")
     )
     assert all(
         evidence in task_index
-        for evidence in ("completed/F7.4.md", "42b6f8f", "33291856113", "a62c164", "33292240896")
+        for evidence in ("completed/F7.4.md", "42b6f8f", "33291856113", "a62c164", "33292240896", "PR #91", "33293115877")
     )
     assert all(
         evidence in readme
-        for evidence in ("PR #90", "42b6f8f", "33291856113", "a62c164", "33292240896")
+        for evidence in ("PR #90", "42b6f8f", "33291856113", "a62c164", "33292240896", "PR #91")
     )
     assert "32085923509" in panel
     assert "docs/tasks/completed/F7.3.md" in panel

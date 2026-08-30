@@ -16,7 +16,7 @@ automaticamente essa fronteira.
 
 Não use `harness run`, `harness doctor`, `harness verify` ou `harness rollback` como garantia de segurança em um
 repositório valioso. As Fases 0–6 e as tarefas F7.1–F7.3 foram concluídas no escopo planejado. O
-produto F7.4 foi promovido pelo PR #90, mas sua reconciliação administrativa ainda é somente local;
+produto F7.4 foi promovido pelo PR #90, mas sua reconciliação administrativa ainda está no PR #91;
 a composição automática F7.C1 e a F7.5 continuam pendentes. Execute esses comandos somente em cópias descartáveis.
 
 ## Objetivo do produto
@@ -41,9 +41,9 @@ auditável. Isso é a direção do produto, não uma descrição do estado entre
 
 | Capacidade | Implementada | Experimental | Planejada |
 |---|---|---|---|
-| Ambiente e pacote | `uv.lock`, build de wheel, metadata SPDX Apache-2.0, defaults via `importlib.resources` e smoke externo ao checkout; F7.4 promovida pelo PR #90/merge `a62c164` | A reconciliação F7.4 ainda é local; bootstrap depende de instalar `uv`, e macOS não possui job de CI | Distribuição pública e instalação externa suportadas como produto |
+| Ambiente e pacote | `uv.lock`, build de wheel, metadata SPDX Apache-2.0, defaults via `importlib.resources` e smoke externo ao checkout; F7.4 promovida pelo PR #90/merge `a62c164` | A reconciliação F7.4 está no PR #91; bootstrap depende de instalar `uv`, e macOS não possui job de CI | Distribuição pública e instalação externa suportadas como produto |
 | Versionamento | Package version única e schemas graph/artifact/policy separados | Compatibilidade ainda é comparação exata | Migrações compatíveis e política de evolução |
-| Configuração e governança | F5.1–F5.7, F5.C1, F6.1–F6.7 e F7.1–F7.3 estão terminalmente reconciliadas; o produto F7.4 está `PROMOTED` | A reconciliação F7.4 está `LOCAL_READY / PUBLICATION_PENDING`; a composição automática do lifecycle foi congelada como F7.C1 pela [DEC-016](docs/decisions/DEC-016-composicao-operacional-antes-da-release.md) | Governança operacional integral após F7.4 → F7.C1 → F7.5 |
+| Configuração e governança | F5.1–F5.7, F5.C1, F6.1–F6.7 e F7.1–F7.3 estão terminalmente reconciliadas; o produto F7.4 está `PROMOTED` | A reconciliação F7.4 está `ADMIN_PR_OPEN / CHECKS_PENDING` no PR #91; a composição automática do lifecycle foi congelada como F7.C1 pela [DEC-016](docs/decisions/DEC-016-composicao-operacional-antes-da-release.md) | Governança operacional integral após F7.4 → F7.C1 → F7.5 |
 | CLI e scaffold | `--help`, `--version`, `init`, `compile`, `run`, `resume`, `approve`, `cancel`, `cleanup-worktree`, `rollback`, `list`, `status`, `inspect`, `events`, `evidence` e doctor possuem contratos/testes | Sem backends reais, `run` falha no preflight; os comandos F6.5 são inspeção local fail-closed e estado/worktree válidos continuam necessários | UX estável para CLI e IDE em repositórios externos |
 | Compilação de grafos | Um único `GraphCompiler` valida contratos/policies e publica artefato 2.0 determinístico, versionado, íntegro e atômico | Capabilities compiladas ainda são declarativas, sem provar adapter disponível ou autorização runtime | Migrações de schema e expansão segura de workflows após o MVP |
 | Runtime/FSM | `GraphExecutor` segue somente arestas compiladas; record/journal usam lock, CAS e fencing. A F5.7 promovida persiste decisão/pedido, interrompe e reapera a árvore vinculada, impede sucesso pós-cancelamento e reconcilia `CANCELLED` sob lock após quiescência | Efeito iniciado sem outcome exige intervenção; executores, tools e worktree ainda dependem de backends/providers injetados | Integração automática dos efeitos reais no lifecycle padrão e recovery F6 |
@@ -281,7 +281,7 @@ auditável. Isso é a direção do produto, não uma descrição do estado entre
   `checkpoint/f7.4-complete`. O PR #90 encerrou no head `42b6f8f`, passou 11/11 mais `CI required`
   no run `33291856113`, foi incorporado pelo merge `a62c164` e recebeu a CI pós-merge `33292240896`
   verde; a branch remota de produto foi preservada e não há tags remotas. O produto está `PROMOTED`,
-  enquanto a reconciliação administrativa permanece `LOCAL_READY / PUBLICATION_PENDING`. A DEC-016
+  enquanto a reconciliação administrativa permanece `ADMIN_PR_OPEN / CHECKS_PENDING` no PR #91. A DEC-016
   exige F7.C1 entre F7.4 e F7.5 para que a release candidate use a composição operacional pública.
 
 ## Dívidas técnicas críticas
