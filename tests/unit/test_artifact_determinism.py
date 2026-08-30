@@ -91,7 +91,7 @@ def _capability_graph() -> dict[str, Any]:
                 "role": "code_agent",
                 "input_contract": contract,
                 "output_contract": contract,
-                "tool_permissions": [{"tool": "file_writer", "effect": "allow"}],
+                "tool_permissions": [{"tool": "apply_patch", "effect": "allow"}],
                 "on_success": "completed",
                 "on_failure": "failed",
             },
@@ -368,7 +368,7 @@ def test_required_capabilities_are_only_effective_sorted_allows(tmp_path: Path) 
     output = _compile(tmp_path, _capability_graph())
     artifact = MAFAdapter.load_and_validate(output)
 
-    assert artifact.required_capabilities == ("file_writer", "knowledge_retriever")
+    assert artifact.required_capabilities == ("apply_patch", "knowledge_retriever")
     assert "file_reader" not in artifact.required_capabilities
     assert "test_runner" not in artifact.required_capabilities
 

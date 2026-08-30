@@ -14,6 +14,7 @@ from .context_sufficiency import (
     ManifestResult,
     RetrievalRequest,
 )
+from .new_feature import NewFeatureExecutionState
 from .node_contracts import ArchitectureAnalysis, CodeGenNode
 from .test_generation import TestGenerationInput, TestGenerationOutput
 
@@ -34,6 +35,7 @@ __all__ = [
     "ContextSufficiencyReport",
     "EvidenceReference",
     "ManifestResult",
+    "NewFeatureExecutionState",
     "RetrievalRequest",
     "TestGenerationInput",
     "TestGenerationOutput",

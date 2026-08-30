@@ -887,7 +887,7 @@ class ExternalWorktreeManager:
             raise GitCommandError(
                 "Git executable is not allowed by the trust boundary"
             ) from exc
-        argv = [self.git_executable, *arguments]
+        argv = [self.git_executable, "-c", "core.longpaths=true", *arguments]
         try:
             result = subprocess.run(
                 argv,

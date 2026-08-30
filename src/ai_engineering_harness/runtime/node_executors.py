@@ -311,6 +311,12 @@ class NodeExecutionContext(_StrictFrozenModel):
     attempt: int = Field(ge=0)
     input_payload: dict[str, object]
     fencing_token: int = Field(gt=0)
+    base_commit_sha: str | None = Field(default=None, pattern=r"^[0-9a-f]{40}$")
+    effective_configuration: dict[str, object] | None = Field(
+        default=None,
+        exclude=True,
+        repr=False,
+    )
     retry_context: RetryContext | None = None
     tool_effect_recorder: ToolEffectRecorder | None = Field(
         default=None,
@@ -334,6 +340,16 @@ class NodeExecutionContext(_StrictFrozenModel):
     @classmethod
     def detach_input_payload(cls, value: object) -> dict[str, object]:
         return _copy_json_object(value, path="input_payload")
+
+    @field_validator("effective_configuration", mode="before")
+    @classmethod
+    def detach_effective_configuration(
+        cls,
+        value: object,
+    ) -> dict[str, object] | None:
+        if value is None:
+            return None
+        return _copy_json_object(value, path="effective_configuration")
 
     @field_validator("tool_effect_recorder")
     @classmethod

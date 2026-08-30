@@ -1,8 +1,10 @@
 """Interface CLI unificada final com todos os subcomandos do AI-Engineering-Harness."""
 
+import hashlib
 import json
 import sys
 import time
+from datetime import UTC, datetime, timedelta
 from importlib.resources import files as package_files
 from importlib.resources.abc import Traversable
 from pathlib import Path
@@ -33,6 +35,7 @@ from ai_engineering_harness.runtime import (
     NodeExecutorRegistry,
     RollbackManager,
     StateMachineError,
+    build_new_feature_lifecycle,
 )
 from ai_engineering_harness.runtime.maf_adapter import ArtifactValidationError
 from ai_engineering_harness.security import (
@@ -79,9 +82,29 @@ def _lifecycle_service(
     *,
     project_id: str = "default-proj",
     trust_boundary: TrustEvaluationResult | None = None,
+    workflow_name: str | None = None,
+    execution_id: str | None = None,
 ) -> ExecutionLifecycleService:
-    """Build the canonical lifecycle with deliberately unavailable real backends."""
-    boundary = trust_boundary or _cli_trust_boundary(project_root)
+    """Build the registered public composition or a fail-closed empty lifecycle."""
+    boundary = trust_boundary
+    selected_workflow = workflow_name
+    if execution_id is not None:
+        storage = AtomicFileStateStorage(project_root)
+        record = storage.load_execution(execution_id)
+        selected_workflow = record.workflow_name
+        persisted = _persisted_execution_boundary(storage, execution_id)
+        if boundary is not None and boundary != persisted:
+            raise ExecutionLifecycleError(
+                "explicit trust boundary diverges from the immutable execution"
+            )
+        boundary = persisted
+    boundary = boundary or _cli_trust_boundary(project_root)
+    if selected_workflow == "new-feature":
+        return build_new_feature_lifecycle(
+            project_root,
+            project_id=project_id,
+            trust_boundary=boundary,
+        )
     worktrees = ExternalWorktreeManager(
         project_root,
         project_id,
@@ -103,7 +126,30 @@ def _lifecycle_service(
     )
 
 
-def _cli_trust_boundary(project_root: Path) -> TrustEvaluationResult:
+def _persisted_execution_boundary(
+    storage: AtomicFileStateStorage,
+    execution_id: str,
+) -> TrustEvaluationResult:
+    try:
+        bundle = storage.load_execution_bundle(execution_id)
+        configuration = json.loads(bundle.configuration_json)
+        project = configuration.get("project") if type(configuration) is dict else None
+        snapshot = project.get("_trust_boundary") if type(project) is dict else None
+        if snapshot is None:
+            raise ValueError("trust snapshot is absent")
+        return TrustEvaluationResult.from_snapshot(snapshot)
+    except (StateStorageError, TypeError, ValueError, json.JSONDecodeError) as exc:
+        raise ExecutionLifecycleError(
+            "execution trust boundary is unavailable or invalid"
+        ) from exc
+
+
+def _cli_trust_boundary(
+    project_root: Path,
+    *,
+    promotion_allowed: bool = False,
+    provider_secret_names: tuple[str, ...] = (),
+) -> TrustEvaluationResult:
     """Build the fixed host-owned capability projection used by CLI verification."""
 
     executable_aliases = (
@@ -118,13 +164,22 @@ def _cli_trust_boundary(project_root: Path) -> TrustEvaluationResult:
         "yarn",
     )
     consumers = tuple(f"terminal:{alias}" for alias in executable_aliases)
+    grants: dict[str, set[str]] = {
+        name: set(consumers)
+        for name in ("PATH", "Path", "SYSTEMROOT", "SystemRoot")
+    }
+    for name in provider_secret_names:
+        grants.setdefault(name, set()).update(
+            ("provider:anthropic", "provider:local", "provider:openai")
+        )
     authorization = TrustAuthorization(
         repository_root=str(project_root.resolve(strict=True)),
         executable_aliases=executable_aliases,
         secret_grants=tuple(
-            SecretGrant(name=name, consumers=consumers)
-            for name in ("PATH", "Path", "SYSTEMROOT", "SystemRoot")
+            SecretGrant(name=name, consumers=tuple(sorted(grant_consumers)))
+            for name, grant_consumers in sorted(grants.items())
         ),
+        promotion_allowed=promotion_allowed,
     )
     return TrustBoundaryEvaluator(
         project_root,
@@ -140,6 +195,43 @@ def _parse_json_object(raw: str, *, option_name: str = "--input-json") -> dict[s
     if type(value) is not dict:
         raise click.ClickException(f"{option_name} must be a JSON object")
     return value
+
+
+def _new_feature_input(
+    intent: str,
+    *,
+    requirement_id: str | None,
+    affected_files: tuple[str, ...],
+    acceptance_criteria: tuple[str, ...],
+) -> dict[str, object]:
+    selected_intent = intent.strip()
+    if not selected_intent:
+        raise click.ClickException("--intent must be non-empty")
+    selected_requirement = (
+        requirement_id.strip()
+        if requirement_id is not None
+        else "feature-" + hashlib.sha256(selected_intent.encode("utf-8")).hexdigest()[:12]
+    )
+    if not selected_requirement:
+        raise click.ClickException("--requirement-id must be non-empty")
+    graph_input: dict[str, object] = {
+        "schema_version": "1.0",
+        "requirement_id": selected_requirement,
+        "intent": selected_intent,
+        "affected_files": list(affected_files),
+        "acceptance_criteria": list(acceptance_criteria),
+        "modified_files": [],
+        "summary": None,
+        "knowledge_status": "PENDING",
+    }
+    return {
+        "context_request": {
+            "requirement_id": selected_requirement,
+            "graph_type": "new_feature",
+            "query": selected_intent,
+        },
+        "graph_input": graph_input,
+    }
 
 
 def _raise_lifecycle_click_error(exc: Exception) -> None:
@@ -267,8 +359,8 @@ def compile(graph_spec_path: Path, workflow: str | None, render: bool) -> None:
             trust_boundary=_cli_trust_boundary(project_root),
         )
         out_file = compiler.compile_graph(graph_spec_path, workflow)
-    except GraphCompilerError as exc:
-        raise click.ClickException(str(exc)) from exc
+    except (GraphCompilerError, TypeError, ValueError) as exc:
+        _raise_lifecycle_click_error(exc)
     console.print(f"[green]{_get_symbol(True)}[/green]Grafo compilado com sucesso em: [bold]{out_file}[/bold]")
 
     if render:
@@ -297,6 +389,26 @@ def index() -> None:
     show_default=True,
     help="Objeto JSON usado como input inicial canônico.",
 )
+@click.option("--intent", default=None, help="Intenção canônica do workflow new-feature.")
+@click.option("--requirement-id", default=None, help="Identidade estável do requisito.")
+@click.option("--affected-file", "affected_files", multiple=True, help="Path alvo permitido.")
+@click.option(
+    "--acceptance-criterion",
+    "acceptance_criteria",
+    multiple=True,
+    help="Critério de aceite ligado ao requisito.",
+)
+@click.option(
+    "--allow-promotion",
+    is_flag=True,
+    help="Inclui autorização externa de promoção no snapshot imutável da execução.",
+)
+@click.option(
+    "--grant-provider-secret",
+    "provider_secret_names",
+    multiple=True,
+    help="Autoriza um nome de variável de credencial somente para providers registrados.",
+)
 @click.option(
     "--profile",
     "profile_name",
@@ -313,22 +425,44 @@ def run(
     workflow_name: str,
     approval_required: bool,
     input_json: str,
+    intent: str | None,
+    requirement_id: str | None,
+    affected_files: tuple[str, ...],
+    acceptance_criteria: tuple[str, ...],
+    allow_promotion: bool,
+    provider_secret_names: tuple[str, ...],
     profile_name: str,
     config_json: str | None,
 ) -> None:
     project_root = Path.cwd()
-    trust_boundary = _cli_trust_boundary(project_root)
     if approval_required:
         raise click.ClickException(
             "--approval-required is unsupported; approval is declared by an explicit human node"
         )
-    initial_input = _parse_json_object(input_json)
+    if intent is not None:
+        if workflow_name != "new-feature":
+            raise click.ClickException("--intent is supported only by new-feature")
+        if input_json != "{}":
+            raise click.ClickException("--intent and explicit --input-json are mutually exclusive")
+        initial_input = _new_feature_input(
+            intent,
+            requirement_id=requirement_id,
+            affected_files=affected_files,
+            acceptance_criteria=acceptance_criteria,
+        )
+    else:
+        initial_input = _parse_json_object(input_json)
     cli_overrides = (
         None
         if config_json is None
         else _parse_json_object(config_json, option_name="--config-json")
     )
     try:
+        trust_boundary = _cli_trust_boundary(
+            project_root,
+            promotion_allowed=allow_promotion,
+            provider_secret_names=provider_secret_names,
+        )
         compiler = GraphCompiler(
             project_root=project_root,
             trust_boundary=trust_boundary,
@@ -342,13 +476,14 @@ def run(
                     f".harness/graphs/specs/{workflow_name}.yaml"
                 )
             compiled_file = compiler.compile_graph(spec_path, workflow_name)
-    except GraphCompilerError as exc:
-        raise click.ClickException(str(exc)) from exc
+    except (GraphCompilerError, TypeError, ValueError) as exc:
+        _raise_lifecycle_click_error(exc)
 
     try:
         service = _lifecycle_service(
             project_root,
             trust_boundary=trust_boundary,
+            workflow_name=workflow_name,
         )
         result = service.start(
             compiled_file,
@@ -372,6 +507,11 @@ def run(
             f"no node {result.node_id}.[/yellow]"
         )
         return
+    if result.outcome != "success":
+        raise click.ClickException(
+            f"workflow {workflow_name} terminou com outcome {result.outcome}; "
+            f"execution ID: {result.execution_id}"
+        )
     current_state = service.status(result.execution_id).current_state
     if current_state == ExecutionState.VERIFYING:
         console.print(
@@ -419,7 +559,7 @@ def list_executions() -> None:
 @click.option("--json", "as_json", is_flag=True, help="Emite a projeção tipada em JSON.")
 def status(execution_id: str, as_json: bool) -> None:
     try:
-        view = _lifecycle_service(Path.cwd()).status(execution_id)
+        view = _lifecycle_service(Path.cwd(), execution_id=execution_id).status(execution_id)
     except (
         ExecutionLifecycleError,
         StateMachineError,
@@ -439,7 +579,7 @@ def status(execution_id: str, as_json: bool) -> None:
 @click.argument("execution_id")
 def inspect(execution_id: str) -> None:
     try:
-        view = _lifecycle_service(Path.cwd()).inspect(execution_id)
+        view = _lifecycle_service(Path.cwd(), execution_id=execution_id).inspect(execution_id)
     except (
         ExecutionLifecycleError,
         StateMachineError,
@@ -484,7 +624,7 @@ def inspect(execution_id: str) -> None:
 def events(execution_id: str, follow: bool) -> None:
     emitted_count = 0
     try:
-        service = _lifecycle_service(Path.cwd())
+        service = _lifecycle_service(Path.cwd(), execution_id=execution_id)
         while True:
             journal = service.events(execution_id)
             if len(journal) < emitted_count:
@@ -522,7 +662,9 @@ def evidence(execution_id: str, verify: bool) -> None:
     if not verify:
         raise click.ClickException("--verify is required for evidence inspection")
     try:
-        manifest = _lifecycle_service(Path.cwd()).verify_evidence(execution_id)
+        manifest = _lifecycle_service(
+            Path.cwd(), execution_id=execution_id
+        ).verify_evidence(execution_id)
     except (
         EvidenceError,
         ExecutionLifecycleError,
@@ -540,12 +682,12 @@ def evidence(execution_id: str, verify: bool) -> None:
     table.add_row("Verified files", str(len(manifest.files)))
     console.print(table)
 
-@main.command(help="Aprova manualmente a promoção de alterações em estado AWAITING_APPROVAL.")
+@main.command(help="Aprova manualmente o pedido canônico pendente da execução.")
 @click.argument("execution_id")
 @click.option("--approver", required=True, help="Identificador não vazio do aprovador.")
 def approve(execution_id: str, approver: str) -> None:
     try:
-        record = _lifecycle_service(Path.cwd()).approve(
+        record = _lifecycle_service(Path.cwd(), execution_id=execution_id).approve(
             execution_id,
             approver=approver,
         )
@@ -565,7 +707,7 @@ def approve(execution_id: str, approver: str) -> None:
 @click.argument("execution_id")
 def resume(execution_id: str) -> None:
     try:
-        result = _lifecycle_service(Path.cwd()).resume(execution_id)
+        result = _lifecycle_service(Path.cwd(), execution_id=execution_id).resume(execution_id)
     except (
         ArtifactValidationError,
         ExecutionLifecycleError,
@@ -591,7 +733,7 @@ def resume(execution_id: str) -> None:
 @click.argument("execution_id")
 def cancel(execution_id: str) -> None:
     try:
-        record = _lifecycle_service(Path.cwd()).cancel(execution_id)
+        record = _lifecycle_service(Path.cwd(), execution_id=execution_id).cancel(execution_id)
     except (
         ExecutionLifecycleError,
         StateMachineError,
@@ -610,7 +752,9 @@ def cancel(execution_id: str) -> None:
 @click.argument("execution_id")
 def cleanup_worktree(execution_id: str) -> None:
     try:
-        reference = _lifecycle_service(Path.cwd()).cleanup_worktree(execution_id)
+        reference = _lifecycle_service(
+            Path.cwd(), execution_id=execution_id
+        ).cleanup_worktree(execution_id)
     except (
         ExecutionLifecycleError,
         StateMachineError,
@@ -623,6 +767,79 @@ def cleanup_worktree(execution_id: str) -> None:
     )
 
 
+@main.command(name="candidate", help="Cria o commit candidato singular no worktree da execução.")
+@click.argument("execution_id")
+@click.option("--message", required=True, help="Mensagem não vazia do commit candidato.")
+def candidate(execution_id: str, message: str) -> None:
+    try:
+        result = _lifecycle_service(
+            Path.cwd(), execution_id=execution_id
+        ).prepare_candidate(execution_id, message=message)
+    except (
+        ExecutionLifecycleError,
+        StateMachineError,
+        StateStorageError,
+    ) as exc:
+        _raise_lifecycle_click_error(exc)
+    console.print(
+        f"[green]{_get_symbol(True)}[/green]Candidate de [bold]{execution_id}[/bold]: "
+        f"[bold cyan]{result.candidate_commit_sha}[/bold cyan]."
+    )
+
+
+@main.command(
+    name="request-promotion",
+    help="Cria um pedido de promoção ligado ao candidate, diff, plano e gates.",
+)
+@click.argument("execution_id")
+@click.option("--reason", required=True, help="Razão auditável da solicitação.")
+@click.option(
+    "--expires-in-seconds",
+    type=click.IntRange(min=1),
+    default=3600,
+    show_default=True,
+)
+def request_promotion(execution_id: str, reason: str, expires_in_seconds: int) -> None:
+    try:
+        request = _lifecycle_service(
+            Path.cwd(), execution_id=execution_id
+        ).request_promotion_approval(
+            execution_id,
+            reason=reason,
+            expires_at=datetime.now(UTC) + timedelta(seconds=expires_in_seconds),
+        )
+    except (
+        ExecutionLifecycleError,
+        StateMachineError,
+        StateStorageError,
+    ) as exc:
+        _raise_lifecycle_click_error(exc)
+    console.print(
+        f"[yellow]Pedido de promoção {request.subject_digest} para "
+        f"[bold]{execution_id}[/bold] está {request.status.value}.[/yellow]"
+    )
+
+
+@main.command(help="Promove por Git somente o candidate aprovado e integralmente verificado.")
+@click.argument("execution_id")
+@click.option("--dry-run", is_flag=True, help="Valida o plano sem aplicar cherry-pick.")
+def promote(execution_id: str, dry_run: bool) -> None:
+    try:
+        record = _lifecycle_service(
+            Path.cwd(), execution_id=execution_id
+        ).promote(execution_id, dry_run=dry_run)
+    except (
+        ExecutionLifecycleError,
+        StateMachineError,
+        StateStorageError,
+    ) as exc:
+        _raise_lifecycle_click_error(exc)
+    console.print(
+        f"[green]{_get_symbol(True)}[/green]Promoção de [bold]{execution_id}[/bold] "
+        f"encerrada em {record.current_state.value}."
+    )
+
+
 @main.command(help="Executa gates configurados em um worktree validado.")
 @click.argument("execution_id")
 @click.option("--project-id", default="default-proj", show_default=True)
@@ -631,6 +848,7 @@ def verify(execution_id: str, project_id: str) -> None:
         result = _lifecycle_service(
             Path.cwd(),
             project_id=project_id,
+            execution_id=execution_id,
         ).verify(execution_id)
     except (
         ArtifactValidationError,
@@ -677,7 +895,7 @@ def audit(execution_id: str, export: str | None) -> None:
 @click.argument("execution_id")
 def rollback(execution_id: str) -> None:
     try:
-        record = _lifecycle_service(Path.cwd()).rollback(execution_id)
+        record = _lifecycle_service(Path.cwd(), execution_id=execution_id).rollback(execution_id)
     except (
         ExecutionLifecycleError,
         StateMachineError,

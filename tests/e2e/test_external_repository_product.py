@@ -253,12 +253,6 @@ termination_rule: ALL_REQUIRED_GATES_PASSED
 on_failure: route_to_failure_classifier
 '''
 
-_TOOL_REGISTRY_ENTRY = '''
-  - id: apply_patch
-    description: Applies one digest-bound patch inside the authorized F7.1 worktree.
-    capability_status: declared
-'''
-
 _RUNNER = r'''
 from __future__ import annotations
 
@@ -912,7 +906,9 @@ def test_installed_wheel_delivers_promotes_audits_and_reverts_external_repositor
     )
     assert "inicializada com sucesso" in init_result.stdout
     graph = repository / ".harness" / "graphs" / "specs" / f"{workflow}.yaml"
-    assert "context_retrieval" in graph.read_text(encoding="utf-8")
+    packaged_graph = graph.read_text(encoding="utf-8")
+    assert "implement_feature" in packaged_graph
+    assert "knowledge_sync_update" in packaged_graph
 
     (repository / ".harness" / "trusted_repository").write_text(
         "F7.1 test-only trust marker; capabilities still require host authorization.\n",
@@ -929,22 +925,10 @@ def test_installed_wheel_delivers_promotes_audits_and_reverts_external_repositor
     )
     tool_registry = repository / ".harness" / "tools" / "tool_registry.yaml"
     packaged_registry = tool_registry.read_text(encoding="utf-8")
-    assert "id: apply_patch" not in packaged_registry
-    tool_registry.write_text(
-        packaged_registry.rstrip() + "\n" + _TOOL_REGISTRY_ENTRY,
-        encoding="utf-8",
-    )
+    assert "id: apply_patch" in packaged_registry
     code_agent = repository / ".harness" / "agents" / "code_agent" / "agent.yaml"
     packaged_agent = code_agent.read_text(encoding="utf-8")
-    assert "  - file_writer\n" in packaged_agent
-    assert "  - apply_patch\n" not in packaged_agent
-    code_agent.write_text(
-        packaged_agent.replace(
-            "  - file_writer\n",
-            "  - file_writer\n  - apply_patch\n",
-        ),
-        encoding="utf-8",
-    )
+    assert "  - apply_patch\n" in packaged_agent
     compile_result = _run(
         [
             sys.executable,

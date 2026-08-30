@@ -199,6 +199,17 @@ class _StaticBackend:
 
 
 @dataclass
+class _ContextCaptureBackend:
+    observed: list[tuple[str | None, dict[str, object] | None]]
+
+    def execute(self, context: NodeExecutionContext) -> NodeExecutionResult:
+        self.observed.append(
+            (context.base_commit_sha, context.effective_configuration)
+        )
+        return NodeExecutionResult.completed({"result": "ok"})
+
+
+@dataclass
 class _DurableStaticBackend:
     result: NodeExecutionResult
     trace: list[str] | None = None
@@ -731,9 +742,11 @@ def _create_resume_execution(
     artifact: CompiledGraphArtifact,
     execution_id: str,
     initial_input: dict[str, object],
+    *,
+    configuration: dict[str, object] | None = None,
 ) -> None:
     artifact_json = artifact.canonical_json()
-    configuration_json = canonical_json_object({})
+    configuration_json = canonical_json_object(configuration or {})
     initial_json = canonical_json_object(initial_input)
     bundle = ExecutionBundle(
         bundle_schema_version="1.0",
@@ -1198,6 +1211,37 @@ def test_graph_write_ahead_is_persisted_before_effect_and_outcome_after(
     ).execute(artifact, execution_id, {"value": 1})
 
     assert trace == ["TOOL_CALLED", "effect", "TOOL_COMPLETED"]
+
+
+def test_resume_execution_supplies_persisted_identity_and_configuration_to_backend(
+    tmp_path: Path,
+) -> None:
+    artifact = _agent_artifact()
+    storage = AtomicFileStateStorage(tmp_path)
+    execution_id = "exec-context-boundary"
+    initial_input = {"value": 1}
+    configuration = {
+        "provider": {"provider_id": "local-provider"},
+        "trust": {"mode": "restricted"},
+    }
+    _create_resume_execution(
+        storage,
+        artifact,
+        execution_id,
+        initial_input,
+        configuration=configuration,
+    )
+    observed: list[tuple[str | None, dict[str, object] | None]] = []
+
+    result = _resume_executor(
+        storage,
+        NodeExecutorRegistry(
+            agent=AgentNodeExecutor(_ContextCaptureBackend(observed))
+        ),
+    ).execute(artifact, execution_id, initial_input)
+
+    assert result.outcome == "success"
+    assert observed == [("a" * 40, configuration)]
 
 
 def test_tool_call_journal_failure_blocks_effect_before_handler(tmp_path: Path) -> None:

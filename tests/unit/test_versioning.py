@@ -33,7 +33,8 @@ def test_default_graph_versions_use_separate_namespaces() -> None:
         if resource.name.endswith(".yaml"):
             graph_metadata = _load_yaml(resource)["graph"]
             assert graph_metadata["graph_schema_version"] == GRAPH_SCHEMA_VERSION
-            assert graph_metadata["definition_version"] == "3.2.0"
+            expected = "3.3.0" if resource.name == "new-feature.yaml" else "3.2.0"
+            assert graph_metadata["definition_version"] == expected
             assert "version" not in graph_metadata
 
 

@@ -32,6 +32,7 @@ from ai_engineering_harness.runtime import (
     ExecutionNextAction,
     ExecutionStatusView,
     GraphExecutionResult,
+    NodeExecutionFailure,
 )
 
 
@@ -163,6 +164,29 @@ class _FakeLifecycle:
     def verify(self, execution_id: str):
         self.calls.append(("verify", execution_id))
         return self.verification_result
+
+    def prepare_candidate(self, execution_id: str, *, message: str):
+        self.calls.append(("prepare_candidate", (execution_id, message)))
+        return SimpleNamespace(candidate_commit_sha="d" * 40)
+
+    def request_promotion_approval(
+        self,
+        execution_id: str,
+        *,
+        reason: str,
+        expires_at: datetime,
+    ):
+        self.calls.append(
+            ("request_promotion_approval", (execution_id, reason, expires_at))
+        )
+        return SimpleNamespace(
+            subject_digest=f"sha256:{'e' * 64}",
+            status=ApprovalStatus.PENDING,
+        )
+
+    def promote(self, execution_id: str, *, dry_run: bool):
+        self.calls.append(("promote", (execution_id, dry_run)))
+        return SimpleNamespace(current_state=ExecutionState.COMPLETED)
 
 
 def _doctor_result(*, healthy: bool, workflow: str | None = None) -> DoctorResult:
@@ -337,17 +361,14 @@ def test_cli_run_status_inspect_lifecycle():
             [
                 "run",
                 "new-feature",
-                    "--input-json",
-                    (
-                        '{"context_request":{"requirement_id":"req-1",'
-                        '"graph_type":"new_feature","query":"deliver"},'
-                        '"graph_input":{"requirement_id":"req-1",'
-                        '"graph_type":"new_feature","query":"deliver"}}'
-                    ),
+                "--intent",
+                "deliver",
+                "--requirement-id",
+                "req-1",
             ],
         )
         assert res_run.exit_code != 0
-        assert "backend is unavailable" in res_run.output
+        assert "cannot establish starting Git identity" in res_run.output
         assert "concluído" not in res_run.output
         execution_root = Path(".harness/state/executions")
         assert list(execution_root.iterdir()) == []
@@ -381,6 +402,74 @@ def test_cli_run_accepts_explicit_json_and_uses_lifecycle(
         ),
         ("status", "exec-cli-runtime"),
     ]
+
+
+def test_cli_run_builds_public_input_and_immutable_authority_snapshot(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    runner = CliRunner()
+    fake = _FakeLifecycle()
+    captured: dict[str, object] = {}
+
+    def lifecycle(root: Path, **kwargs: object) -> _FakeLifecycle:
+        captured["root"] = root
+        captured.update(kwargs)
+        return fake
+
+    monkeypatch.setattr(CLI_MODULE, "_lifecycle_service", lifecycle)
+    with runner.isolated_filesystem(temp_dir=tmp_path):
+        assert runner.invoke(main, ["init"]).exit_code == 0
+        result = runner.invoke(
+            main,
+            [
+                "run",
+                "new-feature",
+                "--intent",
+                "Deliver a bounded feature",
+                "--requirement-id",
+                "req-public",
+                "--affected-file",
+                "src/example.py",
+                "--acceptance-criterion",
+                "The behavior is verified",
+                "--allow-promotion",
+                "--grant-provider-secret",
+                "LOCAL_MODEL_TOKEN",
+            ],
+        )
+
+    assert result.exit_code == 0
+    assert captured["workflow_name"] == "new-feature"
+    boundary = captured["trust_boundary"]
+    assert boundary.promotion_allowed is True
+    grant = next(
+        item for item in boundary.secret_grants if item.name == "LOCAL_MODEL_TOKEN"
+    )
+    assert set(grant.consumers) == {
+        "provider:anthropic",
+        "provider:local",
+        "provider:openai",
+    }
+    start = fake.calls[0]
+    assert start[0] == "start"
+    assert start[1]["initial_input"] == {
+        "context_request": {
+            "requirement_id": "req-public",
+            "graph_type": "new_feature",
+            "query": "Deliver a bounded feature",
+        },
+        "graph_input": {
+            "schema_version": "1.0",
+            "requirement_id": "req-public",
+            "intent": "Deliver a bounded feature",
+            "affected_files": ["src/example.py"],
+            "acceptance_criteria": ["The behavior is verified"],
+            "modified_files": [],
+            "summary": None,
+            "knowledge_status": "PENDING",
+        },
+    }
 
 
 def test_cli_run_passes_profile_and_highest_precedence_configuration_overrides(
@@ -816,7 +905,7 @@ def test_cli_verify_uses_lifecycle_and_returns_nonzero_when_blocked(
     monkeypatch.setattr(
         CLI_MODULE,
         "_lifecycle_service",
-        lambda root, *, project_id="default-proj", trust_boundary=None: fake,
+        lambda root, **_: fake,
     )
     with runner.isolated_filesystem(temp_dir=tmp_path):
         passed = runner.invoke(
@@ -838,6 +927,94 @@ def test_cli_verify_uses_lifecycle_and_returns_nonzero_when_blocked(
         ("verify", "exec-cli-runtime"),
         ("verify", "exec-cli-runtime"),
     ]
+
+
+def test_cli_run_returns_nonzero_for_failed_graph_outcome(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    runner = CliRunner()
+    fake = _FakeLifecycle()
+    fake.result = GraphExecutionResult(
+        execution_id="exec-cli-runtime",
+        terminal_id="failed",
+        outcome="failure",
+        output={},
+        executed_node_ids=("execute",),
+        final_revision=3,
+        fencing_token=1,
+        failure=NodeExecutionFailure(
+            code="controlled_failure",
+            message="controlled redacted failure",
+            retryable=False,
+        ),
+    )
+    monkeypatch.setattr(CLI_MODULE, "_lifecycle_service", lambda root, **_: fake)
+    with runner.isolated_filesystem(temp_dir=tmp_path):
+        assert runner.invoke(main, ["init"]).exit_code == 0
+        result = runner.invoke(
+            main,
+            ["run", "new-feature", "--input-json", '{"intent":"bounded"}'],
+        )
+
+    assert result.exit_code != 0
+    assert "outcome failure" in result.output
+    assert "exec-cli-runtime" in result.output
+    assert "concluído" not in result.output
+    assert fake.calls == [
+        (
+            "start",
+            {
+                "initial_input": {"intent": "bounded"},
+                "profile_name": "default",
+                "cli_overrides": None,
+            },
+        )
+    ]
+
+
+def test_cli_candidate_promotion_request_and_promote_use_canonical_lifecycle(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    runner = CliRunner()
+    fake = _FakeLifecycle()
+    monkeypatch.setattr(CLI_MODULE, "_lifecycle_service", lambda root, **_: fake)
+
+    with runner.isolated_filesystem(temp_dir=tmp_path):
+        candidate = runner.invoke(
+            main,
+            ["candidate", "exec-cli-runtime", "--message", "feat: candidate"],
+        )
+        request = runner.invoke(
+            main,
+            [
+                "request-promotion",
+                "exec-cli-runtime",
+                "--reason",
+                "all gates reviewed",
+                "--expires-in-seconds",
+                "90",
+            ],
+        )
+        promoted = runner.invoke(main, ["promote", "exec-cli-runtime"])
+
+    assert candidate.exit_code == 0
+    assert "d" * 40 in candidate.output
+    assert request.exit_code == 0
+    assert f"sha256:{'e' * 64}" in request.output
+    assert promoted.exit_code == 0
+    assert fake.calls[0] == (
+        "prepare_candidate",
+        ("exec-cli-runtime", "feat: candidate"),
+    )
+    assert fake.calls[1][0] == "request_promotion_approval"
+    assert fake.calls[1][1][0:2] == (
+        "exec-cli-runtime",
+        "all gates reviewed",
+    )
+    assert isinstance(fake.calls[1][1][2], datetime)
+    assert fake.calls[2] == ("promote", ("exec-cli-runtime", False))
 
 
 def test_cli_audit_validates_and_exports_exact_execution_identity(

@@ -10,6 +10,12 @@ from .cancellation import (
     CancellationStateIntegrityError,
     ConcurrentCommandError,
 )
+from .composition import (
+    OperationalAgentBackend,
+    OperationalKnowledgeBackend,
+    PublicCompositionError,
+    build_new_feature_lifecycle,
+)
 from .context_assembler import (
     ContextAssembler,
     ContextAssemblyError,
@@ -282,6 +288,8 @@ __all__ = [
     "NodeExecutorUnavailableError",
     "NodeInputValidationError",
     "NodeOutputValidationError",
+    "OperationalAgentBackend",
+    "OperationalKnowledgeBackend",
     "PlanDocument",
     "PlanGenerationResult",
     "PlanPrerequisiteError",
@@ -301,6 +309,7 @@ __all__ = [
     "PromotionManager",
     "PromotionPrerequisiteError",
     "PromotionResult",
+    "PublicCompositionError",
     "RetryBudget",
     "RetryContext",
     "RetryContextIntegrityError",
@@ -345,4 +354,5 @@ __all__ = [
     "WorkflowState",
     "WorkflowStateMachine",
     "WorktreeCleanupLifecycleError",
+    "build_new_feature_lifecycle",
 ]

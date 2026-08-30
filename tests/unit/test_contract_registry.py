@@ -109,8 +109,8 @@ def test_public_contract_registry_api_exports_frozen_symbols() -> None:
 def test_internal_catalog_uses_qualified_names_and_exact_legacy_aliases() -> None:
     registry = ContractRegistry()
 
-    assert len(registry.available_contracts) == 18
-    assert len(registry.legacy_aliases) == 15
+    assert len(registry.available_contracts) == 19
+    assert len(registry.legacy_aliases) == 16
     assert all(name.startswith("ai_engineering_harness.contracts.") for name in registry.available_contracts)
     assert (
         "ai_engineering_harness.contracts.nodes.context_sufficiency.ContextSufficiencyReport"
@@ -148,12 +148,16 @@ def test_legacy_aliases_exactly_cover_references_used_by_default_graphs() -> Non
 
     registry = ContractRegistry()
 
-    assert len(references) == 24
+    assert len(references) == 18
     historical_names = {
         "ai_engineering_harness.contracts.events.execution_event.KnowledgeSyncEvent",
         "ai_engineering_harness.contracts.events.knowledge_sync.KnowledgeUpdateEvent",
         "ai_engineering_harness.contracts.events.knowledge_sync.KnowledgeSyncCompleted",
         "ai_engineering_harness.contracts.events.knowledge_sync.KnowledgeSyncFailed",
+        "contracts/events/knowledge_sync.py#KnowledgeSyncCompleted",
+        "contracts/nodes/test_generation.py#TestGenerationInput",
+        "contracts/nodes/test_generation.py#TestGenerationOutput",
+        "contracts/transactions/knowledge_transaction.py#KnowledgeTransaction",
     }
     assert set(references) < set(registry.legacy_aliases)
     assert set(registry.legacy_aliases) - set(references) == historical_names

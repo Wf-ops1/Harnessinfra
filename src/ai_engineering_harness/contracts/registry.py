@@ -25,6 +25,7 @@ from .events.knowledge_sync import (
 from .nodes.architecture_analysis import ArchitectureAnalysisInput, ArchitectureAnalysisOutput
 from .nodes.code_generation import CodeGenerationInput, CodeGenerationOutput
 from .nodes.context_sufficiency import ContextSufficiencyReport, RetrievalRequest
+from .nodes.new_feature import NewFeatureExecutionState
 from .nodes.node_contracts import ArchitectureAnalysis, CodeGenNode
 from .nodes.test_generation import TestGenerationInput, TestGenerationOutput
 from .transactions.knowledge_transaction import ArtifactVersionItem, JournalState, KnowledgeTransaction
@@ -134,6 +135,7 @@ _INTERNAL_MODELS: tuple[ContractModel, ...] = (
     CodeGenerationOutput,
     ContextSufficiencyReport,
     RetrievalRequest,
+    NewFeatureExecutionState,
     ArchitectureAnalysis,
     CodeGenNode,
     TestGenerationInput,
@@ -161,6 +163,7 @@ _LEGACY_ALIAS_MODELS: dict[str, ContractModel] = {
     "contracts/nodes/code_generation.py#CodeGenerationOutput": CodeGenerationOutput,
     "contracts/nodes/context_sufficiency.py#ContextSufficiencyReport": ContextSufficiencyReport,
     "contracts/nodes/context_sufficiency.py#RetrievalRequest": RetrievalRequest,
+    "contracts/nodes/new_feature.py#NewFeatureExecutionState": NewFeatureExecutionState,
     "contracts/nodes/test_generation.py#TestGenerationInput": TestGenerationInput,
     "contracts/nodes/test_generation.py#TestGenerationOutput": TestGenerationOutput,
     "contracts/transactions/knowledge_transaction.py#KnowledgeTransaction": KnowledgeTransaction,
