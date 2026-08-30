@@ -102,6 +102,27 @@ def test_create_real_worktree_persists_identity_and_instantiates_guard(tmp_path:
     assert reopened.trust_boundary == provisioned.trust_boundary
 
 
+def test_managed_git_commands_enable_long_path_support(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo, base_sha = _repository(tmp_path)
+    manager = _manager(repo, tmp_path)
+    real_run = subprocess.run
+    observed: list[tuple[str, ...]] = []
+
+    def recording_run(argv: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        observed.append(tuple(argv))
+        return real_run(argv, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(git_worktree_module.subprocess, "run", recording_run)
+
+    manager.create_worktree("exec-long-path", expected_base_commit_sha=base_sha)
+
+    assert observed
+    assert all(argv[1:3] == ("-c", "core.longpaths=true") for argv in observed)
+
+
 def test_create_retry_recovers_after_active_publication_interruption(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -513,6 +534,8 @@ def test_all_git_commands_are_argv_shell_false_and_bounded(
     assert all(kwargs["timeout"] == 30.0 for _, kwargs in observed)
     assert [
         "git",
+        "-c",
+        "core.longpaths=true",
         "worktree",
         "add",
         "-b",
@@ -531,7 +554,7 @@ def test_controlled_git_add_failure_is_durable_and_never_active(
     real_run = subprocess.run
 
     def failing_add(argv: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
-        if argv[1:3] == ["worktree", "add"]:
+        if argv[3:5] == ["worktree", "add"]:
             return subprocess.CompletedProcess(argv, 17, stdout="", stderr="injected failure")
         return real_run(argv, **kwargs)  # type: ignore[arg-type, return-value]
 

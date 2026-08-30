@@ -5,8 +5,11 @@ inherits: agents/_base/agent_base.yaml
 
 model: claude-sonnet-4
 allowed_tools:
-  - serena_mcp
-  - codebase_memory_ast
-  - test_runner
-  - file_writer
+  - apply_patch
+  - git_diff
+  - git_status
+  - list_files
+  - read_file
+  - run_command
+  - search_text
 system_prompt_file: system_prompt.md

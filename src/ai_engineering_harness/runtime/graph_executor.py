@@ -975,7 +975,7 @@ class GraphExecutor:
             )
             if not skip_human_backend:
                 executor.ensure_available()
-            budget_boundary = self._budget_boundary(
+            budget_boundary, effective_configuration = self._budget_boundary(
                 execution_id,
                 node_id=current_id,
                 attempt=attempt,
@@ -1026,6 +1026,8 @@ class GraphExecutor:
                 attempt=attempt,
                 input_payload=current_payload,
                 fencing_token=lock.fencing_token,
+                base_commit_sha=record.base_commit_sha,
+                effective_configuration=effective_configuration,
                 retry_context=retry_context,
                 tool_effect_recorder=tool_effect_recorder,
                 budget_boundary=budget_boundary,
@@ -1579,17 +1581,21 @@ class GraphExecutor:
         node_id: str,
         attempt: int,
         lock: ExecutionLock,
-    ) -> JournalBudgetBoundary | None:
+    ) -> tuple[JournalBudgetBoundary | None, dict[str, object] | None]:
         if not self._resume_enabled or not isinstance(
             self._storage,
             ResumeStateStorageProvider,
         ):
-            return None
+            return None, None
         try:
             bundle = self._storage.load_execution_bundle(execution_id, lock=lock)
             configuration = json.loads(bundle.configuration_json)
-            if type(configuration) is not dict or "budget" not in configuration:
-                return None
+            if type(configuration) is not dict:
+                raise BudgetConfigurationError(
+                    "persisted execution configuration must be an object"
+                )
+            if "budget" not in configuration:
+                return None, configuration
             limits = BudgetLimits.from_effective_config(configuration)
         except (BudgetConfigurationError, TypeError, ValueError, json.JSONDecodeError) as exc:
             raise GraphExecutionError(
@@ -1597,20 +1603,23 @@ class GraphExecutor:
                 execution_id=execution_id,
                 node_id=node_id,
             ) from exc
-        return JournalBudgetBoundary(
-            storage=self._storage,
-            lock=lock,
-            execution_id=execution_id,
-            graph_name=self._storage.load_execution(
-                execution_id,
+        return (
+            JournalBudgetBoundary(
+                storage=self._storage,
                 lock=lock,
-            ).workflow_name,
-            node_id=node_id,
-            attempt=attempt,
-            limits=limits,
-            event_id_factory=self._event_id_factory,
-            clock=self._clock,
-            monotonic=self._monotonic,
+                execution_id=execution_id,
+                graph_name=self._storage.load_execution(
+                    execution_id,
+                    lock=lock,
+                ).workflow_name,
+                node_id=node_id,
+                attempt=attempt,
+                limits=limits,
+                event_id_factory=self._event_id_factory,
+                clock=self._clock,
+                monotonic=self._monotonic,
+            ),
+            configuration,
         )
 
     @staticmethod

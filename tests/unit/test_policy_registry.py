@@ -129,8 +129,20 @@ def test_public_policy_api_and_catalog_cardinality_are_frozen() -> None:
         "security_agent",
         "test_agent",
     )
-    assert len(registry.available_tools) == 18
-    assert {"git_tool", "terminal_tool", "serena_mcp", "terminal_executor"} <= set(
+    assert len(registry.available_tools) == 25
+    assert {
+        "apply_patch",
+        "git_diff",
+        "git_status",
+        "git_tool",
+        "list_files",
+        "read_file",
+        "run_command",
+        "search_text",
+        "serena_mcp",
+        "terminal_executor",
+        "terminal_tool",
+    } <= set(
         registry.available_tools
     )
 
@@ -283,7 +295,19 @@ def test_all_default_graphs_resolve_without_compiler_fallback() -> None:
                 for role in tool_policy["roles"].values()
                 for node in role["nodes"]
             ]
-            assert all(node["allowed_tools"] == [] for node in decisions)
+            if graph["graph"]["name"] == "new-feature":
+                code_agent = tool_policy["roles"]["code_agent"]["nodes"][0]
+                assert code_agent["allowed_tools"] == [
+                    "apply_patch",
+                    "git_diff",
+                    "git_status",
+                    "list_files",
+                    "read_file",
+                    "run_command",
+                    "search_text",
+                ]
+            else:
+                assert all(node["allowed_tools"] == [] for node in decisions)
 
 
 def test_valid_allow_is_in_effective_default_deny_view() -> None:

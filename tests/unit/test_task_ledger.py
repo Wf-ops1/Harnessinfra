@@ -993,6 +993,7 @@ def test_f5_7_promotion_preserves_r3_negative_evidence_and_certification() -> No
     f5_c1_dossier = _read(COMPLETED_ROOT / "F5.C1.md")
     f6_1_dossier = _read(COMPLETED_ROOT / "F6.1.md")
     f7_4_dossier = _read(COMPLETED_ROOT / "F7.4.md")
+    f7_c1_dossier = _read(ACTIVE_ROOT / "F7.C1.md")
     task_index = _read(TASKS_INDEX)
     readme = _read(ROOT / "README.md")
 
@@ -1076,7 +1077,7 @@ def test_f5_7_promotion_preserves_r3_negative_evidence_and_certification() -> No
         "914 passed, 5 skipped, 6 subtests passed em 328.79s",
     ):
         assert result in f5_c1_dossier
-    assert "| **Gate** | `ADMIN_PR_OPEN / CHECKS_PENDING` |" in panel
+    assert "| **Gate** | `REPAIR_ACTIVE / PROMOTION_BLOCKED` |" in panel
     assert "Apache-2.0" in panel
     assert "docs/tasks/completed/F7.4.md" in panel
     assert not (ACTIVE_ROOT / "F7.4.md").exists()
@@ -1100,6 +1101,12 @@ def test_f5_7_promotion_preserves_r3_negative_evidence_and_certification() -> No
         assert "33291856113" in source
         assert "a62c164" in source
         assert "33292240896" in source
+        assert "0ea7f801" in source
+        assert "33293579533" in source
+    assert (ACTIVE_ROOT / "F7.C1.md").is_file()
+    assert "> **Gate:** `REPAIR_ACTIVE`" in f7_c1_dossier
+    assert "task/f7.c1-public-path-composition" in f7_c1_dossier
+    assert "checkpoint/f7.c1-ready" in f7_c1_dossier
     assert "32085923509" in panel
     assert not (ACTIVE_ROOT / "F7.3.md").exists() and (COMPLETED_ROOT / "F7.3.md").is_file()
     f7_3_dossier = _read(COMPLETED_ROOT / "F7.3.md")
@@ -1488,6 +1495,9 @@ def test_f5_7_promotion_preserves_r3_negative_evidence_and_certification() -> No
         assert "5b8e558" in source
         assert "29e8a975" in source
         assert "31859624571" in source
+    assert "> **Lifecycle:** `PROMOTION_BLOCKED`" in f7_c1_dossier
+    assert "2415f41aff0d746dc11d58a662d8998de6181b76" in f7_c1_dossier  # pragma: allowlist secret
+    assert "1106 passed, 5 skipped, 6 subtests passed" in f7_c1_dossier
 
 
 def test_negative_evidence_precedes_positive_state_until_recertification() -> None:

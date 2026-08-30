@@ -1,8 +1,11 @@
 # Declarative capability catalog. Presence here does not assert an operational runtime adapter.
 registry_schema_version: "1.0"
-definition_version: "3.2.0"
+definition_version: "3.3.0"
 
 tools:
+  - id: apply_patch
+    description: Applies one digest-bound patch inside the authorized worktree.
+    capability_status: declared
   - id: adr_writer
     description: Writes architecture decision record content.
     capability_status: declared
@@ -27,11 +30,23 @@ tools:
   - id: git_committer
     description: Creates an authorized Git commit.
     capability_status: declared
+  - id: git_diff
+    description: Inspects the uncommitted diff inside the authorized worktree.
+    capability_status: declared
+  - id: git_status
+    description: Inspects Git status inside the authorized worktree.
+    capability_status: declared
   - id: git_tool
     description: Names the packaged Git tool configuration.
     capability_status: declared
   - id: knowledge_retriever
     description: Retrieves governed project knowledge.
+    capability_status: declared
+  - id: list_files
+    description: Lists a bounded tree inside the authorized worktree.
+    capability_status: declared
+  - id: read_file
+    description: Reads one strict UTF-8 file inside the authorized worktree.
     capability_status: declared
   - id: production_deployer
     description: Represents a production deployment capability.
@@ -39,8 +54,14 @@ tools:
   - id: rollback_executor
     description: Executes an authorized rollback plan.
     capability_status: declared
+  - id: run_command
+    description: Runs one argv command under executable and environment grants.
+    capability_status: declared
   - id: serena_mcp
     description: Represents semantic code operations through Serena MCP.
+    capability_status: declared
+  - id: search_text
+    description: Searches literal text in bounded files inside the authorized worktree.
     capability_status: declared
   - id: static_analysis_scanner
     description: Runs a declared static-analysis scan.

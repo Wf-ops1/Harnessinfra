@@ -2,10 +2,10 @@
 graph:
   name: new-feature
   graph_schema_version: "1.0"
-  definition_version: "3.2.0"
-  entrypoint: context_retrieval
+  definition_version: "3.3.0"
+  entrypoint: implement_feature
   status: stable
-  description: "Grafo completo de entrega de nova funcionalidade (Modo 1: Canhão de Nova Feature)"
+  description: "Operational public workflow for one governed feature change"
 
 policies:
   - policies/verification_policy.yaml
@@ -16,78 +16,42 @@ policies:
   - policies/knowledge_sync.yaml
 
 contracts:
-  - contracts/nodes/context_sufficiency.py#RetrievalRequest
-  - contracts/nodes/context_sufficiency.py#ContextSufficiencyReport
-  - contracts/nodes/architecture_analysis.py#ArchitectureAnalysisInput
-  - contracts/nodes/architecture_analysis.py#ArchitectureAnalysisOutput
-  - contracts/nodes/code_generation.py#CodeGenerationInput
-  - contracts/nodes/code_generation.py#CodeGenerationOutput
-  - contracts/nodes/test_generation.py#TestGenerationInput
-  - contracts/nodes/test_generation.py#TestGenerationOutput
-  - contracts/transactions/knowledge_transaction.py#KnowledgeTransaction
-  - contracts/events/knowledge_sync.py#KnowledgeSyncCompleted
+  - contracts/nodes/new_feature.py#NewFeatureExecutionState
 
 nodes:
-  - id: context_retrieval
-    type: agent
-    role: requirement_analyst
-    input_contract: contracts/nodes/context_sufficiency.py#RetrievalRequest
-    output_contract: contracts/nodes/context_sufficiency.py#ContextSufficiencyReport
-    on_success: architecture_analysis
-    on_failure: escalate_to_human
-
-  - id: architecture_analysis
-    type: agent
-    role: architecture_analyst
-    input_contract: contracts/nodes/architecture_analysis.py#ArchitectureAnalysisInput
-    output_contract: contracts/nodes/architecture_analysis.py#ArchitectureAnalysisOutput
-    on_success: code_generation
-    on_failure: escalate_to_human
-
-  - id: code_generation
+  - id: implement_feature
     type: agent
     role: code_agent
-    input_contract: contracts/nodes/code_generation.py#CodeGenerationInput
-    output_contract: contracts/nodes/code_generation.py#CodeGenerationOutput
-    on_success: test_generation
-    on_failure: code_generation
-    retry_policy:
-      max_iterations: 2
-      exit_condition: all_required_gates_passed
-
-  - id: test_generation
-    type: agent
-    role: test_agent
-    input_contract: contracts/nodes/test_generation.py#TestGenerationInput
-    output_contract: contracts/nodes/test_generation.py#TestGenerationOutput
-    on_success: verification_gates
-    on_failure: code_generation
-    retry_policy:
-      max_iterations: 2
-      exit_condition: all_required_gates_passed
-
-  - id: verification_gates
-    type: deterministic
-    executor: deterministic_policy
-    policy_ref: policies/verification_policy.yaml
+    input_contract: contracts/nodes/new_feature.py#NewFeatureExecutionState
+    output_contract: contracts/nodes/new_feature.py#NewFeatureExecutionState
+    tool_permissions:
+      - tool: apply_patch
+        effect: allow
+      - tool: git_diff
+        effect: allow
+      - tool: git_status
+        effect: allow
+      - tool: list_files
+        effect: allow
+      - tool: read_file
+        effect: allow
+      - tool: run_command
+        effect: allow
+      - tool: search_text
+        effect: allow
     on_success: knowledge_sync_update
-    on_failure: code_generation
-    retry_policy:
-      max_iterations: 2
-      exit_condition: all_required_gates_passed
+    on_failure: revert_and_fail
 
   - id: knowledge_sync_update
     type: agent
     role: knowledge_updater
-    input_contract: contracts/transactions/knowledge_transaction.py#KnowledgeTransaction
-    output_contract: contracts/events/knowledge_sync.py#KnowledgeSyncCompleted
+    input_contract: contracts/nodes/new_feature.py#NewFeatureExecutionState
+    output_contract: contracts/nodes/new_feature.py#NewFeatureExecutionState
     on_success: END
     on_failure: revert_and_fail
 
 terminal_states:
   - id: END
     outcome: success
-  - id: escalate_to_human
-    outcome: failure
   - id: revert_and_fail
     outcome: failure
