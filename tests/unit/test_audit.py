@@ -357,3 +357,13 @@ def test_checkpoint_mapping_validation_is_strict(tmp_path: Path) -> None:
     )
     with pytest.raises(AuditIntegrityError, match="last event hash"):
         manager.verify_checkpoint(invalid_dataclass)
+
+
+def test_sarif_driver_uses_the_installed_package_version(tmp_path: Path) -> None:
+    from ai_engineering_harness.versioning import PACKAGE_VERSION
+
+    manager = _manager(tmp_path, "exec-audit-package-version")
+    manager.log_event(_draft("audit-version-event", manager.execution_id))
+
+    run = json.loads(manager.export_sarif())["runs"][0]
+    assert run["tool"]["driver"]["version"] == PACKAGE_VERSION

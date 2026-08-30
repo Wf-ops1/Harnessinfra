@@ -46,8 +46,8 @@
 | **Fases concluídas** | Fases 0–6; F7.1–F7.4 e F7.C1 terminalmente reconciliadas |
 | **Fase ativa** | Fase 7 — maturidade operacional |
 | **Tarefa ativa** | [F7.5 — release candidate](docs/tasks/active/F7.5.md) |
-| **Gate** | `READY` — congelamento preparado; checkpoint ainda pendente |
-| **Estado corrente** | F7.C1 terminal; F7.5 congelada como `0.2.0rc1`/tag futura `v0.2.0-rc.1`; implementação ainda não iniciada |
+| **Gate** | `READY` — checkpoint `ec2296d68669e5b155dc2ba3f037a5197b5e55b3` criado antes da implementação |
+| **Estado corrente** | F7.C1 terminal; F7.5 em implementação como `0.2.0rc1`/tag futura `v0.2.0-rc.1` |
 | **Estado F5.6** | F5.6 `PROMOTED`; aprovação de promoção permanece vinculada ao conteúdo exato |
 | **Executor ativo** | `Codex`, único escritor da F7.5 |
 | **Workspace** | `C:\Users\walla\OneDrive\Desktop\ai-engineering-harness` |
@@ -258,9 +258,9 @@ Autorizações posteriores encerraram F6.6/F6.7, produziram/promoveram F7.1 e ab
 O fechamento F7.C1 inclui produto #92/`33325055342`/merge `26c36ff`/pós `33325679613` e reconciliação #93/head `c99f02e`/CI `33326822791`/merge `3415c385`/pós `33327198301`. Em `2026-08-30`, o usuário autorizou concluir integralmente a F7.5 e seus efeitos necessários.
 ## 5. Tarefa ativa
 
-A [F7.5](docs/tasks/active/F7.5.md) está `READY` para publicar a RC `0.2.0rc1`. O escopo cobre
-versão única, docs reais, limitações conhecidas, certificação e GitHub prerelease após merge verde.
-O primeiro arquivo de implementação aguarda o commit e o checkpoint `checkpoint/f7.5-ready`.
+A [F7.5](docs/tasks/active/F7.5.md) está `READY` e em implementação da RC `0.2.0rc1`. O checkpoint
+`checkpoint/f7.5-ready` foi criado em `ec2296d68669e5b155dc2ba3f037a5197b5e55b3` antes do produto.
+O escopo cobre versão única, docs reais, limitações, certificação e GitHub prerelease após merge verde.
 
 ## 6. Bloqueios e fronteiras externas
 
@@ -271,8 +271,8 @@ fora do escopo. Tag publicada será imutável; correção posterior exige nova R
 ## 7. Próxima ação exata
 
 ```text
-COMMITAR O CONGELAMENTO READY E CRIAR checkpoint/f7.5-ready SOMENTE LOCAL.
-DEPOIS IMPLEMENTAR 0.2.0rc1; NÃO PUBLICAR TAG ANTES DO MERGE/PÓS-MERGE VERDES.
+CONCLUIR IMPLEMENTAÇÃO E CERTIFICAÇÃO LOCAL DE 0.2.0rc1.
+NÃO PUBLICAR TAG ANTES DO MERGE/PÓS-MERGE E DA RECONCILIAÇÃO TERMINAL VERDES.
 ```
 
 ## 8. Retomada após perda de contexto

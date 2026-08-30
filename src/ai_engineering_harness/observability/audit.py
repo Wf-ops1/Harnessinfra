@@ -19,6 +19,7 @@ from ai_engineering_harness.persistence import (
     StateStorageError,
 )
 from ai_engineering_harness.security import Redactor
+from ai_engineering_harness.versioning import PACKAGE_VERSION
 
 _CHECKPOINT_SCHEMA_VERSION = "1.0"
 _HMAC_PREFIX = "sha256:"
@@ -328,7 +329,7 @@ class AuditTrailManager:
                     "tool": {
                         "driver": {
                             "name": "AI-Engineering-Harness Audit Trail",
-                            "version": "0.1.0",
+                            "version": PACKAGE_VERSION,
                         }
                     },
                     "automationDetails": {"id": self.execution_id},

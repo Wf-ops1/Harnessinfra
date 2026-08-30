@@ -1,24 +1,20 @@
 # AI Engineering Harness
 
-> **Status atual: Protótipo / Em desenvolvimento**
+> **Status atual: MVP operacional / Release candidate 0.2.0rc1**
 
-O AI Engineering Harness é hoje uma base Python instalável para experimentar um harness de engenharia
-agentic local-first. O repositório já possui empacotamento reproduzível, compilador único e
+O AI Engineering Harness é um harness de engenharia agentic local-first instalável em prerelease. O
+repositório possui empacotamento reproduzível, compilador único e
 determinístico, execução dirigida pelas arestas do artefato, persistência concorrente, FSM por eventos
-e retomada canônica com aprovação, cancelamento e retry limitado por contexto real e redigido. A
-execução autônoma segura sobre um repositório externo ainda não está pronta como composição padrão:
-providers, roteamento, continuação de model-turn e durabilidade/policy do tool loop passaram pelo
-realinhamento; os primitivos de worktree Git, terminal por `argv` e edição confinada já são reais. A
-F7.1 comprovou localmente o ciclo vertical sobre uma wheel instalada e um repositório Git externo,
-incluindo tool loop, aprovação, promoção, evidence, audit e rollback. Essa prova injeta provider,
-registry e backend determinísticos somente no teste; CLI/defaults ainda não constroem
-automaticamente essa fronteira.
+e retomada canônica com aprovação, cancelamento e retry limitado por contexto real e redigido. O
+workflow público `new-feature` compõe as factories canônicas de provider, tools, worktree, contexto,
+planejamento, verificação, aprovação, promoção, knowledge, evidence, cancelamento e rollback. A
+certificação usa o adapter de produção contra transporte controlado; não há mock registrado em
+produção. Configuração, credenciais, trust, grants, serviços ou aprovação ausentes falham fechado.
 
-Não use `harness run`, `harness doctor`, `harness verify` ou `harness rollback` como garantia de segurança em um
-repositório valioso. As Fases 0–6 e as tarefas F7.1–F7.4 foram terminalmente reconciliadas. A
-composição pública F7.C1 foi promovida pelo PR #92/merge `26c36ff`/CI pós-merge `33325679613`; sua
-reconciliação administrativa está no PR #93/run inicial `33326696156`, e a F7.5 continua pendente. Execute esses
-comandos primeiro em cópias descartáveis enquanto a release candidate não estiver certificada.
+Esta versão é uma RC `0.x`, não `1.0` nem declaração de produção. Execute primeiro em cópias
+descartáveis, mantenha aprovação humana e leia as [limitações conhecidas](KNOWN_LIMITATIONS.md).
+F7.C1 encerrou no PR #92/merge `26c36ff`/pós-merge `33325679613`; sua reconciliação encerrou no
+PR #93/merge `3415c385`/pós-merge `33327198301`.
 
 ## Objetivo do produto
 
@@ -33,10 +29,10 @@ A arquitetura-alvo continua sendo:
 \text{Quality/Ops}
 \]
 
-Quando concluído, o pacote deverá permitir instalar uma CLI ou integração de IDE, inicializar um
+O MVP permite instalar a CLI, inicializar um
 repositório externo, executar alterações dentro de um worktree isolado, bloquear efeitos não
 autorizados, verificar o resultado, exigir aprovação, promover por Git e reverter com evidência
-auditável. Isso é a direção do produto, não uma descrição do estado entregue.
+auditável para `new-feature`. IDE e workflows adicionais continuam evolução pós-MVP.
 
 ## Matriz de capacidade
 
@@ -44,17 +40,17 @@ auditável. Isso é a direção do produto, não uma descrição do estado entre
 |---|---|---|---|
 | Ambiente e pacote | `uv.lock`, build de wheel, metadata SPDX Apache-2.0, defaults via `importlib.resources` e smoke externo ao checkout; F7.4 promovida pelo PR #90/merge `a62c164` | A reconciliação F7.4 encerrou no PR #91; bootstrap depende de instalar `uv`, e macOS não possui job de CI | Distribuição pública e instalação externa suportadas como produto |
 | Versionamento | Package version única e schemas graph/artifact/policy separados | Compatibilidade ainda é comparação exata | Migrações compatíveis e política de evolução |
-| Configuração e governança | F5.1–F5.7, F5.C1, F6.1–F6.7 e F7.1–F7.4 estão terminalmente reconciliadas; F7.C1 foi promovida | A reconciliação F7.C1 está no PR #93/run inicial `33326696156`, em `ADMIN_PR_OPEN / CHECKS_PENDING` pela [DEC-014](docs/decisions/DEC-014-reconciliacao-pos-merge.md), preservando a fronteira da [DEC-016](docs/decisions/DEC-016-composicao-operacional-antes-da-release.md) | Fechamento operacional na F7.5 |
+| Configuração e governança | F5.1–F5.7, F5.C1, F6.1–F6.7, F7.1–F7.4 e F7.C1 estão terminalmente reconciliadas; F7.5 prepara a RC | Serviços live e workflows além de `new-feature` seguem os limites da [DEC-016](docs/decisions/DEC-016-composicao-operacional-antes-da-release.md) | Evolução pós-MVP somente após a Fase 7 |
 | CLI e scaffold | `--help`, `--version`, `init`, `compile`, `run`, `resume`, `approve`, `cancel`, `cleanup-worktree`, `rollback`, `list`, `status`, `inspect`, `events`, `evidence` e doctor possuem contratos/testes; `new-feature` seleciona a composição pública de produção | Provider, credencial, trust, grants e serviços live ausentes continuam falhando fechados; workflows adicionais permanecem pós-MVP | UX estável para CLI e IDE em repositórios externos |
 | Compilação de grafos | Um único `GraphCompiler` valida contratos/policies e publica artefato 2.0 determinístico, versionado, íntegro e atômico | Capabilities compiladas ainda são declarativas, sem provar adapter disponível ou autorização runtime | Migrações de schema e expansão segura de workflows após o MVP |
 | Runtime/FSM | `GraphExecutor` segue somente arestas compiladas; record/journal usam lock, CAS e fencing. A F7.C1 compõe factories canônicas de provider, tools, worktree, knowledge, verificação, aprovação, promoção, evidence e rollback para `new-feature` | Efeito iniciado sem outcome exige intervenção; integrações live continuam opt-in | Expansão de workflows somente após o MVP |
-| Providers LLM | OpenAI Responses API e endpoint local Chat Completions executam HTTP real; registry/roteamento vêm da configuração efetiva; continuação nativa, JSON/usage estritos e evidência de todos os model turns foram corrigidos na F3.C1 | Integração live é opt-in; Anthropic falha como não implementado; nenhum backend agentic default torna o protótipo autônomo | Providers adicionais somente após contrato e testes equivalentes |
-| Tool loop | A F5.2 promovida unifica a autorização em um engine tipado default-deny por role, node, workflow, trust mode, tool, operação, path e aprovação; o lote é pré-autorizado e a regra aplicada precede o efeito no journal. A F5.3 promovida exige o mesmo snapshot no router e nos adapters antes do efeito | A composição automática das tools não foi adicionada; a aprovação de promoção F5.6 não transforma o booleano de policy em decisão humana de tool | Integração automática das tools e gates seguintes |
+| Providers LLM | OpenAI Responses API e endpoint local Chat Completions executam HTTP real; registry/roteamento vêm da configuração efetiva; continuação nativa, JSON/usage estritos e evidência de todos os model turns foram corrigidos na F3.C1 | O caminho público `new-feature` seleciona o backend configurado; integração live é opt-in, Anthropic falha como não implementado e nenhum serviço externo é presumido saudável | Providers adicionais somente após contrato e testes equivalentes |
+| Tool loop | A F5.2 promovida unifica a autorização em um engine tipado default-deny por role, node, workflow, trust mode, tool, operação, path e aprovação; F7.C1 registra as tools operacionais para `new-feature` e as confina ao worktree | Workflows além de `new-feature` não recebem composição operacional; a aprovação de promoção F5.6 não transforma o booleano de policy em decisão humana de tool | Expansão somente após contrato e E2E equivalentes |
 | Serena, índice, contexto e planejamento | Edição confinada e Serena MCP explícito usam efeitos verificados; `PythonAstIndexer` indexa o commit exato; F4.3/F4.4 produzem contexto e plano persistidos; a F4.C1 e sua reconciliação administrativa foram incorporadas pelos PRs #40/#41 | Serena é opt-in e a indexação é Python-only/full rebuild/explícita | Backend Codebase-Memory compatível e memória semântica real |
 | Verificação e auditoria | F4.5 mantém a taxonomia única `typecheck/lint/unit_test/build/security_scan`; F6.1–F6.7 fornecem journal, evidence, recovery e knowledge transacional; F7.C1 liga esses serviços ao caminho público; runner `0/0` falham antes de subprocessos | Proteção sem chave é somente “tamper-evident local”; capabilities externas continuam opt-in | Matriz operacional integral com recovery ampliado |
 | Doctor | A F6.4 promovida faz sete componentes percorrerem seis estágios reais; texto/JSON compartilham resultado tipado, `--workflow` resolve gates sem executá-los e ambiente unhealthy retorna não zero | Provider/MCP live continuam dependentes de configuração e serviços externos; adapters não suportados falham fechados | UX adicional e novos adapters somente após contrato/testes equivalentes |
 | Worktree, promoção e rollback | `ExternalWorktreeManager` cria candidate commit real e singular; F3.7 promove por `git cherry-pick`; F5.6/F5.7 vinculam aprovação e rollback; F7.C1 atravessa esses efeitos pelo CLI público em wheel instalada | Rollback não reexecuta gates pós-reversão; falhas externas continuam exigindo intervenção | Recovery/evidence ampliado pós-MVP |
-| CI e release | GitHub Actions executa quality/tests/package em Windows e Linux; F7.3 tornou mypy strict, coverage/branches, secrets e auditoria de dependências gates obrigatórios; F7.C1 passou onze jobs mais `CI required` no PR e pós-merge | Reconciliação F7.C1 ainda local; release candidate F7.5 não começou | Publicar a versão `0.x` MVP pela F7.5 |
+| CI e release | GitHub Actions executa quality/tests/package em Windows e Linux; mypy strict, coverage/branches, secrets e dependências são obrigatórios; package `0.2.0rc1` identifica a RC | GitHub prerelease após merge/pós-merge certificados; sem PyPI e sem CI macOS | Release estável somente após evidência pós-RC |
 
 ## Estado do roadmap
 
@@ -285,7 +281,8 @@ auditável. Isso é a direção do produto, não uma descrição do estado entre
   encerrou no head `f4b4f45`/CI `33293246380`/merge `0ea7f801`; o run pós-merge `33293579533`
   passou onze jobs mais `CI required`. A F7.C1 foi promovida pelo PR #92 no head `bb4dc8c`, passou a
   CI `33325055342`, foi incorporada no merge `26c36ff` e recebeu o pós-merge `33325679613` verde. Sua
-  reconciliação administrativa está local; a F7.5 aguarda somente esse fechamento pela DEC-014.
+  reconciliação encerrou no PR #93/head `c99f02e`/CI `33326822791`/merge `3415c385`; o pós-merge
+  `33327198301` passou onze jobs mais `CI required`, desbloqueando a F7.5.
 
 ## Dívidas técnicas críticas
 
@@ -300,8 +297,8 @@ operacionais:
   [tool loop](src/ai_engineering_harness/runtime/tool_loop.py) já preserva continuação nativa, todos os
   model turns e eventos de tool duráveis. A F5.2 remove os verificadores duplicados: o engine único
   aplica deny-wins/default-deny aos oito eixos do contexto, o router revalida decisão/target e o
-  journal liga regra e digest antes/depois do efeito. A factory operacional registra handlers reais
-  somente quando adapters explícitos são injetados, mas o lifecycle ainda não a constrói;
+  journal liga regra e digest antes/depois do efeito. Para `new-feature`, a composição pública F7.C1
+  constrói esses handlers a partir de adapters e autoridades explícitos;
 - [SerenaAdapter](src/ai_engineering_harness/tools/adapters/serena.py) abre transporte MCP stdio ou
   Streamable HTTP configurado, comprova capability/raiz e valida a mudança real; instalação,
   configuração e injeção live continuam externas e opt-in;
@@ -323,19 +320,20 @@ operacionais:
   worktree e preserva no terminal o launcher ativo selecionado por `sys.prefix`; a F4.7 promovida
   persiste cada outcome e impede `COMPLETED` sem suíte obrigatória aprovada. O R1 concorrente restaurou
   a CI no PR #47 e no merge `4aa701a`; a F4.8 promovida liga essa reprovação ao `on_failure` compilado,
-  persiste orçamento/deadline/contexto e exige targeted seguido da suíte completa, mas não integra
-  automaticamente worktree/provider/tools ao lifecycle padrão;
+  persiste orçamento/deadline/contexto e exige targeted seguido da suíte completa. A composição
+  F7.C1 integra worktree/provider/tools ao lifecycle público `new-feature`; outros workflows seguem
+  fail-closed;
 - o [doctor](src/ai_engineering_harness/doctor/checker.py) local agora inspeciona sete componentes de
   forma read-only e fail-closed; saúde live de provider/MCP depende de configuração, credenciais e
   serviços externos, e nenhum probe instala ou inicia esses componentes;
 - [PromotionManager](src/ai_engineering_harness/runtime/promotion_manager.py) cria e promove SHAs Git
-  reais com recovery exato; sua composição é opt-in e ainda não é construída pelo CLI/defaults;
+  reais com recovery exato; `new-feature` o recebe pela composição pública, após aprovação ligada;
 - [ExternalWorktreeManager](src/ai_engineering_harness/workspace/git_worktree.py) cria, valida e
-  publica candidate real, mas o lifecycle ainda não injeta automaticamente seu guard nas tools;
+  publica candidate real; a composição `new-feature` injeta o guard nas tools canônicas;
 - [TerminalAdapter](src/ai_engineering_harness/tools/adapters/terminal.py) executa somente `argv`
   autorizado, com `shell=False`, cwd confinado, ambiente seletivo, timeout da árvore de processos e
-  saída limitada/redigida; seus handlers são registrados apenas pela factory opt-in e ainda não são
-  ligados ao lifecycle como tool agentic padrão.
+  saída limitada/redigida; seus handlers são registrados pela factory canônica da composição pública
+  `new-feature`.
 
 ## Ambiente de desenvolvimento
 
@@ -371,8 +369,8 @@ uv run harness --version
 uv run harness --help
 ```
 
-`harness init` escreve uma pasta `.harness/` no diretório atual. Enquanto o produto estiver em
-desenvolvimento, teste o scaffold apenas em um repositório descartável.
+`harness init` escreve uma pasta `.harness/` no diretório atual. Durante a RC, teste primeiro em um
+repositório descartável.
 
 ## Contrato de versionamento
 
@@ -390,7 +388,8 @@ independente; `definition_version` identifica apenas a revisão de uma definiç�
 - [Auditoria do ciclo](docs/agentic_lifecycle_audit.md): estado concreto de cada etapa;
 - [Especificação arquitetural](docs/harness_architecture_spec.md): arquitetura-alvo e lacunas;
 - [Guia do usuário](docs/user_guide.md): comandos seguros e limitações atuais;
-- [Portabilidade](docs/portability.md), [suporte](SUPPORT.md), [changelog](CHANGELOG.md) e
+- [Portabilidade](docs/portability.md), [suporte](SUPPORT.md), [changelog](CHANGELOG.md),
+  [limitações conhecidas](KNOWN_LIMITATIONS.md) e
   [licença Apache-2.0](LICENSE): distribuição local e política pública;
 - [Walkthrough](docs/walkthrough.md): estrutura real e fluxo observado;
 - [Auditoria técnica](docs/walkthrough_audit.md): pendências comprovadas.

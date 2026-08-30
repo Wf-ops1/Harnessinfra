@@ -1,18 +1,18 @@
 # Especificação Arquitetural — AI Engineering Harness
 
-> **Status: Arquitetura-alvo / Em desenvolvimento**
+> **Status: MVP operacional / Release candidate 0.2.0rc1**
 > **Revisão documental:** 1.0.0 — não confundir com package ou schema version
 
 ## 1. Visão do produto
 
-O produto pretende ser uma infraestrutura local-first instalável por CLI ou IDE. Um repositório
-externo deverá receber configuração leve em `.harness/`, enquanto execução, ferramentas, Git,
+O produto é uma infraestrutura local-first instalável por CLI. Um repositório
+externo recebe configuração leve em `.harness/`, enquanto execução, ferramentas, Git,
 políticas e evidências permanecerão controlados pelo motor instalado.
 
-No estado atual, essa visão está parcialmente materializada como harness de testes, contratos e
-primitivas operacionais reais. O isolamento por worktree, terminal e edição existe de forma injetável,
-mas o produto ainda não os compõe automaticamente no lifecycle e não oferece autonomia suficiente
-para uso cotidiano sem supervisão.
+No estado atual, o workflow público `new-feature` compõe essas primitivas operacionais no lifecycle:
+provider configurado, worktree, tools, gates, aprovação, promoção, knowledge, evidence e rollback.
+Os demais workflows permanecem fail-closed, a interface IDE está fora da RC e nenhuma integração live
+ou autoridade humana é presumida.
 
 ## 2. Arquitetura-alvo
 
@@ -32,15 +32,15 @@ flowchart TD
 
 | Camada | Base existente | Estado | Limite principal |
 |---|---|---|---|
-| Package e defaults | `pyproject.toml`, `uv.lock`, `src/ai_engineering_harness/defaults/` | Implementada como base | Distribuição de produto e compatibilidade externa ainda não fechadas |
+| Package e defaults | `pyproject.toml`, `uv.lock`, `src/ai_engineering_harness/defaults/` | RC `0.2.0rc1` | Prerelease distribuída no GitHub, sem publicação no PyPI ou garantia estável |
 | Contratos | `src/ai_engineering_harness/contracts/` | Implementada como modelos internos | Evolução/migração compatível dos schemas ainda não está fechada |
 | Compilação | `src/ai_engineering_harness/compiler/` com wrapper legado em `compiler/` | Implementada como pipeline canônico | Distribuição e migração externa dos contratos ainda não estão fechadas |
-| Runtime | `src/ai_engineering_harness/runtime/` | Implementado como núcleo injetável | Percorre arestas, persiste e retoma; o wiring padrão não fornece executores/tools operacionais nem compõe promoção automaticamente |
-| Ferramentas/modelos | `tools/`, `models/`, `indexer/` | Primitivas reais/injetáveis | Edição confinada, terminal, Git somente leitura, providers e memória estrutural local possuem testes e registry opt-in; integração automática e backends externos de memória ainda faltam |
-| Verificação | `verification/`, `tests/ci/` | Implementada para os gates do próprio projeto | CI executa quality/tests/package em Windows e Linux, cobertura decisória, scan de secrets e auditoria de dependências; a composição dos gates no lifecycle padrão continua injetável |
-| Governança/segurança | `governance/`, `security/` | Implementada como fronteiras injetáveis | Policy default-deny, trust, orçamento e redaction governam primitivas reais; o wiring padrão ainda não cobre todo side effect do produto |
-| Auditoria | `observability/audit.py`, `observability/evidence.py` | Implementada como evidência local fail-closed | Journal/evidence validam identidade e digest; hash chain local não é âncora externa imutável e a composição pública ainda falta |
-| Workspace Git | `workspace/` | Implementada como primitivo | Cria/valida worktree Git externo e guard canônico; integração automática com lifecycle/tools ainda falta |
+| Runtime | `src/ai_engineering_harness/runtime/` | Implementado e composto em `new-feature` | Percorre arestas, persiste/retoma e mantém demais workflows sem composição em fail-closed |
+| Ferramentas/modelos | `tools/`, `models/`, `indexer/` | Efeitos reais; composição pública F7.C1 | Edição confinada, terminal, Git somente leitura, providers e memória local; serviços live e Serena são opt-in |
+| Verificação | `verification/`, `tests/ci/` | Implementada e composta em `new-feature` | CI certifica Windows/Linux; stack e ferramentas do repositório externo continuam pré-requisitos |
+| Governança/segurança | `governance/`, `security/` | Implementada no caminho público | Policy default-deny, trust, orçamento e redaction governam os efeitos; autorização externa continua obrigatória |
+| Auditoria | `observability/audit.py`, `observability/evidence.py` | Evidência local fail-closed no caminho público | Journal/evidence validam identidade e digest; hash chain local não é âncora externa imutável |
+| Workspace Git | `workspace/` | Implementado e composto em `new-feature` | Worktree externo e guard canônico; rollback não reexecuta gates pós-reversão automaticamente |
 
 ## 4. Separação Harness vs. produto
 
@@ -48,8 +48,8 @@ flowchart TD
 - **Configuração do produto:** `.harness/agents/`, `.harness/graphs/specs/`,
   `.harness/policies/` e `.harness/tools/`.
 - **Estado local:** `.harness/state/` e `.harness/artifacts/`.
-- **Isolamento disponível como primitivo:** worktree Git externo associado a `execution_id`; uma
-  factory opt-in aceita seu guard explicitamente, mas a injeção pelo lifecycle continua pendente.
+- **Isolamento do caminho público:** `new-feature` cria/recarrega o worktree Git externo associado ao
+  `execution_id` e injeta o mesmo guard no lifecycle e nas tools.
 
 `harness init` cria/copia a estrutura local, mas isso não torna o repositório governado ou seguro por
 si só.
@@ -66,6 +66,6 @@ si só.
 - estado necessário para retomar sobrevive a crash;
 - promoção e rollback usam operações Git explícitas com SHAs reais.
 
-Essas invariantes são requisitos do plano. Enquanto qualquer uma não estiver garantida no caminho
-crítico, o projeto permanece protótipo. A DEC-016 exige a composição pública na F7.C1 antes da
-release candidate F7.5.
+Essas invariantes são garantidas no caminho público `new-feature` e permanecem requisitos para cada
+workflow futuro. A RC não é declaração de produção, autonomia geral ou compatibilidade estável; os
+limites completos estão em [KNOWN_LIMITATIONS.md](../KNOWN_LIMITATIONS.md).

@@ -32,7 +32,7 @@ def _read(document: Path) -> str:
 def test_readme_contains_frozen_capability_matrix() -> None:
     readme = _read(ROOT / "README.md")
 
-    assert "> **Status atual: Protótipo / Em desenvolvimento**" in readme
+    assert "> **Status atual: MVP operacional / Release candidate 0.2.0rc1**" in readme
     assert "| Capacidade | Implementada | Experimental | Planejada |" in readme
     assert "adapters de modelos" in readme
     assert "candidate commit real e singular" in readme
@@ -144,9 +144,9 @@ def test_current_docs_recognize_real_worktree_without_claiming_full_integration(
     assert "cria diretório, não" not in readme
     assert "não chama `git worktree`" not in operating_model
     assert "| Workspace Git | `workspace/` | Simulada" not in architecture
-    assert "lifecycle ainda não injeta automaticamente seu guard" in readme.casefold()
-    assert "worktree git real ainda não está ligado" in operating_model.casefold()
-    assert "Cria/valida worktree Git externo" in architecture
+    assert "F7.C1 compõe factories canônicas" in readme
+    assert "composição pública canônica" in operating_model.casefold()
+    assert "Implementado e composto em `new-feature`" in architecture
 
 
 def test_current_docs_recognize_f3_8_tools_without_claiming_lifecycle_integration() -> None:
@@ -158,10 +158,10 @@ def test_current_docs_recognize_f3_8_tools_without_claiming_lifecycle_integratio
     assert "terminal aceita comando como string" not in operating_model
     assert "terminal não cumpre contrato final" not in architecture
     assert "executa somente `argv`" in readme
-    assert "factory opt-in" in readme.casefold()
-    assert "registrations opt-in" in operating_model.casefold()
-    assert "registry opt-in" in architecture.casefold()
-    assert "ainda não constrói esse registry" in operating_model.casefold()
+    assert "F7.C1 registra as tools operacionais" in readme
+    assert "tool loop durável" in operating_model.casefold()
+    assert "composição pública F7.C1" in architecture
+    assert "Workflows sem composição registrada" in operating_model
 
 
 def test_current_docs_separate_tool_policy_from_content_bound_promotion() -> None:
@@ -184,7 +184,7 @@ def test_current_docs_separate_tool_policy_from_content_bound_promotion() -> Non
     assert "INVALIDATED" in user_guide
     assert "EXPIRED" in user_guide
     assert "não converte" in user_guide
-    assert "não é construído automaticamente" in walkthrough
+    assert "é construído pela factory pública `new-feature`" in walkthrough
 
 
 def test_current_docs_recognize_real_serena_without_claiming_live_default() -> None:
@@ -275,7 +275,7 @@ def test_public_state_docs_distinguish_real_primitives_from_missing_composition(
     assert "merge `94641d2`" in readme
     assert "31447628152" in readme
     assert "POST_PROMOTION_BLOCKED" in readme
-    assert "`harness verify`" in readme
+    assert "`harness verify" in user_guide
     assert "typecheck/lint/unit_test/build/security_scan" in readme
     assert "runner `0/0` falham antes de subprocessos" in readme
     assert "reconciliação F7.4 encerrou no PR #91" in readme
@@ -283,8 +283,8 @@ def test_public_state_docs_distinguish_real_primitives_from_missing_composition(
     assert "32095106958" not in readme
     assert all(evidence in task_index for evidence in ("3be0d12", "32095513602", "43bd135", "32096041236"))
     assert "doctor não mede saúde" not in operating_model
-    assert "promoção e rollback possuem protocolos Git reais" in operating_model
-    assert "Implementada para os gates do próprio projeto" in architecture
+    assert "candidate commit, promoção por `git cherry-pick`" in operating_model
+    assert "Implementada e composta em `new-feature`" in architecture
 
     assert "F5.5 — integrar secrets e redaction no caminho crítico" in panel
     assert "F5.6 `PROMOTED`" in panel
@@ -302,7 +302,7 @@ def test_public_state_docs_distinguish_real_primitives_from_missing_composition(
     assert "998a7acaca46dc7f751798be4e2be9266d8028d1" in panel
     assert "31849767573" in panel
     assert "F5.C1" in panel
-    assert "POST_PROMOTION_BLOCKED" in panel
+    assert "33327198301" in panel
     assert "docs/tasks/completed/F5.C1.md" in panel
     assert "2b405fdae5ea5560ce8e411297a0c11c4abc1bf9" in panel
     assert "31857239235" in panel
@@ -317,24 +317,24 @@ def test_public_state_docs_distinguish_real_primitives_from_missing_composition(
     assert "31868906875" in panel
     assert "7d6a0e179f30008a7a67275da94878a179f0aba9" in panel
     assert "31887143905" in panel
-    assert "| **Gate** | `ADMIN_PR_OPEN / CHECKS_PENDING` |" in panel
+    assert "| **Gate** | `READY` — checkpoint `ec2296d68669e5b155dc2ba3f037a5197b5e55b3`" in panel
     assert "Apache-2.0" in panel
-    assert "docs/tasks/completed/F7.4.md" in panel
+    assert "checkpoint/f7.4-complete" in panel
     assert "docs/tasks/completed/F7.C1.md" in panel
     assert all(
         evidence in panel
-        for evidence in ("PR #92", "bb4dc8c", "33325055342", "26c36ff", "33325679613", "PR #93", "33326696156")
+        for evidence in ("PR #92", "bb4dc8c", "33325055342", "26c36ff", "33325679613", "PR #93", "c99f02e", "33326822791", "3415c385", "33327198301")
     )
     assert all(
         evidence in task_index
-        for evidence in ("completed/F7.C1.md", "bb4dc8c", "33325055342", "26c36ff", "33325679613", "PR #93", "33326696156")
+        for evidence in ("completed/F7.C1.md", "bb4dc8c", "33325055342", "26c36ff", "33325679613", "PR #93", "c99f02e", "33326822791", "3415c385", "33327198301")
     )
     assert all(
         evidence in readme
         for evidence in ("PR #92", "bb4dc8c", "33325055342", "26c36ff", "33325679613")
     )
     assert "32085923509" in panel
-    assert "docs/tasks/completed/F7.3.md" in panel
+    assert "checkpoint/f7.3-complete" in panel
     assert all(evidence in task_index for evidence in ("3be0d12", "32095513602", "43bd135", "32096041236"))
     assert "docs/tasks/completed/F7.2.md" in panel
     assert "task/f7.2-test-matrix" in panel
@@ -456,9 +456,9 @@ def test_public_state_docs_distinguish_real_primitives_from_missing_composition(
     assert "5b10b2d453768de62e9f64ae6d0095cfcd95cd03" in panel
     assert "31918043022" in panel
     assert "tamper-evident local" in readme
-    assert "A F7.1 comprovou localmente o ciclo vertical" in readme
-    assert "Prova vertical controlada F7.1" in user_guide
-    assert "injeção de teste" in user_guide
+    assert "composição pública F7.C1" in readme
+    assert "Prova vertical F7.1 e composição pública F7.C1" in user_guide
+    assert "transporte controlado" in user_guide
     assert "PR #83" in readme
     assert "31985232560" in readme
     assert "31985776520" in readme
@@ -524,7 +524,7 @@ def test_public_state_docs_distinguish_real_primitives_from_missing_composition(
     assert "git revert --no-edit" in lifecycle
     assert "F5.7 R3 está `PROMOTED`" in walkthrough
     assert "terminal usa `shell=True`" not in lifecycle
-    assert "registry de executores vazio" in user_guide
+    assert "registry permanece vazio e fail-closed" in user_guide
     assert "harness resume <id>" in user_guide
     assert "Configuração efetiva F5.1" in user_guide
     assert "importlib.resources" in user_guide
@@ -536,7 +536,7 @@ def test_public_state_docs_distinguish_real_primitives_from_missing_composition(
     assert "A F4.8 promovida" in user_guide
     assert "targeted → full" in lifecycle
     assert "F4.8 `PROMOTED`" in lifecycle
-    assert "F3.7 `PROMOTED`" in lifecycle
+    assert "F3.7/F5.3/F5.6 `PROMOTED`" in lifecycle
     assert "cherry-pick único" in lifecycle
     assert "F4.8 promovida" in walkthrough
     assert "promoção F3.7 usa candidate/cherry-pick reais" in walkthrough
@@ -583,7 +583,7 @@ def test_release_order_requires_current_docs_and_public_runtime_composition() ->
 
     assert "F6.4 `PROMOTED`" in lifecycle
     assert "F6.7 `PROMOTED`" in lifecycle
-    assert "F7.1–F7.3 `PROMOTED`" in lifecycle
+    assert "F7.1–F7.4 e F7.C1 `PROMOTED`" in lifecycle
     assert "F6.3 `COMPLETED_LOCAL / PROMOTION_PENDING`" not in lifecycle
     assert "Todos os estágios retornam OK sem probe" not in lifecycle
     assert "F5.7 R3 está `PROMOTED`" in user_guide
@@ -595,7 +595,7 @@ def test_release_order_requires_current_docs_and_public_runtime_composition() ->
     assert "> **Estado:** aceita" in decision
     assert "não autoriza iniciar F7.4" in decision
     assert "F7.C1" in readme and "DEC-016" in readme
-    assert "DEC-016" in panel and "F7.C1 → F7.5" in panel
+    assert "DEC-016" in panel and "F7.C1 terminal; F7.5" in panel
     assert "https://github.com/Wf-ops1/Hartrol/pull/88" in panel
 
 
@@ -606,3 +606,33 @@ def test_markdown_files_have_basic_structural_integrity() -> None:
         assert content.startswith("# "), document
         assert content.endswith("\n"), document
         assert sum(line.startswith(fence) for line in content.splitlines()) % 2 == 0, document
+
+
+def test_f75_release_candidate_surfaces_are_consistent() -> None:
+    readme = _read(ROOT / "README.md")
+    changelog = _read(ROOT / "CHANGELOG.md")
+    support = _read(ROOT / "SUPPORT.md")
+    portability = _read(ROOT / "docs" / "portability.md")
+    limitations = _read(ROOT / "KNOWN_LIMITATIONS.md")
+    lifecycle = _read(ROOT / "docs" / "agentic_lifecycle_audit.md")
+    operating_model = _read(ROOT / "docs" / "agentic_operating_model.md")
+    panel = _read(ROOT / "TASK.md")
+    dossier = _read(ROOT / "docs" / "tasks" / "active" / "F7.5.md")
+
+    for surface in (readme, changelog, support, portability, limitations, dossier):
+        assert "0.2.0rc1" in surface
+    for surface in (changelog, panel, dossier):
+        assert "v0.2.0-rc.1" in surface
+    for contract in (
+        "somente o workflow `new-feature`",
+        "não há publicação em PyPI",
+        "não reexecuta automaticamente todos os gates",
+        "tamper-evident locais",
+        "macOS",
+    ):
+        assert contract in limitations
+    assert "F7.1–F7.4 e F7.C1 `PROMOTED`" in lifecycle
+    assert "Workflows sem composição registrada" in operating_model
+    assert "F7.C1 deverá" not in lifecycle
+    assert "registry de executores deliberadamente vazio" not in operating_model
+    assert "não é `1.0`" in limitations

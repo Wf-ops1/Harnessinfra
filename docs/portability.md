@@ -1,6 +1,9 @@
 # Instalação e portabilidade
 
-> **Estado:** contrato local da F7.4; ainda não existe distribuição pública estável.
+> **Estado:** contrato da release candidate `0.2.0rc1`; distribuição por GitHub Release, sem PyPI.
+
+A composição F7.C1 do workflow público `new-feature` acompanha a wheel; serviços live, credenciais,
+autoridade de promoção e ferramentas do repositório externo continuam pré-requisitos explícitos.
 
 ## Construir e instalar a wheel local
 
@@ -21,16 +24,16 @@ Instalação manual da wheel construída:
 
 ```powershell
 # Windows PowerShell
-uv tool install .\dist\ai_engineering_harness-0.1.0-py3-none-any.whl
+uv tool install .\dist\ai_engineering_harness-0.2.0rc1-py3-none-any.whl
 ```
 
 ```bash
 # Linux ou macOS
-uv tool install ./dist/ai_engineering_harness-0.1.0-py3-none-any.whl
+uv tool install ./dist/ai_engineering_harness-0.2.0rc1-py3-none-any.whl
 ```
 
-Confirme com `harness --version`. Como o pacote ainda é um protótipo, prefira um ambiente isolado e
-um repositório descartável. Isso não é uma instrução para publicar a wheel em registry.
+Confirme com `harness --version`. Como o pacote é uma prerelease, prefira um ambiente isolado e um
+repositório descartável. Isso não é uma instrução para publicar a wheel em registry.
 
 ## Recursos e estado do projeto
 
@@ -68,6 +71,7 @@ contrato implementado, mas não são certificados por job macOS na F7.4. Consult
 
 ## Limite operacional atual
 
-Instalação portável não significa autonomia operacional. Provider, tools, worktree e aprovações ainda
-não são compostos automaticamente pelo caminho público; essa lacuna pertence à F7.C1, antes da
-release candidate F7.5.
+O caminho público `new-feature` compõe provider, tools, worktree, verificação, aprovação, promoção,
+evidence e rollback com autoridades explícitas e falha fechada. Os demais workflows não possuem essa
+composição nesta RC; serviços live continuam dependentes de configuração externa. Consulte as
+[limitações conhecidas](../KNOWN_LIMITATIONS.md).
