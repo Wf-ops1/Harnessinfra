@@ -20,10 +20,10 @@ em [`TASK.md`](../../TASK.md); requisitos normativos permanecem no
 
 ## Tarefa ativa
 
-A [F7.C1 — composição operacional do caminho público](active/F7.C1.md) está `READY` na branch local
-`task/f7.c1-public-path-composition`, sem upstream. O caminho público foi reproduzido falhando por
-registry de executores vazio; escopo, aceite e rollback estão congelados antes da implementação.
-Publicação, PR, merge, tags remotas e remoção de refs não estão autorizados.
+Nenhuma implementação ativa. A [F7.C1 — composição operacional do caminho público](completed/F7.C1.md)
+está `PROMOTED`: PR #92/head `bb4dc8c`/CI `33325055342`, merge `26c36ff` e CI pós-merge
+`33325679613`, todos verdes. A reconciliação está `LOCAL_READY / PUBLICATION_PENDING` em
+`docs/promote-f7.c1`; a F7.5 foi autorizada e aguarda esse fechamento terminal pela DEC-014.
 
 A [F7.4 — empacotamento e portabilidade](completed/F7.4.md) está terminalmente `PROMOTED`: produto
 PR #90/head `42b6f8f`/CI `33291856113`/merge `a62c164`/pós-merge `33292240896`; reconciliação
@@ -227,7 +227,7 @@ checks no run `31629604755`, foi incorporado pelo merge `c46910e` e recebeu 11/1
 | F7 | F7.2 | [Matriz de testes](completed/F7.2.md) | PR #85 / head `09e0ee3` / merge `53cafa5` / pós-merge `32039759737`; administrativo #86 / merge `4e9f7a25` / pós-merge `32045181204` |
 | F7 | F7.3 | [Quality gates do projeto](completed/F7.3.md) | PR #87 / head `97d2606` / CI `32088471059`; merge `be17bcb` / pós-merge `32088913196`; administrativo #88 / head `3be0d12` / CI `32095513602` / merge `43bd135` / pós-merge `32096041236` |
 | F7 | F7.4 | [Empacotamento e portabilidade](completed/F7.4.md) | PR #90 / head `42b6f8f` / CI `33291856113`; merge `a62c164` / pós-merge `33292240896`; administrativo #91 / head `f4b4f45` / CI `33293246380` / merge `0ea7f801` / pós-merge `33293579533` |
-| F7 | F7.C1 | [Composição operacional do caminho público](active/F7.C1.md) | `READY`; branch local `task/f7.c1-public-path-composition`; checkpoint local pendente neste commit documental |
+| F7 | F7.C1 | [Composição operacional do caminho público](completed/F7.C1.md) | PR #92 / head `bb4dc8c` / CI `33325055342`; merge `26c36ff` / pós-merge `33325679613`; reconciliação local pendente de publicação |
 
 Fechamentos documentais adicionais preservados no Git: PR #13 / merge `3596df3` / run
 `31211290100` e PR #15 / merge `d48151b` / run `31215944126`.
