@@ -35,12 +35,12 @@ flowchart TD
 | Package e defaults | `pyproject.toml`, `uv.lock`, `src/ai_engineering_harness/defaults/` | Implementada como base | Distribuição de produto e compatibilidade externa ainda não fechadas |
 | Contratos | `src/ai_engineering_harness/contracts/` | Implementada como modelos internos | Evolução/migração compatível dos schemas ainda não está fechada |
 | Compilação | `src/ai_engineering_harness/compiler/` com wrapper legado em `compiler/` | Implementada como pipeline canônico | Distribuição e migração externa dos contratos ainda não estão fechadas |
-| Runtime | `src/ai_engineering_harness/runtime/` | Implementado como núcleo injetável | Percorre arestas, persiste e retoma; wiring padrão não fornece executores/tools operacionais nem promoção |
-| Ferramentas/modelos | `tools/`, `models/`, `indexer/` | Experimental | Edição confinada, terminal, Git somente leitura e Serena MCP possuem registry opt-in; integração automática e memória real ainda faltam |
-| Verificação | `verification/` | Experimental | Gates estáticos usam o terminal confinado; fail-closed integral e matriz completa ainda faltam |
-| Governança/segurança | `governance/`, `security/` | Experimental | Enforcement não cobre todo side effect |
-| Auditoria | `observability/audit.py` | Experimental | Hash chain local não prova efeitos externos nem recovery |
-| Workspace Git | `workspace/` | Implementada como primitivo | Cria/valida worktree Git externo e guard canônico; integração com lifecycle/tools ainda falta |
+| Runtime | `src/ai_engineering_harness/runtime/` | Implementado como núcleo injetável | Percorre arestas, persiste e retoma; o wiring padrão não fornece executores/tools operacionais nem compõe promoção automaticamente |
+| Ferramentas/modelos | `tools/`, `models/`, `indexer/` | Primitivas reais/injetáveis | Edição confinada, terminal, Git somente leitura, providers e memória estrutural local possuem testes e registry opt-in; integração automática e backends externos de memória ainda faltam |
+| Verificação | `verification/`, `tests/ci/` | Implementada para os gates do próprio projeto | CI executa quality/tests/package em Windows e Linux, cobertura decisória, scan de secrets e auditoria de dependências; a composição dos gates no lifecycle padrão continua injetável |
+| Governança/segurança | `governance/`, `security/` | Implementada como fronteiras injetáveis | Policy default-deny, trust, orçamento e redaction governam primitivas reais; o wiring padrão ainda não cobre todo side effect do produto |
+| Auditoria | `observability/audit.py`, `observability/evidence.py` | Implementada como evidência local fail-closed | Journal/evidence validam identidade e digest; hash chain local não é âncora externa imutável e a composição pública ainda falta |
+| Workspace Git | `workspace/` | Implementada como primitivo | Cria/valida worktree Git externo e guard canônico; integração automática com lifecycle/tools ainda falta |
 
 ## 4. Separação Harness vs. produto
 
@@ -67,4 +67,5 @@ si só.
 - promoção e rollback usam operações Git explícitas com SHAs reais.
 
 Essas invariantes são requisitos do plano. Enquanto qualquer uma não estiver garantida no caminho
-crítico, o projeto permanece protótipo.
+crítico, o projeto permanece protótipo. A DEC-016 exige a composição pública na F7.C1 antes da
+release candidate F7.5.

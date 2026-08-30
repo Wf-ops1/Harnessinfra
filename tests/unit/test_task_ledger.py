@@ -1075,7 +1075,7 @@ def test_f5_7_promotion_preserves_r3_negative_evidence_and_certification() -> No
         "914 passed, 5 skipped, 6 subtests passed em 328.79s",
     ):
         assert result in f5_c1_dossier
-    assert "| **Gate** | `PROMOTED / ADMIN_PR_OPEN` |" in panel
+    assert "| **Gate** | `PAUSED / F7.4_AUTHORIZATION_REQUIRED` |" in panel
     assert "32085923509" in panel
     assert not (ACTIVE_ROOT / "F7.3.md").exists() and (COMPLETED_ROOT / "F7.3.md").is_file()
     f7_3_dossier = _read(COMPLETED_ROOT / "F7.3.md")
@@ -1136,7 +1136,7 @@ def test_f5_7_promotion_preserves_r3_negative_evidence_and_certification() -> No
     ):
         assert evidence in f7_2_dossier
     assert "completed/F7.2.md" in task_index
-    assert "https://github.com/Wf-ops1/xXHarnessinfraXx/pull/86" in task_index
+    assert "https://github.com/Wf-ops1/Hartrol/pull/86" in task_index
     assert "b40f251" in task_index
     assert "32045181204" in task_index
     assert "docs/tasks/completed/F7.1.md" in panel

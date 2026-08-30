@@ -5,7 +5,8 @@
 ## 0. Metadados do plano
 
 - **Projeto:** `ai-engineering-harness`
-- **Estado atual considerado:** pacote Python `0.1.0`, runtime e integrações parcialmente simulados
+- **Estado atual considerado:** pacote Python `0.1.0`; primitivas promovidas até F7.3, com composição
+  operacional pública, portabilidade e release ainda pendentes
 - **Objetivo do plano:** tornar concreta a proposta do harness, eliminando caminhos falsamente bem-sucedidos, conectando todos os componentes ao fluxo principal e entregando uma vertical slice real antes de ampliar escopo
 - **Estratégia:** Python-first, local-first, fail-closed e incremental
 - **Resultado final esperado:** um repositório externo poderá ser inicializado, analisado, modificado em worktree isolado, verificado, aprovado, promovido e eventualmente revertido com evidência auditável
@@ -1552,10 +1553,30 @@ Cobertura não substitui testes de comportamento.
 - Documentar paths Windows, macOS e Linux.
 - Validar worktree e process termination em Windows e Linux.
 
+### Tarefa F7.C1 — Composição operacional do caminho público
+
+Corretiva obrigatória instituída pela DEC-016 antes da release candidate:
+
+- compor `harness run new-feature` com as factories canônicas de configuração, provider, tools,
+  worktree, contexto, planning, verificação, aprovação, promoção, knowledge, evidence, cancelamento e
+  rollback;
+- manter provider/credencial/trust/policy/grant/aprovação ausentes em falha fechada, sem defaults que
+  concedam autoridade;
+- remover a necessidade de uma factory de lifecycle específica da fixture para atravessar o E2E;
+- testar o caminho público a partir da wheel instalada em repositório Git externo descartável;
+- usar no teste o mesmo adapter de produção contra transporte controlado, sem registrar mocks em
+  produção;
+- repetir matriz F7.2, gates F7.3 e os testes Windows/Linux aplicáveis;
+- preservar como limitações explícitas qualquer capability live que dependa de serviço externo.
+
+O contrato detalhado e as razões desta corretiva estão na
+[DEC-016](decisions/DEC-016-composicao-operacional-antes-da-release.md).
+
 ### Tarefa F7.5 — Release candidate
 
 Uma release candidate só pode ser criada quando:
 
+- F7.4 e F7.C1 estiverem promovidas, reconciliadas e verdes em `main`;
 - todos os gates anteriores estiverem verdes;
 - documentação refletir comportamento real;
 - não houver adapters simulados registrados em produção;
@@ -1658,12 +1679,13 @@ Requisitos:
 | 14 | F3.7 | promoção segura | F3.6, F4.7 |
 | 15 | F5.1–F5.7 | governança integrada | F2–F4 |
 | 16 | F6.1–F6.7 | operação, auditoria e recovery | F2–F5 |
-| 17 | F7.1–F7.5 | E2E e release candidate | F0–F6 |
+| 17 | F7.1–F7.4, F7.C1, F7.5 | E2E, portabilidade, composição pública e release candidate | F0–F6 |
 | 18 | F8 | expansão de infraestrutura | F7 |
 
 DEC-012 impõe F3.C1 → F3.C2 → F3.4. DEC-013 resolve a ordem restante como
 F3.4 → F3.6 → F3.5 → F3.8; F3.7 permanece depois de F4.7. Entregas já promovidas não habilitam
-adapters reais retroativamente: o registry operacional continua vazio até os gates consumidores.
+adapters reais retroativamente. Pela DEC-016, a ordem final é F7.4 → F7.C1 → F7.5; o registry
+operacional continua vazio até a promoção da F7.C1.
 
 ---
 
@@ -1845,7 +1867,8 @@ O projeto só poderá ser chamado de infraestrutura operacional quando todos os 
 - [x] CI em Windows e Linux.
 - [x] Lockfile versionado.
 - [x] Wheel testada fora do repositório.
-- [ ] E2E cobre feature, falha, resume, promoção e rollback.
+- [x] E2E e matriz promovidos cobrem feature, falha, resume, promoção e rollback por composição
+  explícita de teste; o wiring público permanece requisito separado da F7.C1.
 - [x] Documentação corresponde ao comportamento observado.
 - [x] Não existem erros de sintaxe, mojibake ou build artifacts versionados.
 

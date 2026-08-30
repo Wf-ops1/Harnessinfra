@@ -192,6 +192,9 @@ def test_current_docs_recognize_f4_2_indexing_without_claiming_f4_3_or_mcp() -> 
 def test_public_state_docs_distinguish_real_primitives_from_missing_composition() -> None:
     readme = _read(ROOT / "README.md")
     panel = _read(ROOT / "TASK.md")
+    task_index = _read(ROOT / "docs" / "tasks" / "README.md")
+    operating_model = _read(ROOT / "docs" / "agentic_operating_model.md")
+    architecture = _read(ROOT / "docs" / "harness_architecture_spec.md")
     lifecycle = _read(ROOT / "docs" / "agentic_lifecycle_audit.md")
     user_guide = _read(ROOT / "docs" / "user_guide.md")
     walkthrough = _read(ROOT / "docs" / "walkthrough.md")
@@ -200,6 +203,9 @@ def test_public_state_docs_distinguish_real_primitives_from_missing_composition(
 
     readme = " ".join(readme.split())
     panel = " ".join(panel.split())
+    task_index = " ".join(task_index.split())
+    operating_model = " ".join(operating_model.split())
+    architecture = " ".join(architecture.split())
     lifecycle = " ".join(lifecycle.split())
     user_guide = " ".join(user_guide.split())
     walkthrough = " ".join(walkthrough.split())
@@ -247,6 +253,13 @@ def test_public_state_docs_distinguish_real_primitives_from_missing_composition(
     assert "`harness verify`" in readme
     assert "typecheck/lint/unit_test/build/security_scan" in readme
     assert "runner `0/0` falham antes de subprocessos" in readme
+    assert "Fases 0–6 e as tarefas F7.1–F7.3 foram concluídas" in readme
+    assert "Fases 5–7 ainda não estão concluídas" not in readme
+    assert "32095106958" not in readme
+    assert all(evidence in task_index for evidence in ("3be0d12", "32095513602", "43bd135", "32096041236"))
+    assert "doctor não mede saúde" not in operating_model
+    assert "promoção e rollback possuem protocolos Git reais" in operating_model
+    assert "Implementada para os gates do próprio projeto" in architecture
 
     assert "F5.5 — integrar secrets e redaction no caminho crítico" in panel
     assert "F5.6 `PROMOTED`" in panel
@@ -279,10 +292,10 @@ def test_public_state_docs_distinguish_real_primitives_from_missing_composition(
     assert "31868906875" in panel
     assert "7d6a0e179f30008a7a67275da94878a179f0aba9" in panel
     assert "31887143905" in panel
-    assert "| **Gate** | `PROMOTED / ADMIN_PR_OPEN` |" in panel
+    assert "| **Gate** | `PAUSED / F7.4_AUTHORIZATION_REQUIRED` |" in panel
     assert "32085923509" in panel
     assert "docs/tasks/completed/F7.3.md" in panel
-    assert all(evidence in panel for evidence in ("task/f7.3-quality-gates", "97d2606b79c427a647d8218a3fad778c176bcd60", "32088471059", "be17bcb4130ad28c882d2dd781554114e2f6badb", "32088913196", "https://github.com/Wf-ops1/xXHarnessinfraXx/pull/88", "32095106958"))  # pragma: allowlist secret
+    assert all(evidence in panel for evidence in ("task/f7.3-quality-gates", "97d2606b79c427a647d8218a3fad778c176bcd60", "32088471059", "be17bcb4130ad28c882d2dd781554114e2f6badb", "32088913196", "https://github.com/Wf-ops1/Hartrol/pull/88", "3be0d129a2ef82ac368083b1654847198dd3f757", "32095513602", "43bd1352267b4ed955637d5ce77dbb481a9c22a9", "32096041236"))  # pragma: allowlist secret
     assert "docs/tasks/completed/F7.2.md" in panel
     assert "task/f7.2-test-matrix" in panel
     assert "1055 testes coletáveis" in panel
@@ -296,14 +309,14 @@ def test_public_state_docs_distinguish_real_primitives_from_missing_composition(
     assert "53cafa5134c3af5f4d0a7497b3f44e996a6581dd" in panel
     assert "32039759737" in panel
     assert "docs/promote-f7.2" in panel
-    assert "https://github.com/Wf-ops1/xXHarnessinfraXx/pull/86" in panel
+    assert "https://github.com/Wf-ops1/Hartrol/pull/86" in panel
     assert "b40f25113362c1fe11362b69becc6c45c064b48d" in panel
     assert "32043891060" in panel
     assert "4e9f7a25ed47bb425eeefa3821ca2d051d4d8008" in panel
     assert "32045181204" in panel
     assert "85,61%" in panel
     assert "22 arcos" in panel
-    assert "https://github.com/Wf-ops1/xXHarnessinfraXx/pull/87" in readme and "32088913196" in readme and "https://github.com/Wf-ops1/xXHarnessinfraXx/pull/86" in readme
+    assert "https://github.com/Wf-ops1/Hartrol/pull/87" in readme and "32088913196" in readme and "https://github.com/Wf-ops1/Hartrol/pull/86" in readme
     assert "32045181204" in readme
     assert "docs/tasks/completed/F7.1.md" in panel
     assert "2ce104b687650587fa6881a88ea281dac22a83b3" in panel
@@ -314,7 +327,7 @@ def test_public_state_docs_distinguish_real_primitives_from_missing_composition(
     assert "31985232560" in panel
     assert "76f43dd29923c87e00062ca65afd534b5f4f1863" in panel
     assert "31985776520" in panel
-    assert "https://github.com/Wf-ops1/xXHarnessinfraXx/pull/84" in panel
+    assert "https://github.com/Wf-ops1/Hartrol/pull/84" in panel
     assert "197eb33b0d9c33a87a51cef38b4da39afc5588c6" in panel
     assert "31998528616" in panel
     assert "ceca850083fbbc2a6da54394054b09b6f335c9c7" in panel
@@ -511,6 +524,38 @@ def test_markdown_links_are_relative_and_resolve() -> None:
             assert path_part, (document, target)
             resolved = (document.parent / path_part).resolve()
             assert resolved.exists(), (document, target, resolved)
+
+
+def test_release_order_requires_current_docs_and_public_runtime_composition() -> None:
+    readme = _read(ROOT / "README.md")
+    panel = _read(ROOT / "TASK.md")
+    lifecycle = _read(ROOT / "docs" / "agentic_lifecycle_audit.md")
+    user_guide = _read(ROOT / "docs" / "user_guide.md")
+    walkthrough_audit = _read(ROOT / "docs" / "walkthrough_audit.md")
+    plan = _read(ROOT / "docs" / "plano_implementacao_harness_operacional.md")
+    decision = _read(
+        ROOT
+        / "docs"
+        / "decisions"
+        / "DEC-016-composicao-operacional-antes-da-release.md"
+    )
+
+    assert "F6.4 `PROMOTED`" in lifecycle
+    assert "F6.7 `PROMOTED`" in lifecycle
+    assert "F7.1–F7.3 `PROMOTED`" in lifecycle
+    assert "F6.3 `COMPLETED_LOCAL / PROMOTION_PENDING`" not in lifecycle
+    assert "Todos os estágios retornam OK sem probe" not in lifecycle
+    assert "F5.7 R3 está `PROMOTED`" in user_guide
+    assert "Simulado: retorna saudável" not in user_guide
+    assert "Doctor retorna saudável incondicionalmente" not in walkthrough_audit
+    assert "### Tarefa F7.C1 — Composição operacional do caminho público" in plan
+    assert "F7.4 → F7.C1 → F7.5" in plan
+    assert "F7.4 e F7.C1 estiverem promovidas" in plan
+    assert "> **Estado:** aceita" in decision
+    assert "não autoriza iniciar F7.4" in decision
+    assert "F7.C1" in readme and "DEC-016" in readme
+    assert "DEC-016" in panel and "F7.C1 → F7.5" in panel
+    assert "https://github.com/Wf-ops1/Hartrol/pull/88" in panel
 
 
 def test_markdown_files_have_basic_structural_integrity() -> None:

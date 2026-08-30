@@ -21,26 +21,28 @@ em [`TASK.md`](../../TASK.md); requisitos normativos permanecem no
 ## Pausa administrativa
 
 Não há dossiê de implementação ativo. A [F7.3 — quality gates do próprio projeto](completed/F7.3.md)
-está `PROMOTED`: a PR [#87](https://github.com/Wf-ops1/xXHarnessinfraXx/pull/87) encerrou no head
+está `PROMOTED`: a PR [#87](https://github.com/Wf-ops1/Hartrol/pull/87) encerrou no head
 `97d2606`, o run `32088471059` passou 12/12 + `CI required`, o merge foi `be17bcb` e o `push`
 `32088913196` passou no SHA exato. A falha histórica `32085923509` foi preservada e sucedida pela
 correção UTF-8 recertificada. A branch de produto remota permanece preservada, não existem tags
-remotas, e a reconciliação [#88](https://github.com/Wf-ops1/xXHarnessinfraXx/pull/88) está aberta no
-head administrativo inicial, com a CI [32095106958](https://github.com/Wf-ops1/xXHarnessinfraXx/actions/runs/32095106958)
-em andamento. A F7.4 continua somente planejada e requer autorização nominal posterior.
+remotas. A reconciliação [#88](https://github.com/Wf-ops1/Hartrol/pull/88) encerrou no head
+`3be0d12`, passou 12/12 + `CI required` no run [32095513602](https://github.com/Wf-ops1/Hartrol/actions/runs/32095513602),
+foi incorporada no merge `43bd135` e recebeu a CI pós-merge [32096041236](https://github.com/Wf-ops1/Hartrol/actions/runs/32096041236)
+igualmente verde. A F7.4 continua somente planejada e requer autorização nominal posterior; pela
+DEC-016, a ordem restante é F7.4 → F7.C1 → F7.5.
 
 A [F7.2 — matriz de testes](completed/F7.2.md) está terminalmente `PROMOTED`: produto PR #85/merge
 `53cafa5`/CI pós-merge `32039759737`; reconciliação
-[PR #86](https://github.com/Wf-ops1/xXHarnessinfraXx/pull/86) no head final `b40f251`, CI
+[PR #86](https://github.com/Wf-ops1/Hartrol/pull/86) no head final `b40f251`, CI
 `32043891060` tentativa #2, merge `4e9f7a25` e CI pós-merge `32045181204` com 10 jobs mais
 `CI required` verdes. As branches remotas foram preservadas e nenhuma tag remota foi publicada.
 
 A [F7.1 — E2E em repositório Git temporário real](completed/F7.1.md) está `PROMOTED`: o produto
-`2ce104b` e a certificação local permanecem preservados; o [PR #83](https://github.com/Wf-ops1/xXHarnessinfraXx/pull/83)
+`2ce104b` e a certificação local permanecem preservados; o [PR #83](https://github.com/Wf-ops1/Hartrol/pull/83)
 encerrou no head `a26807c`, certificado 10/10 + `CI required` pelo run `31985232560`, foi incorporado
 pelo merge `76f43dd` e recebeu 10/10 + `CI required` na CI pós-merge `31985776520`. A branch de
 produto foi preservada e não existem tags remotas. A reconciliação
-[PR #84](https://github.com/Wf-ops1/xXHarnessinfraXx/pull/84) abriu no head inicial `197eb33`/CI
+[PR #84](https://github.com/Wf-ops1/Hartrol/pull/84) abriu no head inicial `197eb33`/CI
 `31998528616`, encerrou no head `ceca850`/CI `31999182890`, foi incorporado pelo merge `b46ebd9` e
 recebeu 10/10 + `CI required` na CI pós-merge `32000365336`. O fechamento é terminal pela DEC-014.
 
@@ -214,7 +216,7 @@ checks no run `31629604755`, foi incorporado pelo merge `c46910e` e recebeu 11/1
 | F6 | F6.7 | [Knowledge transaction](completed/F6.7.md) | PR #81 / head `c4a864d` / merge `93f7bf20` / pós-merge `31977793119`; administrativo #82 / merge `38849ed` / pós-merge `31979153948` |
 | F7 | F7.1 | [E2E Git temporário](completed/F7.1.md) | PR #83 / head `a26807c` / merge `76f43dd` / pós-merge `31985776520`; administrativo #84 / merge `b46ebd9` / pós-merge `32000365336` |
 | F7 | F7.2 | [Matriz de testes](completed/F7.2.md) | PR #85 / head `09e0ee3` / merge `53cafa5` / pós-merge `32039759737`; administrativo #86 / merge `4e9f7a25` / pós-merge `32045181204` |
-| F7 | F7.3 | [Quality gates do projeto](completed/F7.3.md) | PR #87 / head `97d2606` / CI `32088471059`; merge `be17bcb` / pós-merge `32088913196`; administrativo #88 / CI inicial `32095106958` em andamento |
+| F7 | F7.3 | [Quality gates do projeto](completed/F7.3.md) | PR #87 / head `97d2606` / CI `32088471059`; merge `be17bcb` / pós-merge `32088913196`; administrativo #88 / head `3be0d12` / CI `32095513602` / merge `43bd135` / pós-merge `32096041236` |
 
 Fechamentos documentais adicionais preservados no Git: PR #13 / merge `3596df3` / run
 `31211290100` e PR #15 / merge `d48151b` / run `31215944126`.
@@ -238,3 +240,4 @@ Fechamentos documentais adicionais preservados no Git: PR #13 / merge `3596df3` 
 | DEC-013 | F3.4 cria guard parametrizado sem efeitos; F3.6 fornece worktree; F3.5/F3.8 integram consumidores depois de ambos. |
 | DEC-014 | Reconciliação pós-merge imediata; evidência negativa prevalece e exige recertificação integral. |
 | DEC-015 | Lifecycle possui a preparação F4; contexto bloqueia antes do grafo e verificação guarda `COMPLETED`. |
+| DEC-016 | F7.C1 compõe o caminho público entre portabilidade F7.4 e release candidate F7.5. |

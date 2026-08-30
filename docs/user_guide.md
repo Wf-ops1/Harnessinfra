@@ -31,7 +31,7 @@ uv run python -m build
 |---|---|---|
 | `harness --version` | Lê a versão da metadata instalada | Implementado |
 | `harness init` | Cria `.harness/` e copia defaults disponíveis | Implementado como scaffold; testar somente em repo descartável |
-| `harness doctor` | Renderiza quatro componentes em seis estágios | Simulado: retorna saudável sem conectividade real |
+| `harness doctor [--json] [--workflow <nome>]` | Inspeciona sete componentes em seis estágios reais sem produzir efeitos | F6.4 `PROMOTED`: texto/JSON compartilham resultado tipado; unhealthy retorna não zero; provider/MCP live dependem da configuração externa |
 | `harness compile <yaml>` | Compila pelo `GraphCompiler` canônico do pacote | Implementado como contrato interno; estabilidade/migração externa ainda não fechadas |
 | `harness index` | Usa `PythonAstIndexer` para reconstruir módulos, classes, funções/métodos e imports dos blobs `.py` do commit Git atual e publica `.harness/state/structural-index/snapshots/<sha>.json` | Implementado para Python por full rebuild; working tree/untracked não entram, erro Git/encoding/sintaxe falha sem snapshot parcial |
 | `harness run <workflow> [--profile <nome>] [--config-json <objeto>]` | Compila/carrega artefato, resolve a configuração tipada e inicia o lifecycle canônico | Fail-closed: configuração inválida não cria execução; o wiring padrão possui registry de executores vazio e não executa modelos/tools automaticamente |
@@ -45,7 +45,7 @@ uv run python -m build
 | `harness cancel <id>` | Publica decisão/pedido duráveis, interrompe comando operacional vinculado e reconcilia `CANCELLED` após quiescência | Não remove worktree; a tool/terminal precisa ter sido composta com o controlador da mesma execução |
 | `harness cleanup-worktree <id>` | Remove explicitamente o worktree ativo, limpo e no HEAD esperado | Nunca usa force nem apaga branch; worktree sujo ou divergente é recusado |
 | `harness verify <execution_id> [--project-id <id>]` | Carrega o `ProvisionedWorktree`, detecta configuração e executa a suíte canônica compilada | F4.5–F4.8 bloqueiam pré-requisito inválido, persistem resultados commit-bound e exigem targeted → full após reparo; worktree/provider ainda precisam existir |
-| `harness audit <id>` | Verifica/exporta o diário local | Implementação local; não prova efeitos reais |
+| `harness audit <id>` | Verifica/exporta o diário canônico em JSON/SARIF | F6.2 `PROMOTED`; falha fechado em corrupção, mas continua tamper-evident local sem âncora externa obrigatória |
 | `harness rollback <id>` | Reverte por argv o `promotion_commit_sha` canônico e verifica o novo SHA/parent/worktree | Exige execução `COMPLETED`, raiz/branch/trust exatas e checkout limpo; conflito faz abort e termina `BLOCKED_ROLLBACK`; ainda não reexecuta gates |
 
 ## Configuração efetiva F5.1
@@ -79,7 +79,7 @@ andamento; é necessário iniciar uma nova execução.
 
 ## Orçamento durável F5.4
 
-A implementação local F5.4 substitui, no lifecycle persistido, o contador process-local por um
+A F5.4 promovida substitui, no lifecycle persistido, o contador process-local por um
 ledger derivado do journal canônico. A configuração efetiva aceita limites positivos de prompt,
 completion/total, tool calls, duração, tentativas e custo, além de overrides por nó, preços decimais
 por `provider:model`/tool e o teto conservador de completion por chamada. Essa projeção é persistida no
@@ -97,8 +97,8 @@ digest de limites, fencing, ordem ou payload divergente falham fechado. Excesso 
 `FAILED_BUDGET_EXCEEDED`; retomar esse estado não chama provider, tool, nó ou fallback. Os guards
 específicos de repair/verificação F4.8 continuam existindo, e o limite mais restritivo prevalece.
 
-Essa capacidade está local e ainda aguarda checkpoint/promoção próprios. Ela não adiciona a
-composição automática de providers, tools ou worktree ao CLI.
+Essa capacidade está `PROMOTED`. Ela não adiciona a composição automática de providers, tools ou
+worktree ao CLI; essa fronteira foi explicitada como F7.C1 antes da release candidate.
 
 ## Envelope e gate de contexto F4.3
 
@@ -122,7 +122,7 @@ publica somente a projeção sem conteúdo bruto em
 `.harness/state/executions/<execution_id>/context.json` e registra `CONTEXT_EVALUATED` apontando para o
 relatório por digest. Os resultados são fail-closed:
 
-- contexto suficiente: `CONTEXT_ASSEMBLING → PLANNING`; a implementação local F4.4 exige plano
+- contexto suficiente: `CONTEXT_ASSEMBLING → PLANNING`; a F4.4 promovida exige plano
   durável antes de `PLANNING → EXECUTING`, entregando ao grafo somente `graph_input`;
 - manifesto, snapshot vazio, relevância zero ou confiança insuficiente:
   `BLOCKED_INSUFFICIENT_CONTEXT`, sem executar nó;
@@ -134,7 +134,7 @@ relatório por digest. Os resultados são fail-closed:
 `force_confidence`, override de score ou fallback para policy mutável. A auditoria R6 do PR #36
 reproduziu suficiência sem evidência de artefato e com identidade de request divergente; o reparo agora
 vincula identidade/digest, manifesto/evidência e path canônico. A F4.3 e sua reconciliação
-administrativa #37 foram promovidas, ambas com CI pós-merge verde. A implementação local F4.4 agora:
+administrativa #37 foram promovidas, ambas com CI pós-merge verde. A F4.4 promovida:
 
 - valida rota/egress antes de reler artefatos ou construir o prompt;
 - exige structured output compatível com `PlanContent` e anexa identidades confiáveis por código;
@@ -233,9 +233,9 @@ solicitação e nova decisão sobre o conteúdo corrente.
 
 ## Cancelamento, cleanup e rollback F5.7
 
-> **Estado corrente:** o reparo R3 está `COMPLETED_LOCAL / PROMOTION_PENDING`. A recertificação local
-> comprovou Git transitivo bloqueado, aprovação de hook ligada, erro CLI não zero em bloqueio e reap
-> fail-closed; a capacidade ainda não foi publicada e permanece restrita a repositórios descartáveis.
+> **Estado corrente:** a F5.7 R3 está `PROMOTED`. A recertificação comprovou Git transitivo bloqueado,
+> aprovação de hook ligada, erro CLI não zero em bloqueio e reap fail-closed. O uso continua restrito
+> a repositórios descartáveis enquanto a composição padrão F7.C1 não existir.
 
 O cancelamento usa arquivos de controle duráveis por execução. `cancellation-policy.json` registra a
 decisão antes de `cancellation-request.json` e antes do sinal. Isso permite interromper uma tool mesmo
@@ -258,9 +258,9 @@ se o resultado for ambíguo. Hook de produto é injetável/allowlisted e continu
 destrutivo exige request/decisão durável ligada à execução, hook, promotion SHA e tentativa de
 rollback. Estado bloqueado retorna erro CLI sem símbolo de sucesso.
 
-Essas APIs estão recertificadas somente na branch local e não tornam o protótipo seguro para um repositório valioso:
-a composição automática de provider/tools/worktree e os gates pós-reversão/evidence recovery
-permanecem pendentes.
+Essas APIs foram promovidas e não tornam, isoladamente, o protótipo seguro para um repositório
+valioso: a composição automática de provider/tools/worktree e os gates pós-reversão permanecem
+pendentes.
 
 ## Matriz de recovery F6.6
 
@@ -287,7 +287,7 @@ atômica, com lock/fencing, staging validado, pointer swap e recovery verificáv
 
 ### Protocolo knowledge corrigido na F6.7
 
-A linha `CP-09` acima permanece como baseline histórico da F6.6. Na implementação local F6.7,
+A linha `CP-09` acima permanece como baseline histórico da F6.6. Na F6.7 promovida,
 `PREPARED` deixou de significar que o efeito foi concluído: o recovery precisa provar o snapshot e o
 pointer antes de publicar `COMMITTED`. Um registro legado sem SHA, digest ou staging termina
 `ABORTED`; ele nunca cria `current.json`.
@@ -334,7 +334,7 @@ commitado.
 
 ## Prova vertical controlada F7.1
 
-A F7.1 certificou localmente que os primitivos existentes podem formar um ciclo completo em um
+A F7.1, promovida e terminalmente reconciliada, comprovou que as primitivas existentes podem formar um ciclo completo em um
 repositório Git Python externo e descartável. O teste constrói e instala a wheel fora do checkout,
 executa `harness init` e `harness compile`, injeta provider/backend determinísticos somente na
 fixture e atravessa tool loop, edição confinada no worktree, pausa/aprovação/retomada, quatro gates,
