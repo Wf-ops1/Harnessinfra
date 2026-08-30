@@ -20,8 +20,8 @@ em [`TASK.md`](../../TASK.md); requisitos normativos permanecem no
 
 ## Tarefa ativa
 
-A [F7.5 — release candidate do MVP operacional](active/F7.5.md) está em gate `READY`, na branch
-`task/f7.5-release-candidate`, para package `0.2.0rc1` e tag futura `v0.2.0-rc.1`.
+A [F7.5 — release candidate do MVP operacional](active/F7.5.md) está `COMPLETED_LOCAL`, no PR #94:
+head inicial `e0dc299`, CI `33332291645` verde; package `0.2.0rc1` e tag futura `v0.2.0-rc.1`.
 A [F7.C1 — composição operacional do caminho público](completed/F7.C1.md) encerrou produto no
 PR #92/merge `26c36ff`/pós-merge `33325679613` e reconciliação no PR #93/head `c99f02e`/CI
 `33326822791`/merge `3415c385`/pós-merge `33327198301`, todos verdes.

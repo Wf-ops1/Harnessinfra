@@ -5,7 +5,7 @@
 ## 1. Fontes de verdade
 
 1. Este painel: fase, coordenação, gate, bloqueios e próxima ação.
-2. [F7.5](docs/tasks/active/F7.5.md): release candidate `0.2.0rc1` em gate `READY`; [F7.C1](docs/tasks/completed/F7.C1.md) terminal no PR #93/head `c99f02e`/CI `33326822791`/merge `3415c385`/pós-merge `33327198301`.
+2. [F7.5](docs/tasks/active/F7.5.md): RC `0.2.0rc1`, PR #94/head inicial `e0dc299`/CI `33332291645` verde; [F7.C1](docs/tasks/completed/F7.C1.md) terminal no PR #93/head `c99f02e`/CI `33326822791`/merge `3415c385`/pós-merge `33327198301`.
 3. [F7.2](docs/tasks/completed/F7.2.md): produto PR #85/merge `53cafa5`/pós-merge `32039759737`; reconciliação PR #86/final `b40f251`/CI `32043891060`/merge `4e9f7a25`/pós-merge `32045181204`.
 4. [F7.1](docs/tasks/completed/F7.1.md): produto PR #83/merge `76f43dd`/pós-merge `31985776520`; reconciliação PR #84/final `ceca850`/CI `31999182890`/merge `b46ebd9`/pós-merge `32000365336`.
 4. Fase 6 — [F6.7](docs/tasks/completed/F6.7.md): knowledge transaction promovida pelo PR #81; reconciliação #82 encerrada no merge `38849ed`, com CI pós-merge `31979153948` verde.
@@ -47,11 +47,11 @@
 | **Fase ativa** | Fase 7 — maturidade operacional |
 | **Tarefa ativa** | [F7.5 — release candidate](docs/tasks/active/F7.5.md) |
 | **Gate** | `COMPLETED_LOCAL` — produto `9f7886a`; certificação `6d87267`; checkpoint COMPLETE local criado |
-| **Estado corrente** | F7.5 localmente certificada como `0.2.0rc1`; promoção, reconciliação, tag `v0.2.0-rc.1` e prerelease pendentes |
+| **Estado corrente** | F7.5 localmente certificada; PR #94 inicial `e0dc299`/CI `33332291645` verde; head documental final, merge, reconciliação, tag e prerelease pendentes |
 | **Estado F5.6** | F5.6 `PROMOTED`; aprovação de promoção permanece vinculada ao conteúdo exato |
 | **Executor ativo** | `Codex`, único escritor da F7.5 |
 | **Workspace** | `C:\Users\walla\OneDrive\Desktop\ai-engineering-harness` |
-| **Branch** | `task/f7.5-release-candidate`, local, sem upstream, criada de `main == origin/main == 3415c385ae185f240d8707e98fe5d6a8d51e7a98` |
+| **Branch** | `task/f7.5-release-candidate`, publicada sem force e rastreando `origin/task/f7.5-release-candidate`; baseline `3415c385ae185f240d8707e98fe5d6a8d51e7a98` |
 | **Branch de produto F6.5** | `task/f6.5-status-inspection`, remota e preservada após o merge |
 | **Branch de produto F6.4** | `task/f6.4-real-doctor`, remota e preservada após o merge |
 | **Branch de produto F6.3** | `task/f6.3-evidence-manifest`, remota e preservada após o merge |
@@ -260,7 +260,7 @@ O fechamento F7.C1 inclui produto #92/`33325055342`/merge `26c36ff`/pós `333256
 
 A [F7.5](docs/tasks/active/F7.5.md) está `COMPLETED_LOCAL`: produto `9f7886a`, certificação/checkpoint
 `6d87267`, full/coverage `1108/5/6`, core `88.73%`, matriz `62`, secrets `348/307/0`, deps `74/0`
-e smoke `0.2.0rc1` verdes. A branch está pronta para push/PR sem force.
+e smoke `0.2.0rc1` verdes. O PR #94/head inicial `e0dc299` passou a CI `33332291645`; este snapshot deve receber CI final antes do merge.
 
 ## 6. Bloqueios e fronteiras externas
 
@@ -271,7 +271,7 @@ fora do escopo. Tag publicada será imutável; correção posterior exige nova R
 ## 7. Próxima ação exata
 
 ```text
-PUBLICAR task/f7.5-release-candidate E ABRIR PR CONTRA main SEM FORCE.
+PUBLICAR O SNAPSHOT DOCUMENTAL NO PR #94 E EXIGIR CI VERDE NO NOVO HEAD.
 NÃO PUBLICAR TAG ANTES DOS MERGES, CIs PÓS-MERGE E RECONCILIAÇÃO TERMINAL VERDES.
 ```
 
@@ -297,4 +297,4 @@ NÃO PUBLICAR TAG ANTES DOS MERGES, CIs PÓS-MERGE E RECONCILIAÇÃO TERMINAL VE
 18. Preserve PR #82: inicial `5ee3fcc`/`31978357679`; final `cfd97c6`/`31978820506`; merge `38849ed`; pós-merge `31979153948` 11/11. F7.1 parte somente dessa base.
 19. Preserve F7.1: `c55edaa`/`2ce104b`, `1/1`, `42/1`, `1050/5/6`; PR #83 final `a26807c`/`31985232560`, merge `76f43dd`/pós-merge `31985776520`.
 20. Preserve PR #84: final `ceca850`/`31999182890`, merge `b46ebd9`/pós-merge `32000365336`; F7.2 `1badf40`/`bdae858`/`09e0ee3`, PR #85/run `32038804579`, merge `53cafa5`/pós-merge `32039759737`; PR #86 final `b40f251`/`32043891060`, merge `4e9f7a25`/pós-merge `32045181204`; F7.3 negativo `32085923509`, final `97d2606`/`32088471059`, merge `be17bcb`/pós-merge `32088913196`, reconciliação #88 final `3be0d12`/`32095513602`, merge `43bd135`/pós-merge `32096041236`; F7.4 PR #90 final `42b6f8f`/`33291856113`, merge `a62c164`/pós-merge `33292240896`.
-*Atualizado em: 2026-08-30T16:55:02-03:00 | Fonte: produto F7.5 9f7886a; certificação/checkpoint 6d87267; full/coverage 1108/5/6*
+*Atualizado em: 2026-08-30T17:20:00-03:00 | Fonte: F7.5 PR #94/head inicial e0dc299/CI 33332291645; full/coverage 1108/5/6*
