@@ -18,9 +18,15 @@ em [`TASK.md`](../../TASK.md); requisitos normativos permanecem no
 - `migration-manifest.json`: origem e SHA-256 dos 19 payloads extraídos do painel legado.
 - Git, PRs e runs de CI permanecem a evidência externa autoritativa de promoção.
 
-## Pausa administrativa
+## Tarefa ativa
 
-Não há dossiê de implementação ativo. A [F7.3 — quality gates do próprio projeto](completed/F7.3.md)
+A [F7.4 — empacotamento e portabilidade](active/F7.4.md) está
+`READY_FOR_MERGE / MERGE_AUTHORIZATION_REQUIRED` no [PR #90](https://github.com/Wf-ops1/Hartrol/pull/90). Apache-2.0,
+recursos instalados, documentos de release, wheel e smoke externo foram certificados no checkpoint
+local `checkpoint/f7.4-complete`; o head `c4b946a` passou 11/11 jobs obrigatórios mais `CI required`
+na CI `33291468406`. Merge, tag remota, exclusão da branch e F7.C1 permanecem fora do gate atual.
+
+A [F7.3 — quality gates do próprio projeto](completed/F7.3.md)
 está `PROMOTED`: a PR [#87](https://github.com/Wf-ops1/Hartrol/pull/87) encerrou no head
 `97d2606`, o run `32088471059` passou 12/12 + `CI required`, o merge foi `be17bcb` e o `push`
 `32088913196` passou no SHA exato. A falha histórica `32085923509` foi preservada e sucedida pela
@@ -28,8 +34,7 @@ correção UTF-8 recertificada. A branch de produto remota permanece preservada,
 remotas. A reconciliação [#88](https://github.com/Wf-ops1/Hartrol/pull/88) encerrou no head
 `3be0d12`, passou 12/12 + `CI required` no run [32095513602](https://github.com/Wf-ops1/Hartrol/actions/runs/32095513602),
 foi incorporada no merge `43bd135` e recebeu a CI pós-merge [32096041236](https://github.com/Wf-ops1/Hartrol/actions/runs/32096041236)
-igualmente verde. A F7.4 continua somente planejada e requer autorização nominal posterior; pela
-DEC-016, a ordem restante é F7.4 → F7.C1 → F7.5.
+igualmente verde. Pela DEC-016, a ordem restante é F7.4 → F7.C1 → F7.5.
 
 A [F7.2 — matriz de testes](completed/F7.2.md) está terminalmente `PROMOTED`: produto PR #85/merge
 `53cafa5`/CI pós-merge `32039759737`; reconciliação

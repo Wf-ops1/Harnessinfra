@@ -1,9 +1,10 @@
 """Interface CLI unificada final com todos os subcomandos do AI-Engineering-Harness."""
 
 import json
-import shutil
 import sys
 import time
+from importlib.resources import files as package_files
+from importlib.resources.abc import Traversable
 from pathlib import Path
 
 import click
@@ -57,6 +58,20 @@ _FOLLOW_TERMINAL_STATES = frozenset(
         ExecutionState.FAILED_RETRY_EXHAUSTED,
     }
 )
+
+
+def _copy_packaged_resource_if_missing(source: Traversable, destination: Path) -> None:
+    """Copy one packaged resource without replacing user-owned scaffold content."""
+    if destination.exists():
+        return
+    if source.is_file():
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes(source.read_bytes())
+        return
+    if source.is_dir():
+        destination.mkdir(parents=True, exist_ok=False)
+        for child in source.iterdir():
+            _copy_packaged_resource_if_missing(child, destination / child.name)
 
 
 def _lifecycle_service(
@@ -205,17 +220,17 @@ def init() -> None:
     (harness_dir / "state" / "worktree-references").mkdir(parents=True, exist_ok=True)
     (harness_dir / "artifacts" / "executions").mkdir(parents=True, exist_ok=True)
 
-    defaults_dir = Path(__file__).resolve().parent.parent / "defaults"
-    if defaults_dir.exists():
-        for category, target in [("agents", harness_dir / "agents"), ("graphs", harness_dir / "graphs" / "specs"), ("policies", harness_dir / "policies"), ("tools", harness_dir / "tools")]:
-            src_cat = defaults_dir / category
-            if src_cat.exists():
-                for item in src_cat.glob("*"):
-                    dst_item = target / item.name
-                    if item.is_file() and not dst_item.exists():
-                        shutil.copy2(item, dst_item)
-                    elif item.is_dir() and not dst_item.exists():
-                        shutil.copytree(item, dst_item)
+    defaults = package_files("ai_engineering_harness.defaults")
+    for category, target in [
+        ("agents", harness_dir / "agents"),
+        ("graphs", harness_dir / "graphs" / "specs"),
+        ("policies", harness_dir / "policies"),
+        ("tools", harness_dir / "tools"),
+    ]:
+        source_category = defaults.joinpath(category)
+        if source_category.is_dir():
+            for resource in source_category.iterdir():
+                _copy_packaged_resource_if_missing(resource, target / resource.name)
 
     project_yaml = harness_dir / "project.yaml"
     if not project_yaml.exists():

@@ -15,9 +15,9 @@ registry e backend determinísticos somente no teste; CLI/defaults ainda não co
 automaticamente essa fronteira.
 
 Não use `harness run`, `harness doctor`, `harness verify` ou `harness rollback` como garantia de segurança em um
-repositório valioso. As Fases 0–6 e as tarefas F7.1–F7.3 foram concluídas no escopo planejado, mas a
-composição automática do runtime padrão continua pendente; F7.4, a corretiva F7.C1 e F7.5 ainda não
-começaram. Execute esses comandos somente em cópias descartáveis.
+repositório valioso. As Fases 0–6 e as tarefas F7.1–F7.3 foram concluídas no escopo planejado. A F7.4
+está concluída e verde no PR #90, mas ainda não foi mesclada; a promoção, a composição automática
+F7.C1 e a F7.5 continuam pendentes. Execute esses comandos somente em cópias descartáveis.
 
 ## Objetivo do produto
 
@@ -41,9 +41,9 @@ auditável. Isso é a direção do produto, não uma descrição do estado entre
 
 | Capacidade | Implementada | Experimental | Planejada |
 |---|---|---|---|
-| Ambiente e pacote | `uv.lock`, build de wheel, metadata e toolchain reproduzível | Bootstrap ainda depende de instalar `uv` | Distribuição e instalação externa suportadas como produto |
+| Ambiente e pacote | `uv.lock`, build de wheel, metadata SPDX Apache-2.0, defaults via `importlib.resources` e smoke externo ao checkout | F7.4 está verde no PR #90, ainda sem merge; bootstrap depende de instalar `uv`, e macOS não possui job de CI | Distribuição pública e instalação externa suportadas como produto |
 | Versionamento | Package version única e schemas graph/artifact/policy separados | Compatibilidade ainda é comparação exata | Migrações compatíveis e política de evolução |
-| Configuração e governança | F5.1–F5.7, F5.C1, F6.1–F6.7 e F7.1–F7.3 estão terminalmente reconciliadas; F7.3 encerrou no PR #87/merge `be17bcb` e a reconciliação #88 no merge `43bd135` | F7.4 não iniciou; a composição automática do lifecycle foi congelada como F7.C1 pela [DEC-016](docs/decisions/DEC-016-composicao-operacional-antes-da-release.md) | Governança operacional integral após F7.4 → F7.C1 → F7.5 |
+| Configuração e governança | F5.1–F5.7, F5.C1, F6.1–F6.7 e F7.1–F7.3 estão terminalmente reconciliadas; F7.4 está concluída localmente | A promoção F7.4 está pendente; a composição automática do lifecycle foi congelada como F7.C1 pela [DEC-016](docs/decisions/DEC-016-composicao-operacional-antes-da-release.md) | Governança operacional integral após F7.4 → F7.C1 → F7.5 |
 | CLI e scaffold | `--help`, `--version`, `init`, `compile`, `run`, `resume`, `approve`, `cancel`, `cleanup-worktree`, `rollback`, `list`, `status`, `inspect`, `events`, `evidence` e doctor possuem contratos/testes | Sem backends reais, `run` falha no preflight; os comandos F6.5 são inspeção local fail-closed e estado/worktree válidos continuam necessários | UX estável para CLI e IDE em repositórios externos |
 | Compilação de grafos | Um único `GraphCompiler` valida contratos/policies e publica artefato 2.0 determinístico, versionado, íntegro e atômico | Capabilities compiladas ainda são declarativas, sem provar adapter disponível ou autorização runtime | Migrações de schema e expansão segura de workflows após o MVP |
 | Runtime/FSM | `GraphExecutor` segue somente arestas compiladas; record/journal usam lock, CAS e fencing. A F5.7 promovida persiste decisão/pedido, interrompe e reapera a árvore vinculada, impede sucesso pós-cancelamento e reconcilia `CANCELLED` sob lock após quiescência | Efeito iniciado sem outcome exige intervenção; executores, tools e worktree ainda dependem de backends/providers injetados | Integração automática dos efeitos reais no lifecycle padrão e recovery F6 |
@@ -53,7 +53,7 @@ auditável. Isso é a direção do produto, não uma descrição do estado entre
 | Verificação e auditoria | F4.5 mantém a taxonomia única `typecheck/lint/unit_test/build/security_scan`, e runner `0/0` falham antes de subprocessos; F6.1–F6.3 fornecem journal/audit/evidence fail-closed; F6.5 adiciona inspeção; F6.6 documenta nove checkpoints; F6.7 promoveu a transação knowledge fail-closed | Proteção sem chave é somente “tamper-evident local”; F6.7 não foi ligada automaticamente ao lifecycle | Matriz operacional integral com recovery ampliado |
 | Doctor | A F6.4 promovida faz sete componentes percorrerem seis estágios reais; texto/JSON compartilham resultado tipado, `--workflow` resolve gates sem executá-los e ambiente unhealthy retorna não zero | Provider/MCP live continuam dependentes de configuração e serviços externos; adapters não suportados falham fechados | UX adicional e novos adapters somente após contrato/testes equivalentes |
 | Worktree, promoção e rollback | `ExternalWorktreeManager` cria candidate commit real e singular e faz cleanup explícito; F3.7 promove por `git cherry-pick`; F5.6 revalida aprovação ligada ao conteúdo; F5.7 R3 promovida confina Git, liga aprovação destrutiva à tentativa e falha corretamente em rollback bloqueado. A F7.1 atravessa esses efeitos em repositório externo descartável | Rollback não reexecuta gates pós-reversão e a composição continua opt-in/injetada no teste | Composição operacional padrão e recovery/evidence ampliado |
-| CI e release | GitHub Actions executa quality/tests/package em Windows e Linux; F7.3 tornou mypy strict, coverage/branches, secrets e auditoria de dependências gates obrigatórios; `main` exige `CI required` e a reconciliação #88 passou no merge `43bd135`/CI `32096041236` | Empacotamento F7.4 e composição pública F7.C1, seguidos da release candidate F7.5, ainda não começaram | Distribuição pública e processo de release operacional na F7 |
+| CI e release | GitHub Actions executa quality/tests/package em Windows e Linux; F7.3 tornou mypy strict, coverage/branches, secrets e auditoria de dependências gates obrigatórios; o PR #90 passou 11/11 jobs mais `CI required` na CI `33291468406` | A F7.4 aguarda autorização de merge; composição pública F7.C1 e release candidate F7.5 não começaram | Distribuição pública e processo de release operacional na F7 |
 
 ## Estado do roadmap
 
@@ -276,8 +276,10 @@ auditável. Isso é a direção do produto, não uma descrição do estado entre
   SHA exato; a branch remota foi preservada e não há tags remotas. A reconciliação administrativa
   [#88](https://github.com/Wf-ops1/Hartrol/pull/88) encerrou no head `3be0d12`, passou 12/12 +
   `CI required` no run `32095513602`, foi incorporada no merge `43bd135` e recebeu a CI pós-merge
-  `32096041236` igualmente verde. A F7.4 permanece somente planejada; a DEC-016 exige F7.C1 entre
-  F7.4 e F7.5 para que a release candidate use a composição operacional pública.
+  `32096041236` igualmente verde. A F7.4 foi concluída e certificada na branch local
+  `task/f7.4-packaging-portability`, com checkpoints locais `checkpoint/f7.4-ready` e
+  `checkpoint/f7.4-complete`; o PR #90 está aberto e sua promoção ainda não ocorreu. A DEC-016 exige F7.C1 entre F7.4 e F7.5 para que a release candidate use a composição
+  operacional pública.
 
 ## Dívidas técnicas críticas
 
@@ -353,6 +355,9 @@ uv run python tests/ci/smoke_wheel.py
 Os comandos de coverage decisório, scan de secrets e auditoria completa de dependências estão no
 [guia de quality gates](docs/quality_gates.md).
 
+Instalação da wheel, paths de estado/worktree e diferenças Windows, macOS e Linux estão no
+[guia de portabilidade](docs/portability.md).
+
 Para inspecionar a superfície da CLI sem executar o runtime:
 
 ```bash
@@ -379,5 +384,7 @@ independente; `definition_version` identifica apenas a revisão de uma definiç�
 - [Auditoria do ciclo](docs/agentic_lifecycle_audit.md): estado concreto de cada etapa;
 - [Especificação arquitetural](docs/harness_architecture_spec.md): arquitetura-alvo e lacunas;
 - [Guia do usuário](docs/user_guide.md): comandos seguros e limitações atuais;
+- [Portabilidade](docs/portability.md), [suporte](SUPPORT.md), [changelog](CHANGELOG.md) e
+  [licença Apache-2.0](LICENSE): distribuição local e política pública;
 - [Walkthrough](docs/walkthrough.md): estrutura real e fluxo observado;
 - [Auditoria técnica](docs/walkthrough_audit.md): pendências comprovadas.

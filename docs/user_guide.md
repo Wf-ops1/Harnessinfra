@@ -332,6 +332,18 @@ Crie um repositório descartável e execute o binário instalado pelo ambiente d
 arquivos gerados antes de removê-los. Não aponte o protótipo para um checkout com trabalho não
 commitado.
 
+## Empacotamento e portabilidade F7.4
+
+O scaffold agora lê seus templates por `importlib.resources` da distribuição instalada, sem depender
+de um checkout com `src/ai_engineering_harness`, e preserva arquivos já existentes. O smoke oficial
+aceita uma wheel explícita, instala-a com `uv` isolado e executa versão, recursos e `harness init` em
+um diretório temporário externo.
+
+Consulte o [guia de portabilidade](portability.md) para instalação local, paths `.harness/` e
+worktrees em Windows, macOS e Linux. Windows/Linux são certificados pela CI; macOS permanece contrato
+documentado sem job de certificação. A [política de suporte](../SUPPORT.md), o
+[changelog](../CHANGELOG.md) e a [licença Apache-2.0](../LICENSE) também integram a distribuição.
+
 ## Prova vertical controlada F7.1
 
 A F7.1, promovida e terminalmente reconciliada, comprovou que as primitivas existentes podem formar um ciclo completo em um

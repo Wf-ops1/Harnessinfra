@@ -1075,7 +1075,9 @@ def test_f5_7_promotion_preserves_r3_negative_evidence_and_certification() -> No
         "914 passed, 5 skipped, 6 subtests passed em 328.79s",
     ):
         assert result in f5_c1_dossier
-    assert "| **Gate** | `PAUSED / F7.4_AUTHORIZATION_REQUIRED` |" in panel
+    assert "| **Gate** | `READY_FOR_MERGE / MERGE_AUTHORIZATION_REQUIRED` |" in panel
+    assert "Apache-2.0" in panel
+    assert "docs/tasks/active/F7.4.md" in panel
     assert "32085923509" in panel
     assert not (ACTIVE_ROOT / "F7.3.md").exists() and (COMPLETED_ROOT / "F7.3.md").is_file()
     f7_3_dossier = _read(COMPLETED_ROOT / "F7.3.md")
