@@ -278,7 +278,7 @@ def test_public_state_docs_distinguish_real_primitives_from_missing_composition(
     assert "`harness verify`" in readme
     assert "typecheck/lint/unit_test/build/security_scan" in readme
     assert "runner `0/0` falham antes de subprocessos" in readme
-    assert "Fases 0–6 e as tarefas F7.1–F7.3 foram concluídas" in readme
+    assert "produto F7.4 foi promovido pelo PR #90" in readme
     assert "Fases 5–7 ainda não estão concluídas" not in readme
     assert "32095106958" not in readme
     assert all(evidence in task_index for evidence in ("3be0d12", "32095513602", "43bd135", "32096041236"))
@@ -317,9 +317,22 @@ def test_public_state_docs_distinguish_real_primitives_from_missing_composition(
     assert "31868906875" in panel
     assert "7d6a0e179f30008a7a67275da94878a179f0aba9" in panel
     assert "31887143905" in panel
-    assert "| **Gate** | `READY_FOR_MERGE / MERGE_AUTHORIZATION_REQUIRED` |" in panel
+    assert "| **Gate** | `LOCAL_READY / PUBLICATION_PENDING` |" in panel
     assert "Apache-2.0" in panel
-    assert "docs/tasks/active/F7.4.md" in panel
+    assert "docs/tasks/completed/F7.4.md" in panel
+    assert "nenhuma tarefa ativa" in panel.casefold()
+    assert all(
+        evidence in panel
+        for evidence in ("42b6f8f", "33291856113", "a62c164", "33292240896", "docs/promote-f7.4")
+    )
+    assert all(
+        evidence in task_index
+        for evidence in ("completed/F7.4.md", "42b6f8f", "33291856113", "a62c164", "33292240896")
+    )
+    assert all(
+        evidence in readme
+        for evidence in ("PR #90", "42b6f8f", "33291856113", "a62c164", "33292240896")
+    )
     assert "32085923509" in panel
     assert "docs/tasks/completed/F7.3.md" in panel
     assert all(evidence in panel for evidence in ("task/f7.3-quality-gates", "97d2606b79c427a647d8218a3fad778c176bcd60", "32088471059", "be17bcb4130ad28c882d2dd781554114e2f6badb", "32088913196", "https://github.com/Wf-ops1/Hartrol/pull/88", "3be0d129a2ef82ac368083b1654847198dd3f757", "32095513602", "43bd1352267b4ed955637d5ce77dbb481a9c22a9", "32096041236"))  # pragma: allowlist secret
