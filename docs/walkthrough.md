@@ -1,6 +1,6 @@
 # Walkthrough da Estrutura e dos Fluxos Atuais
 
-> **Status: mapa do protótipo em 8 de agosto de 2026**
+> **Status: mapa do MVP operacional / release candidate 0.2.0rc1 em 30 de agosto de 2026**
 
 Este walkthrough mostra a organização real do repositório e distingue o que é código executável do
 que é arquitetura futura. O [dashboard HTML](walkthrough_dashboard.html) é um artefato visual
@@ -75,10 +75,10 @@ flowchart TD
     Q --> D
     X -->|Insuficiente| I["BLOCKED_INSUFFICIENT_CONTEXT antes do primeiro nó"]
     X -->|Pré-requisito inválido| J["BLOCKED_PREREQUISITE antes do primeiro nó"]
-    D --> E["NodeExecutorRegistry exige backend do nó"]
-    E --> F{"Executor explicitamente injetado?"}
-    F -->|Não, padrão da CLI| G["Erro tipado e estado fail-closed"]
-    F -->|Sim, testes/integração| H["Execução, pausa e resume persistidos"]
+    D --> E{"Workflow possui composição pública?"}
+    E -->|new-feature| F["F7.C1 compõe provider, tools, worktree e serviços"]
+    F --> H["Execução, pausa e resume persistidos"]
+    E -->|outro workflow| G["Registry vazio; erro tipado fail-closed"]
 ```
 
 Limitações importantes:
@@ -86,8 +86,8 @@ Limitações importantes:
 - defaults são lidos do pacote instalado por `importlib.resources`; `run --profile` seleciona o
   perfil e `--config-json` ocupa a maior precedência. `resume` usa somente a projeção redigida e o
   digest do bundle, sem adotar mudanças posteriores do disco;
-- o runtime percorre nós/arestas pelo `GraphExecutor`, mas a CLI constrói um registry de executores
-  deliberadamente vazio e falha antes de efeitos;
+- o runtime percorre nós/arestas pelo `GraphExecutor`; a CLI seleciona a composição pública F7.C1
+  para `new-feature` e mantém registry vazio/fail-closed para workflows não registrados;
 - os quatro workflows F4.3 exigem envelope exato `context_request + graph_input`; a decisão usa a
   policy resolvida do artefato, o snapshot do commit e os manifestos de conhecimento, com até duas
   retomadas além da tentativa inicial;
@@ -95,10 +95,11 @@ Limitações importantes:
   limitado às policies compiladas e persiste payload/projeção/eventos antes de entregar `graph_input`;
 - a F4.5 promovida normaliza os IDs e bloqueia suítes vazias/desconhecidas/duplicadas; a F4.6
   promovida resolve configuração/argv e pré-requisitos no worktree antes de efeitos;
-- providers e tools reais existem como dependências injetáveis, mas o caminho padrão não os compõe;
+- providers e tools reais são compostos para `new-feature`; serviços live, credenciais e grants
+  continuam explícitos e workflows adicionais não herdam essa autoridade;
 - a F5.2 pré-autoriza cada lote por role/node/workflow/trust/tool/operação/path/aprovação, aplica
   default-deny e persiste a regra antes do efeito; o outcome fica ligado pelo digest da decisão;
-- o `ToolRouter` operacional revalida a decisão, mas não é construído automaticamente pelo lifecycle;
+- o `ToolRouter` operacional revalida a decisão e é construído pela factory pública `new-feature`;
 - a trust boundary F5.3 e o budget F5.4 estão promovidos/reconciliados; a F5.6 promovida cria a aprovação
   de promoção somente após candidate + full suite e liga artifact/plano/diff/SHA/gates no mesmo
   `approval-request.json`;
@@ -108,7 +109,7 @@ Limitações importantes:
   subject imediatamente antes do Git e persiste `INVALIDATED`/`EXPIRED` sem efeito em mismatch;
   a indexação Python é real e commit-bound e a F4.3 consome seu snapshot, mas o lifecycle ainda não
   executa `harness index` automaticamente;
-- o worktree Git existe como primitiva, mas ainda não é criado/injetado nessa sequência.
+- a factory `new-feature` cria/recarrega o worktree Git e injeta seu guard nessa sequência.
 
 ## Fluxo de verificação
 
@@ -120,17 +121,15 @@ pré-requisito ausente em `ERROR_PREREQUISITE`; F4.7 persiste cada resultado e i
 suíte obrigatória aprovada. A F4.8 promovida recupera a última reprovação canônica, agenda somente o
 `on_failure` compilado com contexto redigido e orçamento durável, executa primeiro os gates reprovados
 e exige a suíte integral no mesmo commit limpo antes de `COMPLETED`. O E2E prova crash-resume sem
-duplicar o efeito e exaustão por nó, execução, tokens, custo e deadline. A composição automática de
-worktree/provider/tools permanece pendente.
+duplicar o efeito e exaustão por nó, execução, tokens, custo e deadline. A composição automática
+existe para `new-feature`; nos demais workflows a ausência de composição bloqueia antes do efeito.
 
 ## Fluxo de auditoria e rollback
 
 > A F5.7 R3 está `PROMOTED`: PR #65, merge `e8470ec` e CI pós-merge `31846634851` verdes. A
 > reconciliação administrativa foi incorporada pelo PR #66 no merge `998a7ac`, com CI pós-merge
-> `31849767573` 11/11 verde. A corretiva F5.C1 preservou esse histórico, fechou os dois critérios de
-> redaction reabertos, foi incorporada pelo PR #67 no merge `2b405fd` e recebeu 11/11 na CI pós-merge
-> `31857239235`. Sua reconciliação administrativa foi publicada no PR #68; o run inicial
-> `31858431821` permanece com checks pendentes.
+> `31849767573` verde. F5.C1 fechou os critérios de redaction; F7.C1 posteriormente integrou essas
+> autoridades ao caminho público `new-feature` e encerrou no merge `26c36ff`/CI `33325679613`.
 
 O journal canônico é tamper-evident local: lock, sequência e hash chain são testados, e a F6.2 local
 adiciona verificação legível, checkpoint HMAC opcional e exports fail-closed; sem chave externa isso
@@ -146,8 +145,9 @@ zero, novo SHA, parent anterior e worktree limpo são comprovados antes de `COMP
 executa somente `git revert --abort` e termina `BLOCKED_ROLLBACK`; ambiguidade não produz retry ou
 sucesso. R3 bloqueia drivers/filtros Git executáveis, exige aprovação destrutiva journaled e ligada à
 tentativa, retorna erro CLI em bloqueio e não limpa o slot sem reap comprovado. A composição
-automática de tools/worktree e os gates pós-reversão/evidence recovery ainda
-permanecem pendentes, portanto o protótipo continua restrito a ambientes descartáveis.
+automática de tools/worktree está disponível em `new-feature`; os gates pós-reversão ainda não são
+reexecutados. A RC permanece indicada para avaliação em repositórios descartáveis, conforme
+[KNOWN_LIMITATIONS.md](../KNOWN_LIMITATIONS.md).
 
 ## Onde acompanhar
 

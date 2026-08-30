@@ -1077,9 +1077,9 @@ def test_f5_7_promotion_preserves_r3_negative_evidence_and_certification() -> No
         "914 passed, 5 skipped, 6 subtests passed em 328.79s",
     ):
         assert result in f5_c1_dossier
-    assert "| **Gate** | `ADMIN_PR_OPEN / CHECKS_PENDING` |" in panel
+    assert "| **Gate** | `COMPLETED_LOCAL` — produto `9f7886a`" in panel
     assert "Apache-2.0" in panel
-    assert "docs/tasks/completed/F7.4.md" in panel
+    assert "checkpoint/f7.4-complete" in panel
     assert not (ACTIVE_ROOT / "F7.4.md").exists()
     assert (COMPLETED_ROOT / "F7.4.md").is_file()
     for evidence in (
@@ -1558,6 +1558,6 @@ def test_phase3_realignment_requires_two_isolated_gates_and_human_pauses() -> No
     assert "PAUSA HUMANA OBRIGATÓRIA" in realignment
     assert "autorização explícita nova" in realignment
     assert "completed/F4.4.md" in task_index
-    assert "Fases 0–4" in panel
+    assert "Fases 0–6" in panel
     assert "F3.7 — promoção Git segura" in panel
     assert "Não restou achado blocker/high" in realignment

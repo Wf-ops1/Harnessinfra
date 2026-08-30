@@ -1,8 +1,8 @@
 # Política de suporte
 
-O AI Engineering Harness está em desenvolvimento e ainda não possui release pública estável. Use-o
-somente em repositórios descartáveis até a composição operacional e a release candidate serem
-concluídas.
+O AI Engineering Harness `0.2.0rc1` é a release candidate do MVP operacional. Continua sendo uma
+prerelease `0.x`, sem garantia de estabilidade ou aptidão para produção. Comece em repositórios
+descartáveis e leia as [limitações conhecidas](KNOWN_LIMITATIONS.md).
 
 ## Ambientes cobertos
 
@@ -11,7 +11,7 @@ concluídas.
 - macOS com paths e contrato de instalação documentados, mas ainda sem certificação de CI.
 
 Correções são direcionadas à branch `main`. Não há, nesta fase, janela de manutenção para versões
-anteriores nem garantia de compatibilidade de interfaces ainda marcadas como protótipo.
+anteriores nem garantia de compatibilidade entre interfaces prerelease.
 
 ## Solicitar ajuda
 

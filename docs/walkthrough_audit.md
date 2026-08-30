@@ -1,6 +1,6 @@
 # Auditoria Técnica da Estrutura, Fluxos e Pendências
 
-> **Status:** diagnóstico corrente após F7.3; não é certificação de release nem de produção.
+> **Status:** diagnóstico corrente do MVP operacional / RC `0.2.0rc1`; não é certificação de produção.
 
 ## 1. Método
 
@@ -45,7 +45,8 @@ Para artefatos com a policy F4.3, o prefixo real agora é
 solicitação após três decisões persistidas leva a `FAILED_RETRY_EXHAUSTED`. O grafo maior acima
 descreve a FSM legada, não o fluxo padrão atual da CLI nem efeitos garantidos. O lifecycle canônico
 percorre arestas compiladas, persiste bundle/eventos e retoma por identidade; com o
-registry padrão vazio, `harness run` falha fechado antes de modelo ou tool. `PromotionManager` suporta
+workflow `new-feature`, `harness run` seleciona a composição F7.C1; nos demais, o registry vazio
+falha fechado antes de modelo ou tool. `PromotionManager` suporta
 dry-run explícito sem atribuir ao resultado semântica de promoção. O `PythonAstIndexer` permanece
 separado do lifecycle, mas
 `harness index` agora resolve o commit Git real, lê seus blobs `.py`, produz símbolos AST e publica um
@@ -65,7 +66,7 @@ duplicata ou divergência de policy/input bloqueiam antes do primeiro nó.
 | `harness doctor` | Sim | Inspeciona sete componentes em seis estágios, compartilha resultado texto/JSON e retorna não zero quando unhealthy | F6.4 `PROMOTED`; read-only real |
 | `harness compile` | Sim | Compila pelo pipeline canônico e grava artefato validado | Implementado como contrato interno |
 | `harness index` | Sim | Faz rebuild AST dos blobs Python do SHA Git atual, publica e recarrega snapshot íntegro | Implementado; explícito, Python-only e ainda fora do lifecycle |
-| `harness run` | Sim | Cria bundle e falha fechado sem executor injetado | Experimental/fail-closed |
+| `harness run` | Sim | Para `new-feature`, compõe provider, tools e worktree; workflows não registrados falham antes do efeito | MVP público limitado / fail-closed |
 | `harness status` | Sim | Projeta estado tipado, tentativa, duração, blocker, próxima ação e budget | F6.5 `PROMOTED`; leitura local fail-closed |
 | `harness inspect` | Sim | Lê status, digests, journal e aprovação sem payload bruto | F6.5 `PROMOTED`; leitura local fail-closed |
 | `harness approve` | Sim | Persiste decisão ligada ao conteúdo da solicitação corrente | F5.6 `PROMOTED`; não fabrica candidate nem retoma sem backend |
@@ -78,11 +79,11 @@ duplicata ou divergência de policy/input bloqueiam antes do primeiro nó.
 
 | Prioridade | Risco | Causa atual | Fase responsável |
 |---|---|---|---|
-| P0 | Release declarada operacional sem wiring público | O E2E F7.1 monta as primitivas explicitamente, enquanto `harness run` usa registry vazio | F7.C1 antes de F7.5 |
-| P1 | Portabilidade incompleta | Package resources, metadata de release, paths por SO e wheel externa ainda precisam do gate F7.4 | F7.4 |
-| P1 | Primitivas não compostas | Lifecycle padrão não injeta provider, tools, worktree, gates, promotion, knowledge e evidence como uma fronteira única | F7.C1 |
+| Resolvido | Wiring público ausente | F7.C1 passou a compor o caminho `new-feature` e o comprovou pela wheel instalada | PR #92 + reconciliação #93 |
+| Resolvido | Portabilidade do artefato | F7.4 certificou package resources, paths por SO e wheel externa em Windows/Linux | PR #90 + reconciliação #91 |
+| P1 | Escopo de composição limitado | Somente `new-feature` compõe provider, tools, worktree, gates, promotion, knowledge e evidence | Limitação publicada da RC |
 | P1 | Âncora somente local | Journal/evidence possuem hash e digest, mas não uma âncora externa imutável | Limitação publicada; fora do MVP distribuído |
-| P2 | Gates pós-rollback ausentes | O revert é real e validado, mas a suíte não é reexecutada automaticamente depois dele | F7.C1 ou limitação explícita da RC |
+| P2 | Gates pós-rollback ausentes | O revert é real e validado, mas a suíte não é reexecutada automaticamente depois dele | Limitação publicada da RC |
 | P2 | Serviços live condicionais | Provider remoto e Serena MCP dependem de configuração, credenciais e disponibilidade externa | Doctor/configuração fail-closed; documentação de suporte F7.4 |
 
 ## 6. Gates para considerar o produto operacional
@@ -95,8 +96,8 @@ duplicata ou divergência de policy/input bloqueiam antes do primeiro nó.
 - gate obrigatório não executado bloqueia;
 - aprovação pausa e retoma após reinício;
 - promoção produz candidate SHA e promoted SHA reais;
-- rollback usa `git revert` e reexecuta gates;
-- E2E cobre sucesso, falha, retry, resume, promoção e rollback sem mocks;
+- rollback usa `git revert`; a ausência de gates pós-reversão é publicada e não recebe claim de sucesso integral;
+- E2E público cobre sucesso, falha, retry, resume, promoção e rollback sem adapter simulado em produção;
 - CI Windows/Linux e artefato de release validados.
 
 Os critérios completos estão no

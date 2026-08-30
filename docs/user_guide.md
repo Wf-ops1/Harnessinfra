@@ -1,10 +1,10 @@
-# Guia de Uso do Protótipo — AI Engineering Harness
+# Guia de Uso da Release Candidate — AI Engineering Harness
 
-> **Status: uso de desenvolvimento em ambiente descartável**
+> **Status: MVP operacional / release candidate `0.2.0rc1`**
 
-O pacote ainda não está publicado como ferramenta operacional nem é seguro para automatizar mudanças
-em um repositório valioso. Este guia descreve como inspecionar e testar o protótipo no clone do
-projeto.
+Esta versão é uma prerelease distribuída pelo GitHub, sem publicação no PyPI ou garantia de
+compatibilidade estável. Avalie-a primeiro em repositório descartável e leia
+[KNOWN_LIMITATIONS.md](../KNOWN_LIMITATIONS.md) antes de conceder provider, tools ou promoção.
 
 ## Preparar o ambiente
 
@@ -34,7 +34,7 @@ uv run python -m build
 | `harness doctor [--json] [--workflow <nome>]` | Inspeciona sete componentes em seis estágios reais sem produzir efeitos | F6.4 `PROMOTED`: texto/JSON compartilham resultado tipado; unhealthy retorna não zero; provider/MCP live dependem da configuração externa |
 | `harness compile <yaml>` | Compila pelo `GraphCompiler` canônico do pacote | Implementado como contrato interno; estabilidade/migração externa ainda não fechadas |
 | `harness index` | Usa `PythonAstIndexer` para reconstruir módulos, classes, funções/métodos e imports dos blobs `.py` do commit Git atual e publica `.harness/state/structural-index/snapshots/<sha>.json` | Implementado para Python por full rebuild; working tree/untracked não entram, erro Git/encoding/sintaxe falha sem snapshot parcial |
-| `harness run <workflow> [--profile <nome>] [--config-json <objeto>]` | Compila/carrega artefato, resolve a configuração tipada e inicia o lifecycle canônico | Fail-closed: configuração inválida não cria execução; o wiring padrão possui registry de executores vazio e não executa modelos/tools automaticamente |
+| `harness run <workflow> [--profile <nome>] [--config-json <objeto>]` | Compila/carrega artefato, resolve a configuração tipada e inicia o lifecycle canônico | `new-feature` usa a composição pública F7.C1; workflows sem composição registrada mantêm registry vazio e falham antes de efeitos |
 | `harness list` | Lista o catálogo canônico ordenado por execution ID | Falha fechado se qualquer record gerenciado estiver corrompido; não cria execução nem resultado parcial |
 | `harness status <id> [--json]` | Projeta estado, node, tentativa, duração persistida, blocker, próxima ação e budget | Texto e JSON usam a mesma view tipada/versionada; não expõem paths, configuração ou payload bruto |
 | `harness inspect <id>` | Exibe o status completo, digests e resumo do journal sem payloads/secrets | Implementado como inspeção local; não usa contador paralelo de apresentação |
@@ -97,8 +97,8 @@ digest de limites, fencing, ordem ou payload divergente falham fechado. Excesso 
 `FAILED_BUDGET_EXCEEDED`; retomar esse estado não chama provider, tool, nó ou fallback. Os guards
 específicos de repair/verificação F4.8 continuam existindo, e o limite mais restritivo prevalece.
 
-Essa capacidade está `PROMOTED`. Ela não adiciona a composição automática de providers, tools ou
-worktree ao CLI; essa fronteira foi explicitada como F7.C1 antes da release candidate.
+Essa capacidade está `PROMOTED`. A F7.C1 a integrou à composição pública `new-feature`; limites e
+preços continuam ligados ao bundle, e workflows adicionais não recebem essa composição por herança.
 
 ## Envelope e gate de contexto F4.3
 
@@ -149,8 +149,8 @@ configuração real, resolve toda a suíte em `argv` e falha `ERROR_PREREQUISITE
 subprocesso se configuração ou ferramenta faltar. A F4.7 persiste os resultados commit-bound e guarda
 `COMPLETED`. A F4.8 promovida transforma somente essa reprovação canônica em contexto para
 o `on_failure` compilado, executa os gates afetados e depois a suíte integral, com limites duráveis de
-nó, execução, tokens, custo e tempo. Isso ainda não torna o protótipo autônomo: o registry padrão de
-executores continua vazio e worktree/provider são injetados.
+nó, execução, tokens, custo e tempo. Para `new-feature`, a F7.C1 compõe registry, worktree e provider
+configurado; nos demais workflows o registry permanece vazio e fail-closed.
 
 ## Autorização de tools F5.2
 
@@ -234,8 +234,8 @@ solicitação e nova decisão sobre o conteúdo corrente.
 ## Cancelamento, cleanup e rollback F5.7
 
 > **Estado corrente:** a F5.7 R3 está `PROMOTED`. A recertificação comprovou Git transitivo bloqueado,
-> aprovação de hook ligada, erro CLI não zero em bloqueio e reap fail-closed. O uso continua restrito
-> a repositórios descartáveis enquanto a composição padrão F7.C1 não existir.
+> aprovação de hook ligada, erro CLI não zero em bloqueio e reap fail-closed. A F7.C1 compõe esses
+> contratos para `new-feature`; a RC continua indicada primeiro para repositórios descartáveis.
 
 O cancelamento usa arquivos de controle duráveis por execução. `cancellation-policy.json` registra a
 decisão antes de `cancellation-request.json` e antes do sinal. Isso permite interromper uma tool mesmo
@@ -258,9 +258,9 @@ se o resultado for ambíguo. Hook de produto é injetável/allowlisted e continu
 destrutivo exige request/decisão durável ligada à execução, hook, promotion SHA e tentativa de
 rollback. Estado bloqueado retorna erro CLI sem símbolo de sucesso.
 
-Essas APIs foram promovidas e não tornam, isoladamente, o protótipo seguro para um repositório
-valioso: a composição automática de provider/tools/worktree e os gates pós-reversão permanecem
-pendentes.
+Essas APIs foram promovidas e a F7.C1 compõe provider/tools/worktree para `new-feature`. Isso não
+torna a RC segura para qualquer repositório: os gates pós-reversão permanecem ausentes e serviços
+live dependem de configuração, credenciais e disponibilidade externas.
 
 ## Matriz de recovery F6.6
 
@@ -329,7 +329,7 @@ retenção é explícita por `cleanup_retained_snapshots()` e remove somente sna
 ## Teste controlado de `init`
 
 Crie um repositório descartável e execute o binário instalado pelo ambiente do clone. Confirme os
-arquivos gerados antes de removê-los. Não aponte o protótipo para um checkout com trabalho não
+arquivos gerados antes de removê-los. Não aponte a RC para um checkout com trabalho não
 commitado.
 
 ## Empacotamento e portabilidade F7.4
@@ -344,7 +344,7 @@ worktrees em Windows, macOS e Linux. Windows/Linux são certificados pela CI; ma
 documentado sem job de certificação. A [política de suporte](../SUPPORT.md), o
 [changelog](../CHANGELOG.md) e a [licença Apache-2.0](../LICENSE) também integram a distribuição.
 
-## Prova vertical controlada F7.1
+## Prova vertical F7.1 e composição pública F7.C1
 
 A F7.1, promovida e terminalmente reconciliada, comprovou que as primitivas existentes podem formar um ciclo completo em um
 repositório Git Python externo e descartável. O teste constrói e instala a wheel fora do checkout,
@@ -353,19 +353,17 @@ fixture e atravessa tool loop, edição confinada no worktree, pausa/aprovação
 candidate commit, aprovação ligada ao conteúdo, `git cherry-pick`, evidence, audit e rollback por
 `git revert`.
 
-Essa é uma prova de integração do produto, não uma receita de operação em repositório valioso. A CLI
-padrão ainda não seleciona nem injeta automaticamente provider, tools e backend, e o rollback
-corrente não reexecuta os gates depois da reversão. Até a composição operacional ser concluída,
-continue usando somente repositórios descartáveis.
+Essa foi a prova de integração anterior. A F7.C1 eliminou a injeção de lifecycle da fixture no
+caminho `new-feature`: o E2E instala a wheel e invoca CLI/factory públicas contra provider HTTP de
+produção com transporte controlado. O fluxo cria worktree, executa tools e gates, produz candidate,
+exige decisão ligada, promove, sincroniza knowledge, verifica evidence/audit e executa rollback.
+Serviço live e credenciais continuam externos; rollback não reexecuta gates pós-reversão.
 
 ## O que ainda não está disponível
 
-- instalação pública estável por `pipx`, `uv tool` ou extensão de IDE;
-- seleção/injeção automática de provider e tools pelo lifecycle padrão;
+- release estável ou publicação no PyPI; a RC é distribuída como artefato de GitHub Release;
+- composição pública de workflows além de `new-feature` e extensão de IDE;
 - Serena live plug-and-play e Codebase-Memory semântica real;
-- ligação automática entre worktree Git, guard e registry operacional;
-- promoção por candidate commit e cherry-pick acionada automaticamente pela CLI padrão;
-- execução E2E com provider/backend live selecionados pelo produto, sem injeção de teste;
 - reexecução dos gates após rollback e recovery abrangente para efeitos ambíguos;
 - doctor live plug-and-play para providers e MCP sem configuração externa.
 

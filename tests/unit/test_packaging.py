@@ -66,6 +66,7 @@ def test_init_reads_traversable_resources_and_preserves_user_content(
 def test_release_metadata_and_documents_are_consistent() -> None:
     project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]
 
+    assert project["version"] == "0.2.0rc1"
     assert project["license"] == "Apache-2.0"
     assert project["license-files"] == ["LICENSE"]
     assert all(not classifier.startswith("License ::") for classifier in project["classifiers"])
@@ -74,6 +75,7 @@ def test_release_metadata_and_documents_are_consistent() -> None:
     assert "Apache License" in (ROOT / "LICENSE").read_text(encoding="utf-8")
     assert (ROOT / "CHANGELOG.md").is_file()
     assert (ROOT / "SUPPORT.md").is_file()
+    assert (ROOT / "KNOWN_LIMITATIONS.md").is_file()
     assert (ROOT / "docs" / "portability.md").is_file()
 
 
