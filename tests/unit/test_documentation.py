@@ -317,21 +317,21 @@ def test_public_state_docs_distinguish_real_primitives_from_missing_composition(
     assert "31868906875" in panel
     assert "7d6a0e179f30008a7a67275da94878a179f0aba9" in panel
     assert "31887143905" in panel
-    assert "| **Gate** | `REPAIR_ACTIVE / PROMOTION_BLOCKED` |" in panel
+    assert "| **Gate** | `ADMIN_PR_OPEN / CHECKS_PENDING` |" in panel
     assert "Apache-2.0" in panel
     assert "docs/tasks/completed/F7.4.md" in panel
-    assert "docs/tasks/active/F7.C1.md" in panel
+    assert "docs/tasks/completed/F7.C1.md" in panel
     assert all(
         evidence in panel
-        for evidence in ("42b6f8f", "33291856113", "a62c164", "33292240896", "PR #91", "0ea7f801", "33293579533")
+        for evidence in ("PR #92", "bb4dc8c", "33325055342", "26c36ff", "33325679613", "PR #93", "33326696156")
     )
     assert all(
         evidence in task_index
-        for evidence in ("completed/F7.4.md", "42b6f8f", "33291856113", "a62c164", "33292240896", "PR #91", "0ea7f801", "33293579533")
+        for evidence in ("completed/F7.C1.md", "bb4dc8c", "33325055342", "26c36ff", "33325679613", "PR #93", "33326696156")
     )
     assert all(
         evidence in readme
-        for evidence in ("PR #90", "42b6f8f", "33291856113", "a62c164", "33292240896", "PR #91", "0ea7f801", "33293579533")
+        for evidence in ("PR #92", "bb4dc8c", "33325055342", "26c36ff", "33325679613")
     )
     assert "32085923509" in panel
     assert "docs/tasks/completed/F7.3.md" in panel
