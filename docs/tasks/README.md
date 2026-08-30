@@ -20,10 +20,11 @@ em [`TASK.md`](../../TASK.md); requisitos normativos permanecem no
 
 ## Tarefa ativa
 
-Nenhuma tarefa ativa. A [F7.C1 — composição operacional do caminho público](completed/F7.C1.md)
-está `PROMOTED`: PR #92/head `bb4dc8c`/CI `33325055342`, merge `26c36ff` e CI pós-merge
-`33325679613`, todos verdes. A reconciliação está `ADMIN_PR_OPEN / CHECKS_PENDING` no PR #93,
-head inicial `b6d9e05`/run `33326696156`; a F7.5 aguarda esse fechamento terminal pela DEC-014.
+A [F7.5 — release candidate do MVP operacional](active/F7.5.md) está em gate `READY`, na branch
+`task/f7.5-release-candidate`, para package `0.2.0rc1` e tag futura `v0.2.0-rc.1`.
+A [F7.C1 — composição operacional do caminho público](completed/F7.C1.md) encerrou produto no
+PR #92/merge `26c36ff`/pós-merge `33325679613` e reconciliação no PR #93/head `c99f02e`/CI
+`33326822791`/merge `3415c385`/pós-merge `33327198301`, todos verdes.
 
 A [F7.4 — empacotamento e portabilidade](completed/F7.4.md) está terminalmente `PROMOTED`: produto
 PR #90/head `42b6f8f`/CI `33291856113`/merge `a62c164`/pós-merge `33292240896`; reconciliação
