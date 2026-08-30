@@ -317,7 +317,7 @@ def test_public_state_docs_distinguish_real_primitives_from_missing_composition(
     assert "31868906875" in panel
     assert "7d6a0e179f30008a7a67275da94878a179f0aba9" in panel
     assert "31887143905" in panel
-    assert "| **Gate** | `READY` — checkpoint `ec2296d68669e5b155dc2ba3f037a5197b5e55b3`" in panel
+    assert "| **Gate** | `COMPLETED_LOCAL` — produto `9f7886a`" in panel
     assert "Apache-2.0" in panel
     assert "checkpoint/f7.4-complete" in panel
     assert "docs/tasks/completed/F7.C1.md" in panel
@@ -595,7 +595,7 @@ def test_release_order_requires_current_docs_and_public_runtime_composition() ->
     assert "> **Estado:** aceita" in decision
     assert "não autoriza iniciar F7.4" in decision
     assert "F7.C1" in readme and "DEC-016" in readme
-    assert "DEC-016" in panel and "F7.C1 terminal; F7.5" in panel
+    assert "DEC-016" in panel and "F7.5 localmente certificada" in panel
     assert "https://github.com/Wf-ops1/Hartrol/pull/88" in panel
 
 
