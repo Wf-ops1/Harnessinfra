@@ -21,10 +21,10 @@ em [`TASK.md`](../../TASK.md); requisitos normativos permanecem no
 ## Tarefa ativa
 
 A [F7.4 — empacotamento e portabilidade](active/F7.4.md) está
-`PR_OPEN / CHECKS_PENDING` no [PR #90](https://github.com/Wf-ops1/Hartrol/pull/90). Apache-2.0,
+`READY_FOR_MERGE / MERGE_AUTHORIZATION_REQUIRED` no [PR #90](https://github.com/Wf-ops1/Hartrol/pull/90). Apache-2.0,
 recursos instalados, documentos de release, wheel e smoke externo foram certificados no checkpoint
-local `checkpoint/f7.4-complete`; a CI inicial `33291322213` está em andamento e merge, tag remota e
-F7.C1 permanecem fora do gate atual.
+local `checkpoint/f7.4-complete`; o head `c4b946a` passou 11/11 jobs obrigatórios mais `CI required`
+na CI `33291468406`. Merge, tag remota, exclusão da branch e F7.C1 permanecem fora do gate atual.
 
 A [F7.3 — quality gates do próprio projeto](completed/F7.3.md)
 está `PROMOTED`: a PR [#87](https://github.com/Wf-ops1/Hartrol/pull/87) encerrou no head
